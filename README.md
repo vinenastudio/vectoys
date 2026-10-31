@@ -31,7 +31,7 @@ Items to copy into a project, each described by its `item.json`. Every item is M
 Devices:
 
 - `registry/laptop`: a 14 inch laptop with a lid that opens and closes and live HTML on its display.
-  `<Laptop eye={FRONT}>` shows it straight on, as a product shot: the lid upright with its glass a plain rectangle and the base only a thin lip under it. Laptop takes no style or className, so to let a frame cut its sides and bottom, put it in a div with `width: 108%; margin-inline: -4%; margin-bottom: -3%` inside a wrapper with `overflow: hidden`. It cuts through the black bezel at the sides, short of the glass, and through the lip under the thumb slot.
+  `<Laptop eye={FRONT}>` shows it straight on, as a product shot drawn flat to sizes measured on product renders: the open lid with its notch, over the base's front face with the thumb's scoop and two feet. The lid is always open there, and its aluminum takes `--vectoys-finish`, silver by default (`#3d3b3e` reads as space black). The scene is the laptop's own bounds. Laptop takes no style or className, so to let a frame cut it, put it in a div with `width: 121.4%; margin-inline: -10.7%; margin-bottom: -3%` inside a wrapper with `overflow: hidden`. The lid then fills the wrapper's width, the base's ends are cut flush with the lid's sides, and the base's face just under the thumb's scoop.
 - `registry/phone`: a modern flagship phone that turns any way, with side buttons, a camera bump and live HTML on its display.
 - `registry/tablet`: an 11 inch tablet that turns any way, upright or on its side, with live HTML on its display.
 - `registry/monitor`: a 27 inch monitor on a stand that turns any way, its panel tilting on the stand, with live HTML on its display.

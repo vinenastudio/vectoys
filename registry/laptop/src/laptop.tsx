@@ -1,7 +1,7 @@
 import { fixed } from "@vinena/vectoys";
 import { Screen, Stage } from "@vinena/vectoys-react";
 import { memo, useId, useMemo, type CSSProperties, type ReactNode } from "react";
-import { BEZEL, DESK, GLASS, HOLE, ROUND, type View } from "./geometry";
+import { BEZEL, DESK, GLASS, HOLE, ROUND, type Perspective, type Straight, type View } from "./geometry";
 
 // The page's colors, as CSS variables, each with the light tone of the site
 // this laptop was first drawn for, so it shows as meant before they are set.
@@ -11,11 +11,11 @@ const BORDER = "var(--vectoys-border, #d4d4d4)";
 const SURFACE_TONE = "var(--vectoys-surface, #f5f5f5)";
 const SHADOW = "var(--vectoys-shadow, rgba(0, 0, 0, 0.08))";
 
-// Anodised aluminium in close tones, lit from above: the tops are the page's
+// Anodized aluminum in close tones, lit from above: the tops are the page's
 // surface, the sides a step darker under the page's shadow, the rim round the
 // glass a step toward the border, and the shut lid an even tone. The glass,
 // the hinge cover and the keyboard are near black, as on the machine, and the
-// hinge's barrels a darker aluminium in the shade of the lid.
+// hinge's barrels a darker aluminum in the shade of the lid.
 const SURFACE: CSSProperties = { fill: SURFACE_TONE };
 const shade = (share: number): CSSProperties => ({ fill: SHADOW, fillOpacity: share });
 const SIDE = 0.45;
@@ -47,7 +47,7 @@ const HOLES_SHOWN = `
 `;
 
 /** The base, which never changes as the lid moves. */
-const Base = memo(function Base({ id, view: { DECK } }: { id: string; view: View }) {
+const Base = memo(function Base({ id, view: { DECK } }: { id: string; view: Perspective }) {
   return (
     <>
       <path d={DECK.ground} filter={`url(#${id}-far)`} style={shade(1)} />
@@ -82,7 +82,7 @@ const Base = memo(function Base({ id, view: { DECK } }: { id: string; view: View
 });
 
 /** What the drawing refers to, under names of its own so any number of laptops share a page. */
-const defs = (id: string, { width, height }: View["camera"]) => (
+const defs = (id: string, { width, height }: Perspective["camera"]) => (
   <>
     <style>{HOLES_SHOWN}</style>
     <filter id={`${id}-near`} filterUnits="userSpaceOnUse" x="0" y="0" width={width} height={height}>
@@ -113,7 +113,7 @@ const GLASS_STYLE: CSSProperties = {
 const FILL: CSSProperties = { position: "absolute", inset: 0 };
 
 type LaptopProps = {
-  /** How far the lid has closed, from 0 (open) to 1 (shut on the base); open by default. */
+  /** How far the lid has closed, from 0 (open) to 1 (shut on the base); open by default. `FRONT` is always open. */
   closed?: number;
   /** The eye that sees it: `DESK`, `PHONE` or `FRONT`; `DESK` by default. */
   eye?: View;
@@ -129,6 +129,19 @@ type LaptopProps = {
  * live content on it, hidden while the lid faces away.
  */
 export const Laptop = memo(function Laptop({ closed = 0, eye = DESK, children, label = "Laptop" }: LaptopProps) {
+  return "art" in eye ? (
+    <Front eye={eye} label={label}>
+      {children}
+    </Front>
+  ) : (
+    <Angled closed={closed} eye={eye} label={label}>
+      {children}
+    </Angled>
+  );
+});
+
+/** The laptop in perspective, its lid swung to `closed`. */
+function Angled({ closed, eye, children, label }: { closed: number; eye: Perspective; label: string; children?: ReactNode }) {
   const id = `laptop-${eye.id}-${useId().replace(/[^\w-]/g, "")}`;
   const { DECK, camera } = eye;
   const lid = useMemo(() => eye.lidArt(closed), [eye, closed]);
@@ -202,4 +215,214 @@ export const Laptop = memo(function Laptop({ closed = 0, eye = DESK, children, l
       </g>
     </Stage>
   );
-});
+}
+
+// Straight on, the aluminum is the page's finish, silver by default. Every
+// tone is a share of it toward black, as measured on a silver machine's
+// renders, so a dark finish such as #3d3b3e reads as a space black one. The
+// gasket, the glass and the hinge's band, #0c0c0c on average, darker toward
+// the base, are the machine's own near blacks.
+const FINISH = "var(--vectoys-finish, #f0f1f3)";
+const tone = (share: number) => (share >= 100 ? FINISH : `color-mix(in srgb, ${FINISH} ${share}%, black)`);
+const GASKET = "#232323";
+const GASKET_LINE = "#2c2c2c";
+const HINGE_LINE = "#1a1a1a";
+// The base's face from its top down, in its middle: a bright top edge, light
+// over its upper half, darkest where its rounded underside turns away, then a
+// bright lip and a dark bottom edge.
+const FACE: readonly (readonly [number, number])[] = [
+  [0, 99],
+  [0.012, 99],
+  [0.03, 92],
+  [0.29, 90],
+  [0.37, 88],
+  [0.42, 87],
+  [0.48, 83],
+  [0.5, 80],
+  [0.53, 74],
+  [0.56, 67],
+  [0.61, 60],
+  [0.66, 54],
+  [0.72, 54],
+  [0.77, 56],
+  [0.82, 64],
+  [0.88, 77],
+  [0.92, 89],
+  [0.935, 83],
+  [0.95, 89],
+  [0.96, 82],
+  [0.975, 70],
+  [1, 57],
+];
+// Toward its ends the face takes one even tone, as the light falls off, with
+// a bright streak where the end turns away; as shares of the base's width.
+const ENDS: readonly (readonly [number, number])[] = [
+  [0, 1],
+  [0.04, 1],
+  [0.07, 0.75],
+  [0.11, 0.5],
+  [0.17, 0.3],
+  [0.25, 0.15],
+  [0.32, 0.05],
+  [0.38, 0],
+];
+const STREAK: readonly (readonly [number, number])[] = [
+  [0, 0.2],
+  [0.0045, 0.2],
+  [0.008, 0.55],
+  [0.0105, 0.85],
+  [0.0135, 0.7],
+  [0.0195, 0.1],
+  [0.025, 0],
+];
+// The feet: an aluminum ring under the face, a dark line, then the dark pad,
+// round so each is lighter in its middle and at its very sides.
+const FOOT: readonly (readonly [number, number])[] = [
+  [0, 87],
+  [0.45, 87],
+  [0.5, 13],
+  [0.56, 29],
+  [0.92, 29],
+  [1, 22],
+];
+const FOOT_ROUND: readonly (readonly [number, number])[] = [
+  [0, 0.08],
+  [0.05, 0.08],
+  [0.14, 0.3],
+  [0.3, 0.12],
+  [0.5, 0],
+];
+
+/** Stops from both ends of a gradient toward its middle, mirrored. */
+const mirrored = (half: readonly (readonly [number, number])[]) => [
+  ...half,
+  ...[...half]
+    .filter(([offset]) => offset < 0.5)
+    .reverse()
+    .map(([offset, value]): readonly [number, number] => [fixed(1 - offset), value]),
+];
+
+const stops = (tones: readonly (readonly [number, number])[]) =>
+  tones.map(([offset, share]) => <stop key={offset} offset={offset} style={{ stopColor: tone(share) }} />);
+
+const across = (share: number) => `${fixed(share * 100)}%`;
+const frontGlass = ({ glass, round }: Straight): CSSProperties => {
+  const [x, y] = [across(round / glass.width), across(round / glass.height)];
+  return { ...GLASS_STYLE, borderRadius: `${x} ${x} 0 0 / ${y} ${y} 0 0`, clipPath: `inset(0 round ${x} ${x} 0 0 / ${y} ${y} 0 0)` };
+};
+
+/** The laptop straight on, drawn flat, with live content on its display under the notch. */
+function Front({ eye, children, label }: { eye: Straight; label: string; children?: ReactNode }) {
+  const id = `laptop-${eye.id}-${useId().replace(/[^\w-]/g, "")}`;
+  const { art, notch, camera } = eye;
+  const url = (name: string) => `url(#${id}-${name})`;
+
+  const glass = (
+    <Screen camera={camera} pose={eye.pose} rect={eye.glass} style={frontGlass(eye)}>
+      <div style={FILL}>{children}</div>
+      <svg
+        viewBox={`0 0 ${fixed(notch.width)} ${notch.height}`}
+        preserveAspectRatio="none"
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          left: across(notch.left),
+          top: 0,
+          width: across(notch.across),
+          height: across(notch.down),
+          overflow: "visible",
+          pointerEvents: "none",
+        }}
+      >
+        <path d={notch.path} fill="black" />
+        <circle cx={notch.lens.x} cy={notch.lens.y} r={0.35} fill="#111112" />
+        <circle cx={notch.lens.x} cy={notch.lens.y} r={0.11} fill="#1b3048" />
+        <circle cx={notch.lens.x} cy={fixed(notch.lens.y - 0.04)} r={0.04} fill="#2d5c86" />
+      </svg>
+    </Screen>
+  );
+
+  return (
+    <Stage role={children == null ? "img" : "group"} label={label} camera={camera} overlay={glass}>
+      <defs>
+        <linearGradient id={`${id}-face`} x1="0" y1="0" x2="0" y2="1">
+          {stops(FACE)}
+        </linearGradient>
+        <linearGradient id={`${id}-ends`} x1="0" y1="0" x2="1" y2="0">
+          {mirrored(ENDS).map(([offset, opacity]) => (
+            <stop key={offset} offset={offset} style={{ stopColor: tone(62), stopOpacity: opacity }} />
+          ))}
+        </linearGradient>
+        <linearGradient id={`${id}-streak`} x1="0" y1="0" x2="1" y2="0">
+          {mirrored(STREAK).map(([offset, opacity]) => (
+            <stop key={offset} offset={offset} style={{ stopColor: FINISH, stopOpacity: opacity }} />
+          ))}
+        </linearGradient>
+        <linearGradient id={`${id}-hinge`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#161616" />
+          <stop offset="1" stopColor="#030303" />
+        </linearGradient>
+        <linearGradient id={`${id}-edge`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={art.rimFade}>
+          {stops([
+            [0, 66],
+            [1, 73],
+          ])}
+        </linearGradient>
+        <linearGradient id={`${id}-rim`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={art.rimFade}>
+          {stops([
+            [0, 60],
+            [1, 67],
+          ])}
+        </linearGradient>
+        <linearGradient id={`${id}-wall`} x1="0" y1="0" x2="0" y2="1">
+          {stops([
+            [0, 15],
+            [0.5, 30],
+            [0.85, 75],
+            [1, 90],
+          ])}
+        </linearGradient>
+        <linearGradient id={`${id}-floor`} x1="0" y1="0" x2="0" y2="1">
+          {stops([
+            [0, 96],
+            [0.9, 100],
+          ])}
+        </linearGradient>
+        <linearGradient id={`${id}-feet`} gradientUnits="userSpaceOnUse" x1="0" y1={art.feetTop} x2="0" y2={art.feetBottom}>
+          {stops(FOOT)}
+        </linearGradient>
+        <linearGradient id={`${id}-foot`} x1="0" y1="0" x2="1" y2="0">
+          {mirrored(FOOT_ROUND).map(([offset, opacity]) => (
+            <stop key={offset} offset={offset} style={{ stopColor: "black", stopOpacity: opacity }} />
+          ))}
+        </linearGradient>
+        <filter id={`${id}-soft`}>
+          <feGaussianBlur stdDeviation="0.12" />
+        </filter>
+        <clipPath id={`${id}-scoop`}>
+          <path d={art.scoop} />
+        </clipPath>
+      </defs>
+      {art.feet.map((foot) => (
+        <g key={foot}>
+          <path d={foot} fill={url("feet")} />
+          <path d={foot} fill={url("foot")} />
+        </g>
+      ))}
+      <path d={art.edge} fill={url("edge")} />
+      <path d={art.rim} fill={url("rim")} />
+      <path d={art.gasket} fill={GASKET} />
+      <path d={art.gasketLine} fill={GASKET_LINE} />
+      <path d={art.glass} fill="black" />
+      <path d={art.hingeLine} fill={HINGE_LINE} />
+      <path d={art.hinge} fill={url("hinge")} />
+      <path d={art.base} fill={url("face")} />
+      <path d={art.base} fill={url("ends")} />
+      <path d={art.base} fill={url("streak")} />
+      <path d={art.scoop} fill={url("floor")} />
+      <g clipPath={url("scoop")}>
+        <path d={art.walls} fillRule="evenodd" fill={url("wall")} filter={url("soft")} />
+      </g>
+    </Stage>
+  );
+}
