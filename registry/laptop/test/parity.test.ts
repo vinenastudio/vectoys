@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { DESK, PHONE, type View } from "../src/geometry";
+import { DESK, PHONE, type Perspective } from "../src/geometry";
 
-type Original = { DESK: Pick<View, "DECK" | "lidArt">; PHONE: Pick<View, "DECK" | "lidArt"> };
+type Original = { DESK: Pick<Perspective, "DECK" | "lidArt">; PHONE: Pick<Perspective, "DECK" | "lidArt"> };
 
 // The Agent Caffeine laptop this item was ported from, copied unchanged. It is
 // imported by a computed name so the type checker, under this repo's stricter
@@ -18,7 +18,7 @@ describe.each([
   test("draws every deck path as the original did", () => {
     expect(Object.keys(after.DECK)).toEqual(Object.keys(before.DECK));
     for (const [name, paths] of Object.entries(after.DECK)) {
-      expect([name, paths]).toEqual([name, before.DECK[name as keyof View["DECK"]]]);
+      expect([name, paths]).toEqual([name, before.DECK[name as keyof Perspective["DECK"]]]);
     }
   });
 
