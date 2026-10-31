@@ -116,7 +116,7 @@ Every item reads its colors from CSS variables, so a page themes them all at onc
 - `--vectoys-surface`: the main surface of a body or a part, `#f5f5f5`.
 - `--vectoys-hairline`: the outlines and the darker edges, `#8a8a8a`.
 - `--vectoys-shadow`: the shadow on the ground, `rgba(0, 0, 0, 0.08)`.
-- `--vectoys-finish`: the color of a body: the back and stand of a device, a keycap, a keyboard's keys, a die, the card's back. By default the surface; the envelope's lining a shade under it, the floppy disk `#2c2c2e`, the gift box `#e5484d`.
+- `--vectoys-finish`: the color of a body: the back and stand of a device, a keycap, a keyboard's keys, a die, the card's back. By default the surface; the envelope's lining a shade under it, the floppy disk `#2c2c2e`, the gift box `#e5484d`, and the laptop seen from the front a silver `#f0f1f3` (`#3d3b3e` gives space black).
 - `--vectoys-accent`: the gift box's ribbon and bow, `#f5c84c`.
 - `--vectoys-band`: the watch's band, a shade under the surface.
 - `--vectoys-ink`: a keycap's label, a keyboard's legends, the die's pips and the browser's address, `#1d1d1c`.
