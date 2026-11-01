@@ -145,7 +145,7 @@ pre {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 4rem;
+  min-height: 4rem;
 }
 
 .wordmark {
@@ -160,7 +160,8 @@ pre {
   At large text sizes the nav's links wrap onto a second row inside the
   header instead of running past the page's edge. The header's height is in
   rem so it grows with the text, and the hero below starts under it by the
-  same amount.
+  same amount. Its height is a minimum, so rows past what 4rem holds grow
+  the header and push the hero down rather than run over it or off the top.
 */
 .site-nav {
   display: flex;

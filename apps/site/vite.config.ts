@@ -17,7 +17,12 @@ const refs = (): Plugin => ({
     const folder = process.env.VECTOYS_REFS;
     if (!folder) return;
     server.middlewares.use("/refs/", (request, response, next) => {
-      const file = normalize(decodeURIComponent((request.url ?? "").split("?")[0] ?? "")).replace(/^\/+/, "");
+      let file: string;
+      try {
+        file = normalize(decodeURIComponent((request.url ?? "").split("?")[0] ?? "")).replace(/^\/+/, "");
+      } catch {
+        return next();
+      }
       const type = TYPES[extname(file)];
       if (!type || file.startsWith("..")) return next();
       readFile(join(folder, file)).then(
