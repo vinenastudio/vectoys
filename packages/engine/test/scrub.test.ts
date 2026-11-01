@@ -120,3 +120,12 @@ test("a keyframe's ease shapes the segment that ends at it, by name, function or
   expect(Object.keys(scrub(0.5, keys))).toEqual(["y"]);
   expect(easing("settle")).toBe(settle);
 });
+
+test("scrub types every field of its keys, so a misspelt ease does not compile", () => {
+  const keys = [{ at: 0, y: 0 }, { at: 1, y: 1, ease: "settle" }] as const;
+  expect(scrub(1, keys).y).toBe(1);
+  // @ts-expect-error `eas` is not `ease`, and a field that is not a number is not a field.
+  expect(scrub(0.5, [{ at: 0, y: 0 }, { at: 1, y: 1, eas: "settle" }]).y).toBeCloseTo(0.5, 10);
+  // @ts-expect-error A field's value is a number.
+  scrub(0.5, [{ at: 0, y: "high" }]);
+});

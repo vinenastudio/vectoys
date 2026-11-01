@@ -233,3 +233,21 @@ test("a free laptop's parts reorder in the page as the eye goes round them, and 
   await moved.rerender(page(10));
   expect(order()).toEqual(first);
 });
+
+test.each([true, false])("with free turned %p while the handle holds a pose, the props' pose is drawn whole", async (from) => {
+  const handle = createRef<LaptopHandle>();
+  const page = (free: boolean) => (
+    <Laptop eye={DESK} flat={0} free={free} ref={handle}>
+      <Live />
+    </Laptop>
+  );
+  const moved = await mount(page(from));
+  await act(async () => handle.current?.set({ yaw: 120, roll: 200, lid: 0.4 }));
+  await moved.rerender(page(!from));
+  const drawn = await mount(
+    <Laptop eye={DESK} flat={0} free={!from} ref={createRef<LaptopHandle>()}>
+      <Live />
+    </Laptop>,
+  );
+  expect(freeMarkup(moved.host)).toBe(freeMarkup(drawn.host));
+});

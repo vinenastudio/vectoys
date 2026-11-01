@@ -35,6 +35,7 @@ export {
   scrub,
   segment,
   settle,
+  type Checked,
   type Easing,
   type Keyframe,
   type ScrubOptions,

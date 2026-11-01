@@ -206,10 +206,11 @@ type LaptopProps = {
    * A handle whose `set({ lid, yaw, pitch })` redraws the laptop in a new
    * pose without a render, for a pose that moves every frame, as a scroll
    * does. The handle owns the pose from its first `set` until a pose prop
-   * changes; then the props' pose is drawn. Renders for anything else, such
-   * as new content on the display, keep the handle's pose. `flat`, `x`,
-   * `y`, `scale` and `roll` move a laptop given `free` or any of them as a
-   * prop, and no other. `FRONT` does not move, so there it does nothing.
+   * or `free` changes; then the props' pose is drawn. Renders for anything
+   * else, such as new content on the display, keep the handle's pose.
+   * `flat`, `x`, `y`, `scale` and `roll` move a laptop given `free` or any
+   * of them as a prop, and no other. `FRONT` does not move, so there it
+   * does nothing.
    */
   ref?: Ref<LaptopHandle>;
 };
@@ -792,15 +793,16 @@ function Free({
   const values = looks(frame, pose);
   const nodes = useNodes();
   const paint = useMemo(() => trickPainter(eye, turning, nodes, id), [eye, turning, nodes, id]);
-  const set = useRef<{ pose: TrickPose; over: TrickPose; paint: typeof paint } | null>(null);
+  const set = useRef<{ pose: TrickPose; over: TrickPose; paint: typeof paint; free: boolean } | null>(null);
   const given = useRef(pose);
 
   // After every render the frame is drawn whole, the handle's if it still
-  // holds, so nothing a render wrote over is left behind.
+  // holds, so nothing a render wrote over is left behind. Turning `free` on
+  // or off lets go of the handle's pose, which was held to the other ranges.
   useLayoutEffect(() => {
     given.current = pose;
     const hold = set.current;
-    if (hold && (hold.paint !== paint || FIELDS.some((field) => hold.over[field] !== pose[field]))) set.current = null;
+    if (hold && (hold.paint !== paint || hold.free !== free || FIELDS.some((field) => hold.over[field] !== pose[field]))) set.current = null;
     paint.reset();
     paint.draw(set.current?.pose ?? pose);
   });
@@ -810,7 +812,7 @@ function Free({
     () => ({
       set(next) {
         const pose = loose({ ...(set.current?.pose ?? given.current), ...next }, free);
-        set.current = { pose, over: given.current, paint };
+        set.current = { pose, over: given.current, paint, free };
         paint.draw(pose);
       },
     }),

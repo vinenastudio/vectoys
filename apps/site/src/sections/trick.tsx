@@ -15,13 +15,13 @@ const STILLS = [
   [1, "On the desk"],
 ] as const;
 
-/** What the display shows: how far the trick has gone, which the scroll fills in through the ref. */
-function Display({ percent }: { percent?: RefObject<HTMLSpanElement | null> }) {
+/** What the display shows: how far the trick has gone, which the scroll fills in through the ref, or `value` as a still frame. */
+function Display({ percent, value = 0 }: { percent?: RefObject<HTMLSpanElement | null>; value?: number }) {
   return (
     <div className="scrub-screen">
       <p className="scrub-screen-label">Kickflip</p>
       <p className="scrub-screen-count">
-        <span ref={percent}>{percent ? 0 : 100}</span>%
+        <span ref={percent}>{value}</span>%
       </p>
     </div>
   );
@@ -67,7 +67,7 @@ function Stills() {
           <div className="trick-slot">
             <div className="trick-room">
               <Laptop eye={DESK} free {...scrub(t, KICKFLIP)} label={`A laptop: ${caption.toLowerCase()}`}>
-                <Display />
+                <Display value={Math.round(t * 100)} />
               </Laptop>
             </div>
           </div>

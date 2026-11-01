@@ -106,6 +106,13 @@ export const segment = (p: number, i: number, n: number) => clamp(p * n - i, 0, 
  */
 export type Keyframe = { readonly at: number; readonly ease?: Easing; readonly [field: string]: number | Easing | undefined };
 
+/**
+ * A keyframe's fields checked one by one: `ease` an easing and every other a
+ * number, so a misspelt `eas: "settle"` fails to compile instead of doing
+ * nothing.
+ */
+export type Checked<K> = { readonly [F in keyof K]: F extends "ease" ? Easing | undefined : number | undefined };
+
 /** Every field a list of keyframes sets, besides `at` and `ease`, each a number. */
 export type Scrubbed<K extends Keyframe> = { [field in K extends unknown ? Exclude<keyof K, "at" | "ease"> : never]: number };
 
@@ -129,7 +136,7 @@ const fields = (key: Keyframe) => Object.entries(key).filter((entry): entry is [
  * is `{ lid: 1, yaw: -8.34 }`: the lid is open, and the yaw, held at 0 until
  * 0.12, is on its way to -20 by 0.3.
  */
-export function scrub<K extends Keyframe>(t: number, keys: readonly K[], options?: ScrubOptions): Scrubbed<K>;
+export function scrub<K extends Keyframe>(t: number, keys: readonly (K & Checked<K>)[], options?: ScrubOptions): Scrubbed<K>;
 export function scrub(t: number, keys: readonly Keyframe[], { ease: shape = ease }: ScrubOptions = {}): Record<string, number> {
   // The segment `t` falls in, from the last keyframe at or before it to the
   // one after; before the first and after the last, both ends are that one.
