@@ -1,6 +1,6 @@
 {
   "name": "@vinena/vectoys",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Perspective camera, 3D poses and SVG outline helpers for device mockups.",
   "license": "MIT",
   "homepage": "https://github.com/vinenastudio/vectoys#readme",
