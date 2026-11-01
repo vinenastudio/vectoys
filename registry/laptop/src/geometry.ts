@@ -127,7 +127,7 @@ const ARROWS: Box[] = [
   const top = ARROW_TOP + half! * (ARROW_HALF + 0.2);
   return [left, top, left + UNIT - 2 * GAP, top + ARROW_HALF];
 });
-const TOUCH_ID = KEYS[ROWS[0]!.length - 1]!;
+const LOCK_KEY = KEYS[ROWS[0]!.length - 1]!;
 
 // The trackpad, 129.6 by 80.9 mm, 3 mm under the well.
 const TRACKPAD: Box = [-13.68, 5.07, 13.68, 22.17];
@@ -180,9 +180,9 @@ const GROUND = -BASE - 0.1;
 /** Everything on the base, as outlines on the deck. */
 const MODEL = {
   well: ring(WELL, 0.8),
-  keys: [...KEYS.filter((key) => key !== TOUCH_ID), ...ARROWS].map((key) => ring(key, key[3] - key[1] < 2 ? 0.25 : 0.38)),
-  touchId: ring(TOUCH_ID, 0.38),
-  touchIdRing: ring([TOUCH_ID[0] + 0.45, TOUCH_ID[1] + 0.45, TOUCH_ID[2] - 0.45, TOUCH_ID[3] - 0.45], 0.3),
+  keys: [...KEYS.filter((key) => key !== LOCK_KEY), ...ARROWS].map((key) => ring(key, key[3] - key[1] < 2 ? 0.25 : 0.38)),
+  lockKey: ring(LOCK_KEY, 0.38),
+  lockKeyRing: ring([LOCK_KEY[0] + 0.45, LOCK_KEY[1] + 0.45, LOCK_KEY[2] - 0.45, LOCK_KEY[3] - 0.45], 0.3),
   // The same field of holes at full, half and quarter density, for scenes
   // too small to keep the finer ones apart.
   holes: [holes(15, 47), holes(8, 24), holes(4, 12)],
@@ -269,8 +269,8 @@ function look(eye: Camera, OPEN: number) {
     scoop: shape([...SCOOP_EDGE.map((point) => onDeck(point)), ...[...DIP_EDGE].reverse()]),
     well: outline(MODEL.well),
     keys: MODEL.keys.map((key) => outline(key)).join(""),
-    touchId: outline(MODEL.touchId),
-    touchIdRing: outline(MODEL.touchIdRing),
+    lockKey: outline(MODEL.lockKey),
+    lockKeyRing: outline(MODEL.lockKeyRing),
     holes: MODEL.holes.map(field),
     trackpad: outline(MODEL.trackpad),
     hinge: outline(MODEL.hinge),
@@ -874,9 +874,9 @@ function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: Boxed
     deckTone: shade(eye, [0, 0, 1]),
     underTone: shade(eye, [0, 0, -1]),
     outerTone: shade(eye, [-normal[0], -normal[1], -normal[2]]),
-    /** Where the realistic look's sheens run on the deck, the underside and the lid's back, from back to front and from the lid's top edge to its hinge. */
     /** How far the keys' bevel highlight stands from them on screen, toward the deck's back. */
     bevel: span([0, -7.7, 0], [0, -7.8, 0]),
+    /** Where the realistic look's sheens run on the deck, the underside and the lid's back, from back to front and from the lid's top edge to its hinge. */
     sheen: {
       top: span([0, -HALF_DEPTH, 0], [0, HALF_DEPTH, 0]),
       under: span([0, -HALF_DEPTH, -thick], [0, HALF_DEPTH, -thick]),
@@ -902,8 +902,8 @@ function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: Boxed
       "base.walls": scoop(SCOOP_END, 0) + scoop(SCOOP_END - SCOOP_WALL, SCOOP_WALL),
       "deck.well": deck?.well ?? "",
       "deck.keys": deck?.keys ?? "",
-      "deck.touchId": deck?.touchId ?? "",
-      "deck.touchIdRing": deck?.touchIdRing ?? "",
+      "deck.lockKey": deck?.lockKey ?? "",
+      "deck.lockKeyRing": deck?.lockKeyRing ?? "",
       "deck.trackpad": deck?.trackpad ?? "",
       "deck.scoop": deck?.scoop ?? "",
       "deck.hinge": deck?.hinge ?? "",

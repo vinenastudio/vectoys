@@ -295,3 +295,38 @@ test("a realistic laptop that is not free takes the lid, yaw and pitch from its 
   );
   expect(realMarkup(moved.host)).toBe(realMarkup(drawn.host));
 });
+
+test.each([
+  ["free", { free: true }],
+  ["not free", { turning: true }],
+] as const)("%s, changing the look while the handle holds a pose lets go of it, and the props' pose is drawn whole", async (_, props) => {
+  for (const [from, to] of [
+    ["simple", "realistic"],
+    ["realistic", "simple"],
+  ] as const) {
+    const handle = createRef<LaptopHandle>();
+    const page = (look: "simple" | "realistic") => (
+      <Laptop eye={DESK} {...props} look={look} lid={1} yaw={0} ref={handle}>
+        <Live />
+      </Laptop>
+    );
+    const moved = await mount(page(from));
+    await act(async () => handle.current?.set({ lid: 0.3, yaw: 25, pitch: 28 }));
+    await moved.rerender(page(to));
+    const drawn = await mount(
+      <Laptop eye={DESK} {...props} look={to} lid={1} yaw={0} ref={createRef<LaptopHandle>()}>
+        <Live />
+      </Laptop>,
+    );
+    expect(realMarkup(moved.host)).toBe(realMarkup(drawn.host));
+    // The handle keeps working after the change, and holds what it sets.
+    await act(async () => handle.current?.set({ lid: 0.5 }));
+    const held = await mount(
+      <Laptop eye={DESK} {...props} look={to} lid={0.5} yaw={0} ref={createRef<LaptopHandle>()}>
+        <Live />
+      </Laptop>,
+    );
+    expect(realMarkup(moved.host)).toBe(realMarkup(held.host));
+    for (const done of [moved, drawn, held]) await done.unmount();
+  }
+});

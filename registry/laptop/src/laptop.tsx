@@ -25,7 +25,7 @@ const HINGE = `color-mix(in srgb, ${HAIRLINE} 6%, black)`;
 const BARREL = `color-mix(in srgb, ${SURFACE_TONE} 78%, black)`;
 const WELL = `color-mix(in srgb, ${SURFACE_TONE} 10%, black)`;
 const KEY = `color-mix(in srgb, ${HAIRLINE} 22%, ${WELL})`;
-const TOUCH_ID = `color-mix(in srgb, ${HAIRLINE} 12%, ${WELL})`;
+const LOCK_KEY = `color-mix(in srgb, ${HAIRLINE} 12%, ${WELL})`;
 
 const hairline = (color: string): CSSProperties => ({ stroke: color, fill: "none" });
 const stroke = {
@@ -77,8 +77,8 @@ const Base = memo(function Base({ id, deck: DECK, holes: name, node }: { id: str
       </g>
       <path ref={node("deck.well")} d={DECK.well} style={{ fill: WELL }} />
       <path ref={node("deck.keys")} d={DECK.keys} style={{ fill: KEY }} />
-      <path ref={node("deck.touchId")} d={DECK.touchId} style={{ fill: TOUCH_ID }} />
-      <path ref={node("deck.touchIdRing")} d={DECK.touchIdRing} {...stroke} style={hairline(KEY)} />
+      <path ref={node("deck.lockKey")} d={DECK.lockKey} style={{ fill: LOCK_KEY }} />
+      <path ref={node("deck.lockKeyRing")} d={DECK.lockKeyRing} {...stroke} style={hairline(KEY)} />
       <path ref={node("deck.trackpad")} d={DECK.trackpad} style={shade(0.2)} />
       <path ref={node("deck.trackpad")} d={DECK.trackpad} {...stroke} style={hairline(BORDER)} />
       <path ref={node("deck.scoop")} d={DECK.scoop} style={shade(1)} />
@@ -177,8 +177,10 @@ type LaptopProps = {
    * machine as it is, silver on any page: carved aluminum lit from above,
    * black keys in a black well, speaker grilles, the trackpad, round feet in
    * rings and the underside's slots and screws. It turns and moves as `free`
-   * does in every pose, and the handle sets it the same way. `FRONT` is
-   * already the product shot, so it draws the same in both.
+   * does in every pose, and the handle sets it the same way. Changing the
+   * look lets go of the handle's pose, as changing `free` does, and draws
+   * the props' pose. `FRONT` is already the product shot, so it draws the
+   * same in both.
    */
   look?: LaptopLook;
   /** The laptop's name for assistive technology. */
@@ -188,11 +190,11 @@ type LaptopProps = {
   /**
    * A handle whose `set({ lid, yaw, pitch })` redraws the laptop in a new
    * pose without a render, for a pose that moves every frame, as a scroll
-   * does. The handle owns the pose from its first `set` until a pose prop
-   * or `free` changes; then the props' pose is drawn. Renders for anything
-   * else, such as new content on the display, keep the handle's pose.
-   * `flat`, `x`, `y`, `scale` and `roll` move a laptop given `free` or any
-   * of them as a prop, and no other. `FRONT` does not move, so there it
+   * does. The handle owns the pose from its first `set` until a pose prop,
+   * `free` or `look` changes; then the props' pose is drawn. Renders for
+   * anything else, such as new content on the display, keep the handle's
+   * pose. `flat`, `x`, `y`, `scale` and `roll` move a laptop given `free` or
+   * any of them as a prop, and no other. `FRONT` does not move, so there it
    * does nothing.
    */
   ref?: Ref<LaptopHandle>;
@@ -426,9 +428,11 @@ function Angled({
 // tone is a share of it toward black, as measured on a silver machine's
 // renders, so a dark finish such as #3d3b3e reads as a space black one. The
 // gasket, the glass and the hinge's band, #0c0c0c on average, darker toward
-// the base, are the machine's own near blacks.
+// the base, are the machine's own near blacks. The realistic look takes the
+// machine's own silver, `SILVER`, in place of the page's finish.
 const FINISH = "var(--vectoys-finish, #f0f1f3)";
-const tone = (share: number) => (share >= 100 ? FINISH : `color-mix(in srgb, ${FINISH} ${share}%, black)`);
+const SILVER = "#f0f1f3";
+const tone = (share: number, finish = FINISH) => (share >= 100 ? finish : `color-mix(in srgb, ${finish} ${share}%, black)`);
 const GASKET = "#232323";
 const GASKET_LINE = "#2c2c2c";
 const HINGE_LINE = "#1a1a1a";
@@ -507,8 +511,8 @@ const mirrored = (half: readonly (readonly [number, number])[]) => [
     .map(([offset, value]): readonly [number, number] => [fixed(1 - offset), value]),
 ];
 
-const stops = (tones: readonly (readonly [number, number])[]) =>
-  tones.map(([offset, share]) => <stop key={offset} offset={offset} style={{ stopColor: tone(share) }} />);
+const stops = (tones: readonly (readonly [number, number])[], finish = FINISH) =>
+  tones.map(([offset, share]) => <stop key={offset} offset={offset} style={{ stopColor: tone(share, finish) }} />);
 
 const across = (share: number) => `${fixed(share * 100)}%`;
 const frontGlass = ({ glass, round }: Straight): CSSProperties => {
@@ -519,8 +523,8 @@ const frontGlass = ({ glass, round }: Straight): CSSProperties => {
 /**
  * FRONT's tones, for `Front` and for a free laptop at `flat`: `edge` is where
  * the lid's edge darkens, `feet` where the feet's tones run with `foot` as
- * their stops, `soft` the blur on the scoop's walls and `scoop` the shape
- * that clips them.
+ * their stops, `soft` the blur on the scoop's walls, `scoop` the shape that
+ * clips them and `finish` the aluminum every tone is a share of.
  */
 const frontDefs = (
   id: string,
@@ -529,19 +533,20 @@ const frontDefs = (
   foot: readonly (readonly [number, number])[],
   soft: number,
   scoop: ReactNode,
+  finish: string,
 ) => (
   <>
     <linearGradient id={`${id}-face`} x1="0" y1="0" x2="0" y2="1">
-      {stops(FACE)}
+      {stops(FACE, finish)}
     </linearGradient>
     <linearGradient id={`${id}-ends`} x1="0" y1="0" x2="1" y2="0">
       {mirrored(ENDS).map(([offset, opacity]) => (
-        <stop key={offset} offset={offset} style={{ stopColor: tone(62), stopOpacity: opacity }} />
+        <stop key={offset} offset={offset} style={{ stopColor: tone(62, finish), stopOpacity: opacity }} />
       ))}
     </linearGradient>
     <linearGradient id={`${id}-streak`} x1="0" y1="0" x2="1" y2="0">
       {mirrored(STREAK).map(([offset, opacity]) => (
-        <stop key={offset} offset={offset} style={{ stopColor: FINISH, stopOpacity: opacity }} />
+        <stop key={offset} offset={offset} style={{ stopColor: finish, stopOpacity: opacity }} />
       ))}
     </linearGradient>
     <linearGradient id={`${id}-hinge`} x1="0" y1="0" x2="0" y2="1">
@@ -549,33 +554,45 @@ const frontDefs = (
       <stop offset="1" stopColor="#030303" />
     </linearGradient>
     <linearGradient id={`${id}-edge`} gradientUnits="userSpaceOnUse" {...edge}>
-      {stops([
-        [0, 66],
-        [1, 73],
-      ])}
+      {stops(
+        [
+          [0, 66],
+          [1, 73],
+        ],
+        finish,
+      )}
     </linearGradient>
     <linearGradient id={`${id}-rim`} gradientUnits="userSpaceOnUse" {...edge}>
-      {stops([
-        [0, 60],
-        [1, 67],
-      ])}
+      {stops(
+        [
+          [0, 60],
+          [1, 67],
+        ],
+        finish,
+      )}
     </linearGradient>
     <linearGradient id={`${id}-wall`} x1="0" y1="0" x2="0" y2="1">
-      {stops([
-        [0, 15],
-        [0.5, 30],
-        [0.85, 75],
-        [1, 90],
-      ])}
+      {stops(
+        [
+          [0, 15],
+          [0.5, 30],
+          [0.85, 75],
+          [1, 90],
+        ],
+        finish,
+      )}
     </linearGradient>
     <linearGradient id={`${id}-floor`} x1="0" y1="0" x2="0" y2="1">
-      {stops([
-        [0, 96],
-        [0.9, 100],
-      ])}
+      {stops(
+        [
+          [0, 96],
+          [0.9, 100],
+        ],
+        finish,
+      )}
     </linearGradient>
     <linearGradient id={`${id}-feet`} {...feet}>
-      {stops(foot)}
+      {stops(foot, finish)}
     </linearGradient>
     <linearGradient id={`${id}-foot`} x1="0" y1="0" x2="1" y2="0">
       {mirrored(FOOT_ROUND).map(([offset, opacity]) => (
@@ -631,6 +648,7 @@ function Front({ eye, children, label, handle }: { eye: Straight; label: string;
           FOOT,
           0.12,
           <path d={art.scoop} />,
+          FINISH,
         )}
       </defs>
       {art.feet.map((foot) => (
@@ -926,8 +944,8 @@ function Free({
         {holeField(WELL)}
         <path {...bind("deck.well", { fill: WELL })} />
         <path {...bind("deck.keys", { fill: KEY })} />
-        <path {...bind("deck.touchId", { fill: TOUCH_ID })} />
-        <path {...bind("deck.touchIdRing", hairline(KEY))} {...stroke} />
+        <path {...bind("deck.lockKey", { fill: LOCK_KEY })} />
+        <path {...bind("deck.lockKeyRing", hairline(KEY))} {...stroke} />
         <path {...bind("deck.trackpad", shade(0.2))} />
         <path {...bind("deck.trackpad", hairline(tone(84)))} {...stroke} />
         <path {...bind("deck.scoop", shade(1))} />
@@ -988,10 +1006,10 @@ function Free({
         <g style={{ fill: REAL.key, stroke: "black" }} strokeWidth={0.07}>
           <g id={`${id}-keys`}>
             <path {...bind("deck.keys")} />
-            <path {...bind("deck.touchId")} />
+            <path {...bind("deck.lockKey")} />
           </g>
         </g>
-        <path {...bind("deck.touchIdRing", hairline(REAL.ring))} {...stroke} />
+        <path {...bind("deck.lockKeyRing", hairline(REAL.ring))} {...stroke} />
         <path {...bind("deck.trackpad", { fill: REAL.pad })} />
         <path {...bind("deck.trackpad", hairline(REAL.padLine))} {...stroke} />
         <path {...bind("deck.scoop", { fill: REAL.scoop })} />
@@ -1043,7 +1061,7 @@ function Free({
     <Stage role={children == null ? "img" : "group"} label={label} camera={frame.camera} overlay={glass}>
       <defs>
         {defs(id, frame.camera, holesShown(holes, frame.camera.width), bind("blur"))}
-        {frontDefs(id, bind("edges"), { x1: "0", y1: "0", x2: "0", y2: "1" }, FOOT_BOX, 0.15, <path {...bind("base.scoop")} />)}
+        {frontDefs(id, bind("edges"), { x1: "0", y1: "0", x2: "0", y2: "1" }, FOOT_BOX, 0.15, <path {...bind("base.scoop")} />, real ? SILVER : FINISH)}
         {real && (
           <>
             {sheen("top", [

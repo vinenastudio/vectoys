@@ -290,8 +290,18 @@ test.each([DESK, PHONE])("the realistic look renders on the server the same twic
       );
     expect(render()).toBe(render());
     expect(render()).not.toMatch(/NaN|Infinity/);
-    expect(render()).not.toMatch(/(fill|stroke):[^;"]*--vectoys-(surface|border|hairline)/);
+    expect(render()).not.toMatch(/(fill|stroke):[^;"]*--vectoys-(surface|border|hairline|finish)/);
   }
+});
+
+test.each([DESK, PHONE])("a page's --vectoys-finish never reaches the realistic look, and the simple look still takes it", (eye) => {
+  for (const props of [{}, { free: true, flat: 1 }, { free: true, ...scrub(0.3, KICKFLIP) }, { free: true, roll: 180, lid: 0 }]) {
+    expect(renderToString(<Laptop eye={eye} look="realistic" {...props} />)).not.toContain("--vectoys-finish");
+  }
+  // The realistic front's tones are shares of the machine's own silver.
+  expect(renderToString(<Laptop eye={eye} look="realistic" free flat={1} />)).toContain("stop-color:color-mix(in srgb, #f0f1f3 99%, black)");
+  expect(renderToString(<Laptop eye={eye} free flat={1} />)).toContain("stop-color:color-mix(in srgb, var(--vectoys-finish, #f0f1f3) 99%, black)");
+  expect(renderToString(<Laptop eye={FRONT} />)).toContain("var(--vectoys-finish, #f0f1f3)");
 });
 
 test("straight on, the realistic look is FRONT's product shot", () => {
