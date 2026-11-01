@@ -1,5 +1,5 @@
 import { clamp, fixed, lerp } from "@vinena/vectoys";
-import { Screen, Stage, placeScreen, useNodes, type Nodes } from "@vinena/vectoys-react";
+import { Glare, Gradient, Grain, Screen, Stage, mirrored, placeScreen, useNodes, type Nodes, type Stop } from "@vinena/vectoys-react";
 import { memo, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, type CSSProperties, type ReactNode, type Ref, type SVGProps } from "react";
 import { BEZEL, DESK, FRONT, GLASS, HOLE, PITCH, ROUND, SHADES, TONES, YAW, type LaptopPose, type Perspective, type Posed, type Straight, type Trick, type TrickPose, type View } from "./geometry";
 
@@ -502,17 +502,10 @@ const FOOT_ROUND: readonly (readonly [number, number])[] = [
   [0.5, 0],
 ];
 
-/** Stops from both ends of a gradient toward its middle, mirrored. */
-const mirrored = (half: readonly (readonly [number, number])[]) => [
-  ...half,
-  ...[...half]
-    .filter(([offset]) => offset < 0.5)
-    .reverse()
-    .map(([offset, value]): readonly [number, number] => [fixed(1 - offset), value]),
-];
-
-const stops = (tones: readonly (readonly [number, number])[], finish = FINISH) =>
-  tones.map(([offset, share]) => <stop key={offset} offset={offset} style={{ stopColor: tone(share, finish) }} />);
+/** Tones as a gradient's stops, shares of `finish`. */
+const shares = (tones: readonly (readonly [number, number])[], finish: string) => tones.map(([offset, share]): Stop => [offset, tone(share, finish)]);
+/** One color's opacities as a gradient's stops, mirrored. */
+const faded = (half: readonly (readonly [number, number])[], color: string) => mirrored(half).map(([offset, opacity]): Stop => [offset, color, opacity]);
 
 const across = (share: number) => `${fixed(share * 100)}%`;
 const frontGlass = ({ glass, round }: Straight): CSSProperties => {
@@ -528,77 +521,27 @@ const frontGlass = ({ glass, round }: Straight): CSSProperties => {
  */
 const frontDefs = (
   id: string,
-  edge: SVGProps<SVGLinearGradientElement>,
-  feet: SVGProps<SVGLinearGradientElement>,
+  edge: Omit<SVGProps<SVGLinearGradientElement>, "id">,
+  feet: Omit<SVGProps<SVGLinearGradientElement>, "id">,
   foot: readonly (readonly [number, number])[],
   soft: number,
   scoop: ReactNode,
   finish: string,
 ) => (
   <>
-    <linearGradient id={`${id}-face`} x1="0" y1="0" x2="0" y2="1">
-      {stops(FACE, finish)}
-    </linearGradient>
-    <linearGradient id={`${id}-ends`} x1="0" y1="0" x2="1" y2="0">
-      {mirrored(ENDS).map(([offset, opacity]) => (
-        <stop key={offset} offset={offset} style={{ stopColor: tone(62, finish), stopOpacity: opacity }} />
-      ))}
-    </linearGradient>
-    <linearGradient id={`${id}-streak`} x1="0" y1="0" x2="1" y2="0">
-      {mirrored(STREAK).map(([offset, opacity]) => (
-        <stop key={offset} offset={offset} style={{ stopColor: finish, stopOpacity: opacity }} />
-      ))}
-    </linearGradient>
+    <Gradient id={`${id}-face`} x1="0" y1="0" x2="0" y2="1" stops={shares(FACE, finish)} />
+    <Gradient id={`${id}-ends`} x1="0" y1="0" x2="1" y2="0" stops={faded(ENDS, tone(62, finish))} />
+    <Gradient id={`${id}-streak`} x1="0" y1="0" x2="1" y2="0" stops={faded(STREAK, finish)} />
     <linearGradient id={`${id}-hinge`} x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stopColor="#161616" />
       <stop offset="1" stopColor="#030303" />
     </linearGradient>
-    <linearGradient id={`${id}-edge`} gradientUnits="userSpaceOnUse" {...edge}>
-      {stops(
-        [
-          [0, 66],
-          [1, 73],
-        ],
-        finish,
-      )}
-    </linearGradient>
-    <linearGradient id={`${id}-rim`} gradientUnits="userSpaceOnUse" {...edge}>
-      {stops(
-        [
-          [0, 60],
-          [1, 67],
-        ],
-        finish,
-      )}
-    </linearGradient>
-    <linearGradient id={`${id}-wall`} x1="0" y1="0" x2="0" y2="1">
-      {stops(
-        [
-          [0, 15],
-          [0.5, 30],
-          [0.85, 75],
-          [1, 90],
-        ],
-        finish,
-      )}
-    </linearGradient>
-    <linearGradient id={`${id}-floor`} x1="0" y1="0" x2="0" y2="1">
-      {stops(
-        [
-          [0, 96],
-          [0.9, 100],
-        ],
-        finish,
-      )}
-    </linearGradient>
-    <linearGradient id={`${id}-feet`} {...feet}>
-      {stops(foot, finish)}
-    </linearGradient>
-    <linearGradient id={`${id}-foot`} x1="0" y1="0" x2="1" y2="0">
-      {mirrored(FOOT_ROUND).map(([offset, opacity]) => (
-        <stop key={offset} offset={offset} style={{ stopColor: "black", stopOpacity: opacity }} />
-      ))}
-    </linearGradient>
+    <Gradient id={`${id}-edge`} gradientUnits="userSpaceOnUse" {...edge} stops={shares([[0, 66], [1, 73]], finish)} />
+    <Gradient id={`${id}-rim`} gradientUnits="userSpaceOnUse" {...edge} stops={shares([[0, 60], [1, 67]], finish)} />
+    <Gradient id={`${id}-wall`} x1="0" y1="0" x2="0" y2="1" stops={shares([[0, 15], [0.5, 30], [0.85, 75], [1, 90]], finish)} />
+    <Gradient id={`${id}-floor`} x1="0" y1="0" x2="0" y2="1" stops={shares([[0, 96], [0.9, 100]], finish)} />
+    <Gradient id={`${id}-feet`} {...feet} stops={shares(foot, finish)} />
+    <Gradient id={`${id}-foot`} x1="0" y1="0" x2="1" y2="0" stops={faded(FOOT_ROUND, "black")} />
     <filter id={`${id}-soft`}>
       <feGaussianBlur stdDeviation={soft} />
     </filter>
@@ -717,7 +660,6 @@ const REAL = {
   holes: "#8f9092",
   pad: "rgba(0, 0, 0, 0.02)",
   padLine: "#b3b4b6",
-  scoop: "#bdbec0",
   hinge: "#141414",
   barrel: "#77787a",
   seam: "#9d9ea0",
@@ -726,6 +668,9 @@ const REAL = {
   rubber: "#343536",
   sole: "#454647",
   bezel: "#c9cacc",
+  turn: "#6f7072",
+  near: "rgba(0, 0, 0, 0.5)",
+  far: "rgba(0, 0, 0, 0.2)",
 };
 
 /** The glass's top corners and the notch, from the eye's own at `flat` 0 to FRONT's at 1. */
@@ -804,6 +749,7 @@ function trickPainter(eye: Perspective, turning: boolean, nodes: Nodes, real: bo
       }
       for (const notch of nodes.all("notch")) if (notch instanceof SVGElement) Object.assign(notch.style, look.notch);
       for (const sheen of nodes.all("sheen")) if (sheen instanceof HTMLElement) Object.assign(sheen.style, look.sheen);
+      for (const glare of nodes.all("glare")) if (glare instanceof HTMLElement) glare.style.opacity = String(fixed(1 - pose.flat));
     },
   };
 }
@@ -870,13 +816,8 @@ function Free({
     real ? SHADE.map((fill, step) => <path key={step} {...bind(`${part}.${step}`, { fill })} />) : TONES.map((share, step) => <path key={step} {...bind(`${part}.${step}`, { fill: tone(share) })} />);
   const look = glassLook(real ? 1 : pose.flat);
   const edge = hairline(REAL.edge);
-  const sheen = (name: string, stops: readonly (readonly [number, string, number])[]) => (
-    <linearGradient {...bind(`sheen.${name}`)} id={`${id}-${name}`} gradientUnits="userSpaceOnUse">
-      {stops.map(([offset, stopColor, stopOpacity]) => (
-        <stop key={offset} offset={offset} style={{ stopColor, stopOpacity }} />
-      ))}
-    </linearGradient>
-  );
+  const sheen = (name: string, stops: Stop[]) => <Gradient {...bind(`sheen.${name}`)} id={`${id}-${name}`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="1" stops={stops} />;
+  const grain = url("grain");
   const flatFeet = (
     <g {...bind("flat")}>
       {[0, 1, 2, 3].map((foot) => (
@@ -979,8 +920,16 @@ function Free({
         {sides("lid")}
         <path {...bind("lid.outer")} />
         <path {...bind("lid.sheen")} fill={url("outer")} />
+        <path {...bind("lid.sheen")} fill={grain} />
         <path {...bind("lid.edge", edge)} {...stroke} />
+        {/* The display side's chamfer, gone at flat 1 as FRONT draws its own: a darker turn off the side, then a bright line on the edge. */}
+        <g {...bind("lines")}>
+          <path {...bind("lid.face", hairline(REAL.turn))} {...stroke} strokeWidth={1.6} />
+        </g>
         <path {...bind("lid.face", { fill: REAL.rim })} />
+        <g {...bind("lines")}>
+          <path {...bind("lid.face", edge)} {...stroke} strokeWidth={0.7} />
+        </g>
         <g {...bind("flat")}>
           <path {...bind("lid.face")} fill={url("edge")} />
           <path {...bind("lid.rim")} fill={url("rim")} />
@@ -988,6 +937,7 @@ function Free({
         <path {...bind("lid.gasket")} />
         <path {...bind("lid.gasketLine")} />
         <path {...bind("lid.glass")} fill="black" />
+        <path {...bind("lid.glass")} fill={url("pane")} />
         {lidHinge}
       </>
     ),
@@ -996,9 +946,10 @@ function Free({
         <path {...bind("base.hull", { fill: SHADE[5] })} />
         {sides("base")}
         <path {...bind("deck.hinge", { fill: REAL.hinge })} />
-        <path {...bind("deck.barrels", { fill: REAL.barrel })} />
+        <path {...bind("deck.barrels", { fill: REAL.turn })} />
         <path {...bind("base.top")} />
         <path {...bind("base.sheen")} fill={url("top")} />
+        <path {...bind("base.sheen")} fill={grain} />
         {holeField(REAL.holes)}
         <path {...bind("deck.well", { fill: REAL.well, stroke: "black" })} {...stroke} />
         {/* Each key's bevel catches the light on its back edge: the keys again, a little toward the deck's back, under them. */}
@@ -1012,10 +963,11 @@ function Free({
         <path {...bind("deck.lockKeyRing", hairline(REAL.ring))} {...stroke} />
         <path {...bind("deck.trackpad", { fill: REAL.pad })} />
         <path {...bind("deck.trackpad", hairline(REAL.padLine))} {...stroke} />
-        <path {...bind("deck.scoop", { fill: REAL.scoop })} />
-        <path {...bind("base.edge", edge)} {...stroke} />
+        <path {...bind("deck.scoop")} fill={url("dish")} />
+        <path {...bind("base.edge", edge)} {...stroke} strokeWidth={0.7} />
         <path {...bind("base.under")} />
         <path {...bind("base.underSheen")} fill={url("under")} />
+        <path {...bind("base.underSheen")} fill={grain} />
         <path {...bind("base.seam", hairline(REAL.seam))} {...stroke} />
         <path {...bind("base.slits", { fill: REAL.slit })} />
         <path {...bind("base.screws", { stroke: REAL.screw, fill: "none" })} strokeWidth={0.32} strokeLinecap="round" />
@@ -1043,6 +995,8 @@ function Free({
     <Screen ref={nodes.ref("glass")} camera={frame.camera} pose={frame.glass} rect={GLASS} style={{ ...GLASS_STYLE, ...look.glass }}>
       <div ref={nodes.ref("sheen")} style={{ ...FILL, ...look.sheen, background: `linear-gradient(110deg, color-mix(in srgb, ${HAIRLINE} 9%, transparent), transparent 35%)` }} />
       <div style={FILL}>{children}</div>
+      {/* Realistic, the glass's glare, none at flat 1, as FRONT has none. */}
+      {real && <Glare ref={nodes.ref("glare")} opacity={fixed(1 - pose.flat)} />}
       <svg
         ref={nodes.ref("notch")}
         viewBox={`0 0 ${fixed(notch.width)} ${notch.height}`}
@@ -1064,20 +1018,46 @@ function Free({
         {frontDefs(id, bind("edges"), { x1: "0", y1: "0", x2: "0", y2: "1" }, FOOT_BOX, 0.15, <path {...bind("base.scoop")} />, real ? SILVER : FINISH)}
         {real && (
           <>
+            {/* The deck: shade where the lid meets it at the hinge, light falling on toward the front, a bright band before the front edge turns away. */}
             {sheen("top", [
-              [0, "black", 0.1],
-              [0.55, "black", 0],
-              [1, "white", 0.22],
+              [0, "black", 0.42],
+              [0.025, "black", 0.2],
+              [0.07, "black", 0.07],
+              [0.4, "black", 0.02],
+              [0.62, "white", 0.04],
+              [0.86, "white", 0.24],
+              [0.95, "white", 0.12],
+              [1, "black", 0.05],
             ])}
+            {/* The lid's back: a bright top edge, an even middle, falling off dark toward the hinge, away from the lamp. */}
             {sheen("outer", [
-              [0, "white", 0.2],
-              [0.45, "white", 0],
-              [1, "black", 0.3],
+              [0, "white", 0.3],
+              [0.06, "white", 0.14],
+              [0.4, "white", 0.03],
+              [0.62, "black", 0.04],
+              [0.85, "black", 0.2],
+              [1, "black", 0.36],
             ])}
             {sheen("under", [
-              [0, "black", 0.12],
-              [1, "white", 0.1],
+              [0, "black", 0.14],
+              [0.5, "black", 0.02],
+              [0.9, "white", 0.12],
+              [1, "white", 0.04],
             ])}
+            {/* The thumb's scoop, a soft shallow cut in shade: darkest at its back wall, lighter toward the lip. */}
+            {sheen("dish", [
+              [0, "#6e6f71"],
+              [0.3, "#8f9092"],
+              [0.7, "#abacae"],
+              [1, "#c6c7c9"],
+            ])}
+            {/* The bezel's glass catching the light from above. */}
+            {sheen("pane", [
+              [0, "white", 0.13],
+              [0.25, "white", 0.04],
+              [0.6, "white", 0],
+            ])}
+            <Grain id={`${id}-grain`} size={2.4} count={160} speck={0.05} strength={0.045} stretch={2} />
           </>
         )}
         <clipPath id={`${id}-deck`}>
@@ -1085,8 +1065,8 @@ function Free({
         </clipPath>
       </defs>
       <g {...bind("shadow")}>
-        <path {...bind("shadow.far", shade(1))} filter={url("far")} />
-        <path {...bind("shadow.near", shade(1))} filter={url("near")} />
+        <path {...bind("shadow.far", real ? { fill: REAL.far } : shade(1))} filter={url("far")} />
+        <path {...bind("shadow.near", real ? { fill: REAL.near } : shade(1))} filter={url("near")} />
       </g>
       <g>
         {frame.order.map((part) => (

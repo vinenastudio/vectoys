@@ -187,6 +187,7 @@ const STYLE = `
 .cmp-cell { margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .cmp-cell figcaption { font-size: 13px; color: var(--muted); text-align: center; }
 .cmp-ref { border-radius: 12px; background-color: #f2f2f2; background-repeat: no-repeat; }
+.cmp-shot { flex: 1; min-height: 200px; border-radius: 12px; background: var(--vectoys-bg, #f2f2f2) center / contain no-repeat; }
 .cmp-stage { flex: 1; display: grid; place-items: center; padding: 18% 8%; border-radius: 12px; background: var(--vectoys-bg); overflow: hidden; }
 .cmp-stage > * { width: 100%; }
 .cmp-light { --vectoys-bg: #f3f4f6; --vectoys-surface: #f5f6f8; --vectoys-hairline: #8a8e96; --vectoys-border: #d2d5db; --vectoys-shadow: rgba(10, 14, 22, 0.1); }
@@ -194,3 +195,60 @@ const STYLE = `
 .cmp-perf { display: grid; grid-template-columns: repeat(3, 720px); gap: 12px; }
 .cmp-dark figcaption { color: #959baa; }
 `;
+
+// Dev only, at /realistic/polish: for each pose of a polish round, the
+// references, the realistic laptop as it was before the round (captures in
+// the polish folder under VECTOYS_REFS, at /refs/polish/before/) and as it
+// is now, live, on a light and a dark page.
+type Shot = { id: string; title: string; refs: readonly string[]; pose: Partial<TrickPose>; free?: boolean; kick?: number };
+
+const SHOTS: readonly Shot[] = [
+  { id: "front", title: "Front, flat 1", refs: ["front-silver-render"], pose: { flat: 1 }, free: true },
+  { id: "tq", title: "Three-quarter, open: yaw -25, pitch 15", refs: ["tq-black-photo-mirrored"], pose: { yaw: -25, pitch: 15 } },
+  { id: "high", title: "High front: pitch 30", refs: ["high-silver-photo"], pose: { pitch: 30 } },
+  { id: "lowside", title: "Low side: yaw 50, pitch 5, lid 0.6", refs: ["lowside-silver-render"], pose: { yaw: 50, pitch: 5, lid: 0.6 }, free: true },
+  { id: "open", title: "Open, from the side: yaw 90, pitch 3", refs: ["open-silver-render"], pose: { yaw: 90, pitch: 3 }, free: true },
+  { id: "shut", title: "Shut: yaw -20, pitch 30", refs: ["shut-black-photo", "shut-silver-top-render"], pose: { lid: 0, yaw: -20, pitch: 30 } },
+  { id: "under", title: "Underside, mid-flip: KICKFLIP at 0.49", refs: ["under-silver-photo"], pose: {}, free: true, kick: 0.49 },
+];
+
+function Shown({ src, note, theme }: { src: string; note: string; theme?: "light" | "dark" }) {
+  return (
+    <figure className={`cmp-cell${theme ? ` cmp-${theme}` : ""}`}>
+      <div className="cmp-shot" style={{ backgroundImage: `url(${src})` }} />
+      <figcaption>{note}</figcaption>
+    </figure>
+  );
+}
+
+export function Polish() {
+  return (
+    <main className="cmp">
+      <style>{STYLE}</style>
+      <h1>Realistic laptop, polish round: reference, before, after</h1>
+      {SHOTS.map((shot) => (
+        <section key={shot.id} id={shot.id} className="cmp-row">
+          <h2>{shot.title}</h2>
+          <div className="cmp-grid" style={{ gridTemplateColumns: `repeat(${shot.refs.length + 4}, minmax(0, 1fr))` }}>
+            {shot.refs.map((ref) => (
+              <Shown key={ref} src={`/refs/polish/refs/${ref}.png`} note={`Reference: ${ref.replace(/^[a-z]+-/, "").replaceAll("-", " ")}`} />
+            ))}
+            {(["light", "dark"] as const).map((theme) => (
+              <Shown key={theme} src={`/refs/polish/before/${shot.id}-${theme}.png`} note={`Before, ${theme}`} theme={theme} />
+            ))}
+            {(["light", "dark"] as const).map((theme) => (
+              <figure key={theme} className={`cmp-cell cmp-${theme}`}>
+                <div className="cmp-stage">
+                  <Laptop eye={DESK} look="realistic" free={shot.free ?? false} {...(shot.kick === undefined ? shot.pose : scrub(shot.kick, KICKFLIP))}>
+                    <Wallpaper />
+                  </Laptop>
+                </div>
+                <figcaption>After, {theme}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+      ))}
+    </main>
+  );
+}

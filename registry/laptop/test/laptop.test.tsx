@@ -349,6 +349,26 @@ test("realistic, the underside shows four round feet in rings, its slots and scr
   expect(html).toMatch(/<use transform="translate\([-\d.]+ -[\d.]+\)"/);
 });
 
+test("realistic, the aluminum has its grain, the glass its glare, and at flat 1 the glare and the lid's chamfer are gone, as FRONT has neither", () => {
+  const html = renderToString(
+    <Laptop eye={DESK} look="realistic">
+      <p>live</p>
+    </Laptop>,
+  );
+  expect(html).toMatch(/<pattern id="[^"]+-grain"/);
+  expect(html.match(/fill="url\(#[^)]+-grain\)"/g)).toHaveLength(3);
+  expect(html).toMatch(/pointer-events:none;opacity:1;background:linear-gradient\(118deg/);
+  const flat = renderToString(
+    <Laptop eye={DESK} look="realistic" free flat={1}>
+      <p>live</p>
+    </Laptop>,
+  );
+  expect(flat).toMatch(/pointer-events:none;opacity:0;background:linear-gradient\(118deg/);
+  expect(flat.match(/<g opacity="0">/g)?.length).toBeGreaterThanOrEqual(2);
+  // Each sheen's lines lie square across its face: its gradient is its own space, mapped onto the screen.
+  expect(html).toMatch(/<linearGradient id="[^"]+-top" gradientTransform="matrix\([-\d. ]+\)" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="1">/);
+});
+
 test.each([DESK, PHONE])("LAPTOP_BOX gives where the eye's own scene sits in the box: its own drawing lands x right and y down", (eye) => {
   const box = LAPTOP_BOX[eye.id];
   expect(Object.keys(box)).toEqual(["width", "height", "x", "y"]);

@@ -1,6 +1,7 @@
 export { Faces, type Look } from "./faces.tsx";
 export { useFrames, useReducedMotion } from "./motion.ts";
 export { useNodes, type Nodes } from "./nodes.ts";
+export { Glare, Gradient, Grain, mirrored, type Stop } from "./paint.tsx";
 export { PIXELS_PER_UNIT, Screen, placeScreen } from "./screen.tsx";
 export { useScrub, type Progress, type UseScrubOptions } from "./scrub.ts";
 export { useSpring } from "./spring.ts";

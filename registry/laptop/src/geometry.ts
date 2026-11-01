@@ -657,7 +657,7 @@ const glint = (eye: Camera, normal: Solid) => {
   const length = Math.hypot(...turned);
   const light = dot(turned, LAMP) / length / Math.hypot(...LAMP);
   const shine = Math.max(0, dot(turned, SHINE) / length / Math.hypot(...SHINE)) ** 10;
-  return Math.round(clamp(0.52 + 0.4 * light + 0.3 * shine, 0, 1) * (SHADES - 1));
+  return Math.round(clamp(0.4 + 0.4 * light + 0.3 * shine, 0, 1) * (SHADES - 1));
 };
 const at = (ring: readonly Flat[], z: number) => ring.map(([x, y]): Solid => [x, y, z]);
 const inset = (by: number, step?: number) => rounded([-HALF_WIDTH + by, -HALF_DEPTH + by, HALF_WIDTH - by, HALF_DEPTH - by], [ROUND - by, ROUND - by], [], [], step);
@@ -842,6 +842,15 @@ function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: Boxed
     const [[x1, y1], [x2, y2]] = [eye.project(from), eye.project(to)];
     return { x1: fixed(x1), y1: fixed(y1), x2: fixed(x2), y2: fixed(y2) };
   };
+  // A sheen's own space on screen: 0 at `from` and 1 at `to` along its y, its
+  // lines along the laptop's width where the face's middle is, so they lie
+  // square across the face however it turns, as plain ends on screen do not.
+  const sheet = (from: Solid, to: Solid) => {
+    const [[ox, oy], [tx, ty]] = [eye.project(from), eye.project(to)];
+    const side = (x: number) => eye.project(add(from, [x, (to[1] - from[1]) / 2, (to[2] - from[2]) / 2]));
+    const [[lx, ly], [rx, ry]] = [side(-1), side(1)];
+    return { gradientTransform: `matrix(${[rx - lx, ry - ly, tx - ox, ty - oy, ox, oy].map(fixed).join(" ")})` };
+  };
   // The realistic look's extra parts: the underside's intake slots along its
   // sides and its eight screws, the feet's soles and rings, and copies of the
   // faces that carry a sheen or a highlight.
@@ -879,11 +888,13 @@ function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: Boxed
     outerTone: shade(eye, [-normal[0], -normal[1], -normal[2]]),
     /** How far the keys' bevel highlight stands from them on screen, toward the deck's back. */
     bevel: span([0, -7.7, 0], [0, -7.8, 0]),
-    /** Where the realistic look's sheens run on the deck, the underside and the lid's back, from back to front and from the lid's top edge to its hinge. */
+    /** The realistic look's sheens, each as its own space on screen: on the deck, the underside and down the thumb's scoop from back to front, on the lid's back and its glass from its top edge to its hinge. */
     sheen: {
-      top: span([0, -HALF_DEPTH, 0], [0, HALF_DEPTH, 0]),
-      under: span([0, -HALF_DEPTH, -thick], [0, HALF_DEPTH, -thick]),
-      outer: span(place(lid, [0, -DEPTH, -LID]), place(lid, [0, 0, -LID])),
+      top: sheet([0, -HALF_DEPTH, 0], [0, HALF_DEPTH, 0]),
+      under: sheet([0, -HALF_DEPTH, -thick], [0, HALF_DEPTH, -thick]),
+      outer: sheet(place(lid, [0, -DEPTH, -LID]), place(lid, [0, 0, -LID])),
+      dish: sheet([0, HALF_DEPTH - SCOOP, 0], [0, HALF_DEPTH, -DIP]),
+      pane: sheet(place(lid, [0, -DEPTH, 0]), place(lid, [0, 0, 0])),
     },
     /** Where FRONT's lid edge gradient runs, from the lid's top edge down. */
     edge: { x1: lidPoint(-DEPTH)[0], y1: lidPoint(-DEPTH)[1], x2: lidPoint(share(LID_ROUND) - DEPTH)[0], y2: lidPoint(share(LID_ROUND) - DEPTH)[1] },
