@@ -75,7 +75,7 @@ The same props must give the same markup on the server and the client, every tim
 ## Accessibility
 
 - A picture: the root is `role="img"` with an `aria-label` (Stage takes `role` and `label`). With live content inside, use `role="group"` so its links stay reachable.
-- Interactive: use a real `<button>` or `<a href>` with a label, laid over the item's bounds. Give it a visible `:focus-visible` ring in `--vectoys-focus`. Enter and Space must do what a click does.
+- Interactive: use a real `<button>` or `<a href>` with a label, laid over the item's bounds. Give it a visible `:focus-visible` ring in `--vectoys-focus`. Enter and Space must do what a click does: a native button already does this, so do not call `preventDefault` on those keys or the click is cancelled.
 - Respect reduced motion: the state still changes, only without the motion.
 - Start hover effects only when `event.pointerType === "mouse"`, so a tap does not stick in the hover state.
 

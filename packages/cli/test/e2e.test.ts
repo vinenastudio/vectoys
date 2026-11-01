@@ -40,8 +40,12 @@ afterAll(() => {
 });
 
 async function run(...args: string[]) {
+  return runIn(project, ...args);
+}
+
+async function runIn(cwd: string, ...args: string[]) {
   const child = Bun.spawn(["node", cli, ...args], {
-    cwd: project,
+    cwd,
     env: { ...process.env, VECTOYS_REGISTRY: registry },
     stdin: "ignore",
     stdout: "pipe",
@@ -165,37 +169,65 @@ test("every item in the index adds, and the page uses each one", async () => {
   for (const name of names) expect(existsSync(target(name, "geometry.ts"))).toBe(true);
 });
 
-test("the copied items typecheck against the workspace packages", () => {
+// A tsconfig for `dir` that maps the vectoys packages and React to this repo.
+function tsconfig(dir: string, options: Record<string, unknown>) {
   const types = realpathSync(join(repo, "packages/react/node_modules/@types"));
   writeFileSync(
-    join(project, "tsconfig.json"),
+    join(dir, "tsconfig.json"),
     JSON.stringify({
       compilerOptions: {
         target: "ES2022",
         lib: ["ES2022", "DOM"],
-        module: "ESNext",
-        moduleResolution: "bundler",
         jsx: "react-jsx",
         strict: true,
         noEmit: true,
         skipLibCheck: true,
+        // The workspace package sources import each other with .ts.
         rewriteRelativeImportExtensions: true,
         types: [],
         paths: {
           "@vinena/vectoys": [join(repo, "packages/engine/src/index.ts")],
           "@vinena/vectoys-react": [join(repo, "packages/react/src/index.ts")],
-          react: [join(types, "react")],
-          "react/*": [join(types, "react/*")],
+          // NodeNext does not look for index.d.ts in a folder, so name the files.
+          react: [join(types, "react/index.d.ts")],
+          "react/*": [join(types, "react/*.d.ts")],
         },
+        ...options,
       },
       include: ["src"],
     }),
   );
-  writeFileSync(
-    join(project, "src/page.tsx"),
-    [...Object.values(USES).flatMap((use) => use.imports), `export const Page = () => (<>${Object.values(USES).map((use) => use.jsx).join("")}</>);`].join("\n"),
-  );
-  const check = Bun.spawnSync([join(repo, "node_modules/.bin/tsc"), "-p", project]);
+}
+
+// A page in `dir` that uses every item, with relative imports ending in `extension`.
+function page(dir: string, extension = "") {
+  const imports = Object.values(USES).flatMap((use) => use.imports.map((line) => line.replace(/(\/[\w-]+)";$/, `$1${extension}";`)));
+  writeFileSync(join(dir, "src/page.tsx"), [...imports, `export const Page = () => (<>${Object.values(USES).map((use) => use.jsx).join("")}</>);`].join("\n"));
+}
+
+function typecheck(dir: string) {
+  const check = Bun.spawnSync([join(repo, "node_modules/.bin/tsc"), "-p", dir]);
   expect(check.stdout.toString() + check.stderr.toString()).toBe("");
   expect(check.exitCode).toBe(0);
+}
+
+test("the copied items typecheck against the workspace packages", () => {
+  tsconfig(project, { module: "ESNext", moduleResolution: "bundler" });
+  page(project);
+  typecheck(project);
+}, 60_000);
+
+test("under NodeNext the copied imports get .js and typecheck", async () => {
+  const node = join(work, "node");
+  mkdirSync(join(node, "src"), { recursive: true });
+  writeFileSync(join(node, "package.json"), JSON.stringify({ name: "node-site", private: true, type: "module", dependencies: { react: "19.0.0" } }));
+  writeFileSync(join(node, "bun.lock"), "");
+  tsconfig(node, { module: "NodeNext", moduleResolution: "NodeNext" });
+  const names: string[] = JSON.parse(readFileSync(join(out, "index.json"), "utf8")).items.map((item: { name: string }) => item.name);
+  const { stderr, code } = await runIn(node, "add", ...names, "--no-install");
+  expect(stderr).toBe("");
+  expect(code).toBe(0);
+  expect(readFileSync(join(node, "src/components/vectoys/laptop/laptop.tsx"), "utf8")).toContain('from "./geometry.js"');
+  page(node, ".js");
+  typecheck(node);
 }, 60_000);

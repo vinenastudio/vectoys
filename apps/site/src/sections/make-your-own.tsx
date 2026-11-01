@@ -9,7 +9,7 @@ export function MakeYourOwn() {
         <h2 id="make-your-own-title">Make your own with your agent</h2>
         <p>The CLI comes with a skill that teaches a coding agent how items are built. Give it this prompt and it creates, checks, previews and submits the item for you.</p>
       </div>
-      <CopyPrompt prompt={PROMPT} caption="Prompt for your agent" />
+      <CopyPrompt prompt={PROMPT} caption="Prompt to make your own toy" placement="make-your-own" />
     </section>
   );
 }

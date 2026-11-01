@@ -56,7 +56,11 @@ Items are copied into your project as source, so you can change them. The engine
 npx @vinena/vectoys-cli add laptop
 ```
 
-This writes `vectoys.json`, copies the item to `src/components/vectoys/laptop/` (or `components/vectoys/` without a `src` folder), and installs `@vinena/vectoys` and `@vinena/vectoys-react` with your package manager. `npx @vinena/vectoys-cli list` shows every item. The shadcn CLI works too:
+This writes `vectoys.json`, copies the item to `src/components/vectoys/laptop/` (or `components/vectoys/` without a `src` folder), and installs `@vinena/vectoys` and `@vinena/vectoys-react` with your package manager. `npx @vinena/vectoys-cli list` shows every item.
+
+The CLI finds your package manager in your project or in the workspace above it: the `packageManager` field first, then the lockfile. In a monorepo it installs in the app folder you run it from. If your tsconfig.json uses `node16` or `nodenext` module resolution, the CLI adds `.js` to the relative imports in the copied files (or `.ts` and `.tsx` with `allowImportingTsExtensions`). Bundler projects get the files unchanged.
+
+The shadcn CLI works too:
 
 ```sh
 npx shadcn add https://vectoys.com/r/laptop.json

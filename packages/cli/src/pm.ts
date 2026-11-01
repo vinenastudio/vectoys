@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 export type PackageManager = "bun" | "pnpm" | "yarn" | "npm";
 
@@ -20,9 +20,32 @@ export function isPackageSpec(value: unknown): value is string {
   return typeof value === "string" && SPEC.test(value);
 }
 
-/** The package manager whose lockfile the project has, npm if none. */
+/**
+ * The package manager of the project or the workspace it is in: the first
+ * folder up from `cwd` with a lockfile, a pnpm-workspace.yaml, or a
+ * package.json that names a packageManager or workspaces. Its packageManager
+ * field wins over its lockfile. The search stops at the repository root, the
+ * first folder with a .git. npm if no folder has one.
+ */
 export function detect(cwd: string): PackageManager {
-  return LOCKFILES.find(([file]) => existsSync(join(cwd, file)))?.[1] ?? "npm";
+  for (let dir = cwd; ; dir = dirname(dir)) {
+    const pkg = readPackage(join(dir, "package.json"));
+    const named = typeof pkg?.packageManager === "string" ? pkg.packageManager.split("@")[0] : undefined;
+    if (named === "bun" || named === "pnpm" || named === "yarn" || named === "npm") return named;
+    const locked = LOCKFILES.find(([file]) => existsSync(join(dir, file)))?.[1];
+    if (locked) return locked;
+    if (existsSync(join(dir, "pnpm-workspace.yaml"))) return "pnpm";
+    if (pkg?.packageManager || pkg?.workspaces || existsSync(join(dir, ".git")) || dirname(dir) === dir) return "npm";
+  }
+}
+
+function readPackage(path: string): Record<string, unknown> | undefined {
+  if (!existsSync(path)) return undefined;
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return undefined;
+  }
 }
 
 export function installCommand(pm: PackageManager, packages: string[]): [string, string[]] {

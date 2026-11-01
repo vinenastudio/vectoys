@@ -394,17 +394,38 @@ code.inline {
   color: var(--muted);
 }
 
-.hero .command {
-  background: var(--page);
-}
-
-.hero .command code {
-  font-size: 14.5px;
-}
-
 .hero-note {
   font-size: 14px;
   color: var(--muted);
+}
+
+/* The prompt sits on the page color like the command did, and its full text link right under it. */
+.hero-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.hero .prompt {
+  max-width: 100%;
+  background: var(--page);
+}
+
+.hero .prompt p {
+  overflow-wrap: anywhere;
+}
+
+.hero-link {
+  font-size: 14px;
+  color: var(--muted);
+  transition: color 150ms var(--ease);
+}
+
+.hero-link:hover,
+.hero-link:focus-visible {
+  color: var(--ink);
 }
 
 .hero-stage {
@@ -444,12 +465,6 @@ code.inline {
 .hero-phone:focus-visible > div > svg > path:last-child {
   stroke: var(--accent) !important;
   stroke-width: 3px !important;
-}
-
-@media (max-width: 719px) {
-  .hero .command code {
-    font-size: 12.5px;
-  }
 }
 
 /* Narrow and upright screens stack the copy over the phone; a short landscape window keeps the two columns. */

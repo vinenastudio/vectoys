@@ -1,11 +1,10 @@
 import { Phone, TURN } from "@vectoys/phone";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
-import { CopyCommand } from "../components/copy-command";
-import { addCommand } from "../registry";
+import { CopyPrompt } from "../components/copy-command";
 import { clamp, useInFocus, useReducedMotion } from "../motion";
 import { START, TodoApp, todosReducer } from "./todo";
 
-const COMMAND = addCommand("phone");
+const PROMPT = "Read https://vectoys.com/prompt.txt and follow it on my landing page.";
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 /** How far along `from` to `to` the time `t` is, eased, from 0 to 1. */
@@ -387,7 +386,12 @@ export function Hero() {
             Phones, laptops and small toys for your React landing page. The screen is live HTML you can tap and type into. No WebGL, no images,
             MIT.
           </p>
-          <CopyCommand command={COMMAND} className="command-hero" />
+          <div className="hero-prompt">
+            <CopyPrompt prompt={PROMPT} caption="Prompt for your agent" placement="hero" />
+            <a href="/prompt.txt" className="hero-link">
+              Read the full prompt
+            </a>
+          </div>
           <p className="hero-note">That phone is live HTML. Add a to-do.</p>
         </div>
         <HeroPhone />
