@@ -8,6 +8,7 @@ import { MakeYourOwn } from "./sections/make-your-own";
 import { Scrub } from "./sections/scrub";
 import { Showcase } from "./sections/showcase";
 import { Toys } from "./sections/toys";
+import { Trick } from "./sections/trick";
 import { Typing } from "./sections/typing";
 import { Uses } from "./sections/uses";
 
@@ -28,6 +29,7 @@ export function App({ index, page }: { index: RegistryIndex | null; page: Page }
             <Hero />
             <div className="sections">
               <JustSvg />
+              <Trick />
               <Scrub />
               <Typing />
               <Uses index={index} />

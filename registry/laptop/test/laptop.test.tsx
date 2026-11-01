@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
-import { fixed, screenQuad } from "@vinena/vectoys";
+import { fixed, screenQuad, scrub } from "@vinena/vectoys";
 import { renderToString } from "react-dom/server";
-import { DESK, FRONT, GLASS, LAPTOP_BOX, Laptop, PHONE, PITCH, WIDTH, YAW } from "../src";
+import { DESK, FRONT, GLASS, KICKFLIP, LAPTOP_BOX, Laptop, PHONE, PITCH, WIDTH, YAW } from "../src";
 
 test.each([
   [DESK, "0 0 100 70"],
@@ -177,4 +177,76 @@ test("an eye's id keys its box, which the type checker knows", () => {
   expect(desk).toBe("desk");
   // @ts-expect-error FRONT does not turn, so it has no box.
   expect(LAPTOP_BOX[FRONT.id]).toBeUndefined();
+});
+
+test("a free laptop renders on the server the same twice, from any side, with no NaN", () => {
+  for (const pose of [{ flat: 1 }, { lid: 0, roll: 170, yaw: 80, y: 0.5, scale: 1.1, flat: 0.4 }, { lid: 0.5, pitch: -40, yaw: 200 }]) {
+    const render = () =>
+      renderToString(
+        <Laptop eye={DESK} free turning {...pose}>
+          <p>live</p>
+        </Laptop>,
+      );
+    expect(render()).toBe(render());
+    expect(render()).toContain(`<svg viewBox="0 0 ${LAPTOP_BOX.desk.width} ${LAPTOP_BOX.desk.height}"`);
+    expect(render()).not.toMatch(/NaN|Infinity/);
+  }
+});
+
+/** The bounds of some path data, as (left, top, right, bottom). */
+const bounds = (d: string) => {
+  const all = points(d);
+  return [Math.min(...all.map(([x]) => x)), Math.min(...all.map(([, y]) => y)), Math.max(...all.map(([x]) => x)), Math.max(...all.map(([, y]) => y))];
+};
+
+test.each([DESK, PHONE])("at flat 1, open and square on, the lid, the base and the glass stand where FRONT draws them across the eye's scene", (eye) => {
+  const view = eye.trick({ lid: 1, yaw: 0, pitch: eye.pitch, flat: 1, x: 0, y: 0, scale: 1, roll: 0 });
+  const scale = 100 / FRONT.camera.width;
+  // In FRONT's scene: the lid from 10.7 to 110.7 hundredths of its width across, the base under it over the whole scene.
+  const lid = (hundredths: number) => (hundredths * WIDTH * scale) / 100;
+  const expected = { lid: [lid(10.7), 0, lid(110.7)], base: [0, lid(100 / 1.465), 100, lid(100 / 1.465 + 4.37)] };
+  bounds(view.d["lid.face"] ?? "").slice(0, 3).forEach((value, index) => expect(value).toBeCloseTo(expected.lid[index] ?? 0, 1));
+  bounds(view.d["base.hull"] ?? "").forEach((value, index) => expect(value).toBeCloseTo(expected.base[index] ?? 0, 1));
+  const quad = screenQuad(view.camera, view.glass, GLASS, { width: 1, height: 1 });
+  const front = screenQuad(FRONT.camera, FRONT.pose, FRONT.glass, { width: 1, height: 1 });
+  quad.corners.forEach(([x, y], index) => {
+    expect(x).toBeCloseTo((front.corners[index]?.[0] ?? 0) * scale, 2);
+    expect(y).toBeCloseTo((front.corners[index]?.[1] ?? 0) * scale, 2);
+  });
+  // Level with the deck, the eye sees neither it nor the underside.
+  expect(view.d["base.top"]).toBe("");
+  expect(view.d["base.under"]).toBe("");
+});
+
+test("from flat 1 to 0 the drawing moves a little for a little flat, and at 0 the camera is the eye's own", () => {
+  const at = (flat: number) => DESK.trick({ lid: 1, yaw: 0, pitch: 15, flat, x: 0, y: 0, scale: 1, roll: 0 });
+  for (let flat = 0; flat < 1; flat += 0.05) {
+    const [a, b] = [bounds(at(flat).d["base.hull"] ?? ""), bounds(at(flat + 0.05).d["base.hull"] ?? "")];
+    a.forEach((value, index) => expect(Math.abs(value - (b[index] ?? 0))).toBeLessThan(4));
+  }
+  const { camera } = at(0);
+  for (const key of ["perspective", "back", "originX", "originY", "anchorX", "anchorY", "pitch"] as const) expect(camera[key]).toBeCloseTo(DESK.camera[key], 6);
+});
+
+test("the kickflip shuts the lid straight on, flips and turns once round, lands on the ground in the eye's own look and opens", () => {
+  const first = KICKFLIP[0];
+  const last = KICKFLIP[KICKFLIP.length - 1];
+  expect(first).toMatchObject({ at: 0, lid: 1, flat: 1, roll: 0, yaw: 0, scale: 1 });
+  expect(last).toMatchObject({ at: 1, lid: 1, flat: 0, roll: 360, yaw: 360, y: 0, scale: 1 });
+  const at = (t: number) => scrub(t, KICKFLIP);
+  expect(at(0.12).lid).toBe(0);
+  expect(at(0.12).flat).toBe(1);
+  // Coming down, the eye rises a little, so the shut slab shows its top before the pop.
+  expect(at(0.3).flat).toBeLessThan(0.8);
+  expect(at(0.3).flat).toBeGreaterThan(0.5);
+  // It crouches before the pop, drawing its front back, and is high in the air at the top of the flip.
+  expect(at(0.36).y).toBeLessThan(0);
+  expect(at(0.37).roll).toBeLessThan(0);
+  expect(at(0.5).y).toBeGreaterThan(0.45);
+  expect(at(0.5).scale).toBeGreaterThan(1);
+  // Its landing bounces up a little and never goes through the ground after.
+  const landing = Array.from({ length: 60 }, (_, step) => at(0.62 + (step / 60) * 0.2).y);
+  expect(Math.max(...landing)).toBeGreaterThan(0.02);
+  expect(Math.min(...landing)).toBeGreaterThanOrEqual(0);
+  for (let step = 1; step < KICKFLIP.length; step++) expect(KICKFLIP[step]?.at ?? 0).toBeGreaterThan(KICKFLIP[step - 1]?.at ?? 1);
 });

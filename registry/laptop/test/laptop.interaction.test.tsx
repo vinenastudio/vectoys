@@ -146,3 +146,90 @@ test.each([
   );
   expect(markup(moved.host)).toBe(markup(drawn.host));
 });
+
+/** `markup`, with a free laptop's own gradient and filter names made one too. */
+const freeMarkup = (host: HTMLElement) => markup(host).replace(/laptop-(desk|phone)-[\w-]*?-(?=face|ends|streak|hinge|edge|rim|wall|floor|feet|foot|soft|scoop)/g, "laptop-$1-X-");
+
+const POSES = [
+  { lid: 1, flat: 1 },
+  { lid: 0.3, flat: 1, y: 0.4 },
+  { lid: 0, flat: 0.6, roll: 140, yaw: 100, y: 0.5, scale: 1.1 },
+  { lid: 0, flat: 0.2, roll: 220, yaw: 250, x: -0.3 },
+  { lid: 0, flat: 0, roll: 300, yaw: 175 },
+  { lid: 0.7, flat: 0, pitch: -20, yaw: 160 },
+  { lid: 1, flat: 0 },
+];
+
+test.each([DESK, PHONE])("a free laptop's handle draws every pose as its props would, from the underside and the back too, with no render", async (eye) => {
+  const handle = createRef<LaptopHandle>();
+  let renders = 0;
+  const Counted = () => {
+    renders += 1;
+    return <p>live</p>;
+  };
+  const moved = await mount(
+    <Laptop eye={eye} free ref={handle}>
+      <Counted />
+    </Laptop>,
+  );
+  for (const pose of POSES) {
+    await act(async () => handle.current?.set({ x: 0, y: 0, scale: 1, roll: 0, yaw: 0, pitch: eye.pitch, ...pose }));
+    const drawn = await mount(
+      <Laptop eye={eye} free ref={createRef<LaptopHandle>()} {...pose}>
+        <p>live</p>
+      </Laptop>,
+    );
+    expect(freeMarkup(moved.host)).toBe(freeMarkup(drawn.host));
+    await drawn.unmount();
+  }
+  expect(renders).toBe(1);
+});
+
+test("not free, a laptop moved by its new fields holds its turns to their ranges; free, it does not", async () => {
+  const draw = async (props: object, pose: object) => {
+    const handle = createRef<LaptopHandle>();
+    const moved = await mount(
+      <Laptop eye={DESK} {...props} ref={handle}>
+        <Live />
+      </Laptop>,
+    );
+    await act(async () => handle.current?.set(pose));
+    const html = freeMarkup(moved.host);
+    await moved.unmount();
+    return html;
+  };
+  expect(await draw({ flat: 0 }, { roll: 200, yaw: 90, pitch: 60, lid: 3, flat: 2 })).toBe(await draw({ flat: 0 }, { roll: 35, yaw: 35, pitch: 30, lid: 1, flat: 1 }));
+  expect(await draw({ free: true }, { roll: 200, yaw: 90 })).not.toBe(await draw({ free: true }, { roll: 35, yaw: 35 }));
+});
+
+test("seen from under the deck or shut, a free laptop hides the glass, and shows it again open from above", async () => {
+  const handle = createRef<LaptopHandle>();
+  const { host } = await mount(
+    <Laptop eye={DESK} free ref={handle}>
+      <Live />
+    </Laptop>,
+  );
+  const glass = host.querySelector("p")?.closest<HTMLElement>("[style*='matrix3d'], [style*='visibility']");
+  expect(glass?.style.visibility).toBe("visible");
+  await act(async () => handle.current?.set({ lid: 0, roll: 180 }));
+  expect(glass?.style.visibility).toBe("hidden");
+  await act(async () => handle.current?.set({ lid: 1, roll: 0, flat: 1 }));
+  expect(glass?.style.visibility).toBe("visible");
+});
+
+test("a free laptop's parts reorder in the page as the eye goes round them, and a render puts them back as drawn", async () => {
+  const handle = createRef<LaptopHandle>();
+  const page = (yaw: number) => (
+    <Laptop eye={DESK} free yaw={yaw} lid={1} ref={handle}>
+      <Live />
+    </Laptop>
+  );
+  const moved = await mount(page(0));
+  const order = () => [...(moved.host.querySelector("svg > g:last-of-type")?.children ?? [])].map((part) => (part.querySelector("[fill*='-edge']") ? "lid" : part.querySelector("[fill*='-face']") ? "base" : "feet"));
+  const first = order();
+  expect(first).toEqual(["lid", "feet", "base"]);
+  await act(async () => handle.current?.set({ yaw: 180 }));
+  expect(order()).toEqual(["feet", "base", "lid"]);
+  await moved.rerender(page(10));
+  expect(order()).toEqual(first);
+});

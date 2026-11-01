@@ -1500,6 +1500,40 @@ code.inline {
   }
 }
 
+/*
+ * Kickflip it: the laptop's stage is where it lands, with room above it for
+ * where it starts, 0.6 of its width up, and the drawing may leave both.
+ */
+.trick-slot {
+  width: min(100%, calc((100svh - 120px) / 1.14));
+}
+
+.trick-room {
+  padding-top: 40%;
+}
+
+.trick-stills {
+  display: grid;
+  gap: 32px;
+}
+
+.trick-still {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.trick-still figcaption {
+  color: var(--muted);
+}
+
+@media (min-width: 900px) {
+  .trick-stills {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 /* Type on it: the full keyboard as wide as the page, with room kept for it and its buttons before it draws. */
 .typing {
   container-type: inline-size;

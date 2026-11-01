@@ -32,8 +32,8 @@ export const BRANDS = [
 ];
 const BRAND = new RegExp(`\\b(${BRANDS.map((brand) => brand.replace(" ", "\\s+")).join("|")})\\b`, "gi");
 
-/** The most an item's files may weigh together, in bytes. */
-export const MAX_SOURCE = 64 * 1024;
+/** The most an item's files may weigh together, in bytes: room for a device with a full 3D model and a hand-drawn front. */
+export const MAX_SOURCE = 96 * 1024;
 
 export type Result = { pass: boolean; line: string };
 

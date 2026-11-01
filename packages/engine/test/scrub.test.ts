@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { clamp, ease, lerp, scrub, segment } from "../src";
+import { EASES, backIn, backInOut, backOut, clamp, cubicBezier, ease, easing, lerp, scrub, segment, settle } from "../src";
 
 test("clamp holds a value between two others", () => {
   expect(clamp(5, 0, 1)).toBe(1);
@@ -66,4 +66,57 @@ test("scrub eases each segment, linear on request, and holds outside the keyfram
 test("scrub types the fields it returns", () => {
   const { lid, yaw, pitch }: { lid: number; yaw: number; pitch: number } = scrub(0.5, KEYS);
   expect(Number.isFinite(lid + yaw + pitch)).toBe(true);
+});
+
+test("the back eases draw back, overshoot and land on their ends", () => {
+  for (const shape of [backIn, backOut, backInOut]) {
+    expect(shape(0)).toBeCloseTo(0, 10);
+    expect(shape(1)).toBeCloseTo(1, 10);
+    expect(shape(-1)).toBe(shape(0));
+    expect(shape(2)).toBe(shape(1));
+  }
+  expect(Math.min(...steps.map(backIn))).toBeLessThan(-0.05);
+  expect(Math.max(...steps.map(backOut))).toBeGreaterThan(1.05);
+  expect(backInOut(0.5)).toBeCloseTo(0.5, 10);
+  expect(Math.min(...steps.map(backInOut))).toBeLessThan(0);
+  expect(Math.max(...steps.map(backInOut))).toBeGreaterThan(1);
+});
+
+const steps = Array.from({ length: 201 }, (_, step) => step / 200);
+
+test("settle falls to 1, bounces lower each time without passing 1, and lands for good", () => {
+  expect(settle(0)).toBe(0);
+  expect(settle(1)).toBe(1);
+  expect(settle(2)).toBe(1);
+  const values = steps.map(settle);
+  expect(Math.max(...values)).toBeLessThanOrEqual(1);
+  // The lowest point of each bounce, after the fall, each nearer 1 than the last.
+  const dips = values.filter((value, index) => index > 0 && value < (values[index - 1] ?? 0) && value <= (values[index + 1] ?? 1));
+  expect(dips.length).toBe(3);
+  for (let index = 1; index < dips.length; index++) expect(dips[index]).toBeGreaterThan(dips[index - 1] ?? 1);
+  expect(dips[0]).toBeLessThan(0.95);
+});
+
+test("cubicBezier follows CSS's curves", () => {
+  const linear = cubicBezier(0, 0, 1, 1);
+  for (const t of [0, 0.25, 0.5, 0.75, 1]) expect(linear(t)).toBeCloseTo(t, 6);
+  // CSS's own `ease`: at each point of the curve, the time it is at gives the share it is at.
+  const css = cubicBezier(0.25, 0.1, 0.25, 1);
+  const at = (a: number, b: number, s: number) => 3 * a * s * (1 - s) ** 2 + 3 * b * s * s * (1 - s) + s ** 3;
+  for (const s of [0.1, 0.3, 0.5, 0.8]) expect(css(at(0.25, 0.25, s))).toBeCloseTo(at(0.1, 1, s), 6);
+  expect(css(0.5)).toBeCloseTo(0.8024, 3);
+  const over = cubicBezier(0.3, 0, 0.2, 1.6);
+  expect(Math.max(...steps.map(over))).toBeGreaterThan(1);
+  expect(over(1)).toBeCloseTo(1, 6);
+});
+
+test("a keyframe's ease shapes the segment that ends at it, by name, function or curve", () => {
+  const keys = [{ at: 0, y: 0 }, { at: 0.5, y: 10, ease: "backOut" }, { at: 1, y: 0, ease: [0, 0, 1, 1] }] as const;
+  expect(scrub(0.25, keys).y).toBeCloseTo(10 * backOut(0.5), 10);
+  expect(scrub(0.75, keys).y).toBeCloseTo(5, 6);
+  expect(scrub(0.25, [{ at: 0, y: 0 }, { at: 1, y: 4, ease: (t: number) => t * t }]).y).toBeCloseTo(0.25, 10);
+  // Without its own, a segment takes the one scrub is given, and `ease` is not a field.
+  expect(scrub(0.75, [...keys.slice(0, 2), { at: 1, y: 0 }], { ease: EASES.linear }).y).toBeCloseTo(5, 10);
+  expect(Object.keys(scrub(0.5, keys))).toEqual(["y"]);
+  expect(easing("settle")).toBe(settle);
 });

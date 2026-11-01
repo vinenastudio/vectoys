@@ -1,7 +1,7 @@
-import { clamp, fixed } from "@vinena/vectoys";
+import { clamp, fixed, lerp } from "@vinena/vectoys";
 import { Screen, Stage, placeScreen } from "@vinena/vectoys-react";
-import { memo, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
-import { BEZEL, DESK, GLASS, HOLE, PITCH, ROUND, YAW, type LaptopPose, type Perspective, type Posed, type Straight, type View } from "./geometry";
+import { memo, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type Ref, type SVGProps } from "react";
+import { BEZEL, DESK, FRONT, GLASS, HOLE, PITCH, ROUND, TONES, YAW, type LaptopPose, type Perspective, type Posed, type Straight, type Trick, type TrickPose, type View } from "./geometry";
 
 // The page's colors, as CSS variables, each with the light tone of the site
 // this laptop was first drawn for, so it shows as meant before they are set.
@@ -116,22 +116,29 @@ const Base = memo(function Base({ id, deck: DECK, holes: name, node }: { id: str
   );
 });
 
-/** What the drawing refers to, under names of its own so any number of laptops share a page. */
-const defs = (id: string, { width, height }: Perspective["camera"], holes: string) => (
-  <>
-    <style>{holes}</style>
-    <filter id={`${id}-near`} filterUnits="userSpaceOnUse" x="0" y="0" width={width} height={height}>
-      <feGaussianBlur stdDeviation="0.4 0.2" />
-    </filter>
-    <filter id={`${id}-far`} filterUnits="userSpaceOnUse" x="0" y="0" width={width} height={height}>
-      <feGaussianBlur stdDeviation="2 0.9" />
-    </filter>
-    <linearGradient id={`${id}-sheen`} x1="0" y1="0" x2="0.35" y2="1">
-      <stop offset="0" style={{ stopColor: `color-mix(in srgb, ${SURFACE_TONE} 70%, ${BG})` }} />
-      <stop offset="1" style={{ stopColor: SURFACE_TONE }} />
-    </linearGradient>
-  </>
-);
+/**
+ * What the drawing refers to, under names of its own so any number of
+ * laptops share a page. A free laptop's shadows blur past the stage, the far
+ * one by `blur`, which a pose sets.
+ */
+const defs = (id: string, { width, height }: Perspective["camera"], holes: string, blur?: SVGProps<SVGFEGaussianBlurElement>) => {
+  const region = blur ? { x: -width, y: -height, width: 3 * width, height: 3 * height } : { x: "0", y: "0", width, height };
+  return (
+    <>
+      <style>{holes}</style>
+      <filter id={`${id}-near`} filterUnits="userSpaceOnUse" {...region}>
+        <feGaussianBlur stdDeviation="0.4 0.2" />
+      </filter>
+      <filter id={`${id}-far`} filterUnits="userSpaceOnUse" {...region}>
+        <feGaussianBlur stdDeviation="2 0.9" {...blur} />
+      </filter>
+      <linearGradient id={`${id}-sheen`} x1="0" y1="0" x2="0.35" y2="1">
+        <stop offset="0" style={{ stopColor: `color-mix(in srgb, ${SURFACE_TONE} 70%, ${BG})` }} />
+        <stop offset="1" style={{ stopColor: SURFACE_TONE }} />
+      </linearGradient>
+    </>
+  );
+};
 
 // The glass's top corners follow the lid's, inside the bezel, as shares of
 // the glass so they hold at any size the content lays out at.
@@ -147,8 +154,8 @@ const GLASS_STYLE: CSSProperties = {
 };
 const FILL: CSSProperties = { position: "absolute", inset: 0 };
 
-/** Moves a laptop to a new pose at once, without a render; any of the three left out stays as it is. */
-export type LaptopHandle = { set(pose: Partial<LaptopPose>): void };
+/** Moves a laptop to a new pose at once, without a render; any field left out stays as it is. */
+export type LaptopHandle = { set(pose: Partial<TrickPose>): void };
 
 type LaptopProps = {
   /** How far the lid is open, from 0 (shut on the base) to 1 (open); open by default. `FRONT` is always open. */
@@ -166,6 +173,29 @@ type LaptopProps = {
    * and crop.
    */
   turning?: boolean;
+  /**
+   * How much the laptop looks as `FRONT` draws it, from 0, the eye's own
+   * look, to 1, FRONT's straight-on shot: there, open and with every angle
+   * 0, it draws as `<Laptop eye={FRONT}>` does with FRONT's scene across the
+   * eye's own, from its top. Between, the camera, the shapes and the tones
+   * ease from one to the other in any pose.
+   */
+  flat?: number;
+  /** A move across the drawing, in shares of the laptop's width, `WIDTH`; positive is to the right. */
+  x?: number;
+  /** A move up the drawing in shares of the laptop's width: its height over the ground, where its shadow stays. */
+  y?: number;
+  /** How large it draws about its middle, 1 at rest. */
+  scale?: number;
+  /** A turn about the laptop's long axis, from left to right, in degrees; positive lifts its front. */
+  roll?: number;
+  /**
+   * Lets the laptop turn any way: no range holds `yaw`, `pitch` or `roll`,
+   * and the drawing may leave its box, so size the box round where it goes.
+   * With this or any of `flat`, `x`, `y`, `scale` and `roll`, the laptop is
+   * drawn as a closed slab from every side, its underside and back too.
+   */
+  free?: boolean;
   /** The eye that sees it: `DESK`, `PHONE` or `FRONT`; `DESK` by default. */
   eye?: View;
   /** The laptop's name for assistive technology. */
@@ -175,10 +205,11 @@ type LaptopProps = {
   /**
    * A handle whose `set({ lid, yaw, pitch })` redraws the laptop in a new
    * pose without a render, for a pose that moves every frame, as a scroll
-   * does. The handle owns the pose from its first `set` until a `lid`,
-   * `closed`, `yaw` or `pitch` prop changes; then the props' pose is drawn.
-   * Renders for anything else, such as new content on the display, keep
-   * the handle's pose. `FRONT` does not move, so there it does nothing.
+   * does. The handle owns the pose from its first `set` until a pose prop
+   * changes; then the props' pose is drawn. Renders for anything else, such
+   * as new content on the display, keep the handle's pose. `flat`, `x`,
+   * `y`, `scale` and `roll` move a laptop given `free` or any of them as a
+   * prop, and no other. `FRONT` does not move, so there it does nothing.
    */
   ref?: Ref<LaptopHandle>;
 };
@@ -188,12 +219,21 @@ type LaptopProps = {
  * drawn from the laptop's projected outline, and the display's glass laid onto the lid with
  * live content on it, hidden while the lid faces away.
  */
-export const Laptop = memo(function Laptop({ lid, closed = 0, yaw, pitch, turning = false, eye = DESK, children, label = "Laptop", ref }: LaptopProps) {
+export const Laptop = memo(function Laptop(props: LaptopProps) {
+  const { lid, closed = 0, yaw, pitch, flat, x, y, scale, roll, free = false, turning = false, eye = DESK, children, label = "Laptop", ref } = props;
   if ("art" in eye) {
     return (
       <Front eye={eye} label={label} handle={ref}>
         {children}
       </Front>
+    );
+  }
+  if (free || [flat, x, y, scale, roll].some((value) => value !== undefined)) {
+    const pose = loose({ lid: lid ?? 1 - closed, yaw: yaw ?? 0, pitch: pitch ?? eye.pitch, flat: flat ?? 0, x: x ?? 0, y: y ?? 0, scale: scale ?? 1, roll: roll ?? 0 }, free);
+    return (
+      <Free pose={pose} free={free} turning={turning} eye={eye} label={label} handle={ref}>
+        {children}
+      </Free>
     );
   }
   // With none of the pose's props, a handle or `turning`, the markup is the
@@ -491,6 +531,79 @@ const frontGlass = ({ glass, round }: Straight): CSSProperties => {
   return { ...GLASS_STYLE, borderRadius: `${x} ${x} 0 0 / ${y} ${y} 0 0`, clipPath: `inset(0 round ${x} ${x} 0 0 / ${y} ${y} 0 0)` };
 };
 
+/**
+ * FRONT's tones, for `Front` and for a free laptop at `flat`: `edge` is where
+ * the lid's edge darkens, `feet` where the feet's tones run with `foot` as
+ * their stops, `soft` the blur on the scoop's walls and `scoop` the shape
+ * that clips them.
+ */
+const frontDefs = (
+  id: string,
+  edge: SVGProps<SVGLinearGradientElement>,
+  feet: SVGProps<SVGLinearGradientElement>,
+  foot: readonly (readonly [number, number])[],
+  soft: number,
+  scoop: ReactNode,
+) => (
+  <>
+    <linearGradient id={`${id}-face`} x1="0" y1="0" x2="0" y2="1">
+      {stops(FACE)}
+    </linearGradient>
+    <linearGradient id={`${id}-ends`} x1="0" y1="0" x2="1" y2="0">
+      {mirrored(ENDS).map(([offset, opacity]) => (
+        <stop key={offset} offset={offset} style={{ stopColor: tone(62), stopOpacity: opacity }} />
+      ))}
+    </linearGradient>
+    <linearGradient id={`${id}-streak`} x1="0" y1="0" x2="1" y2="0">
+      {mirrored(STREAK).map(([offset, opacity]) => (
+        <stop key={offset} offset={offset} style={{ stopColor: FINISH, stopOpacity: opacity }} />
+      ))}
+    </linearGradient>
+    <linearGradient id={`${id}-hinge`} x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stopColor="#161616" />
+      <stop offset="1" stopColor="#030303" />
+    </linearGradient>
+    <linearGradient id={`${id}-edge`} gradientUnits="userSpaceOnUse" {...edge}>
+      {stops([
+        [0, 66],
+        [1, 73],
+      ])}
+    </linearGradient>
+    <linearGradient id={`${id}-rim`} gradientUnits="userSpaceOnUse" {...edge}>
+      {stops([
+        [0, 60],
+        [1, 67],
+      ])}
+    </linearGradient>
+    <linearGradient id={`${id}-wall`} x1="0" y1="0" x2="0" y2="1">
+      {stops([
+        [0, 15],
+        [0.5, 30],
+        [0.85, 75],
+        [1, 90],
+      ])}
+    </linearGradient>
+    <linearGradient id={`${id}-floor`} x1="0" y1="0" x2="0" y2="1">
+      {stops([
+        [0, 96],
+        [0.9, 100],
+      ])}
+    </linearGradient>
+    <linearGradient id={`${id}-feet`} {...feet}>
+      {stops(foot)}
+    </linearGradient>
+    <linearGradient id={`${id}-foot`} x1="0" y1="0" x2="1" y2="0">
+      {mirrored(FOOT_ROUND).map(([offset, opacity]) => (
+        <stop key={offset} offset={offset} style={{ stopColor: "black", stopOpacity: opacity }} />
+      ))}
+    </linearGradient>
+    <filter id={`${id}-soft`}>
+      <feGaussianBlur stdDeviation={soft} />
+    </filter>
+    <clipPath id={`${id}-scoop`}>{scoop}</clipPath>
+  </>
+);
+
 /** The laptop straight on, drawn flat, with live content on its display under the notch. */
 function Front({ eye, children, label, handle }: { eye: Straight; label: string; children?: ReactNode; handle?: Ref<LaptopHandle> | undefined }) {
   const id = `laptop-${eye.id}-${useId().replace(/[^\w-]/g, "")}`;
@@ -526,63 +639,14 @@ function Front({ eye, children, label, handle }: { eye: Straight; label: string;
   return (
     <Stage role={children == null ? "img" : "group"} label={label} camera={camera} overlay={glass}>
       <defs>
-        <linearGradient id={`${id}-face`} x1="0" y1="0" x2="0" y2="1">
-          {stops(FACE)}
-        </linearGradient>
-        <linearGradient id={`${id}-ends`} x1="0" y1="0" x2="1" y2="0">
-          {mirrored(ENDS).map(([offset, opacity]) => (
-            <stop key={offset} offset={offset} style={{ stopColor: tone(62), stopOpacity: opacity }} />
-          ))}
-        </linearGradient>
-        <linearGradient id={`${id}-streak`} x1="0" y1="0" x2="1" y2="0">
-          {mirrored(STREAK).map(([offset, opacity]) => (
-            <stop key={offset} offset={offset} style={{ stopColor: FINISH, stopOpacity: opacity }} />
-          ))}
-        </linearGradient>
-        <linearGradient id={`${id}-hinge`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#161616" />
-          <stop offset="1" stopColor="#030303" />
-        </linearGradient>
-        <linearGradient id={`${id}-edge`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={art.rimFade}>
-          {stops([
-            [0, 66],
-            [1, 73],
-          ])}
-        </linearGradient>
-        <linearGradient id={`${id}-rim`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={art.rimFade}>
-          {stops([
-            [0, 60],
-            [1, 67],
-          ])}
-        </linearGradient>
-        <linearGradient id={`${id}-wall`} x1="0" y1="0" x2="0" y2="1">
-          {stops([
-            [0, 15],
-            [0.5, 30],
-            [0.85, 75],
-            [1, 90],
-          ])}
-        </linearGradient>
-        <linearGradient id={`${id}-floor`} x1="0" y1="0" x2="0" y2="1">
-          {stops([
-            [0, 96],
-            [0.9, 100],
-          ])}
-        </linearGradient>
-        <linearGradient id={`${id}-feet`} gradientUnits="userSpaceOnUse" x1="0" y1={art.feetTop} x2="0" y2={art.feetBottom}>
-          {stops(FOOT)}
-        </linearGradient>
-        <linearGradient id={`${id}-foot`} x1="0" y1="0" x2="1" y2="0">
-          {mirrored(FOOT_ROUND).map(([offset, opacity]) => (
-            <stop key={offset} offset={offset} style={{ stopColor: "black", stopOpacity: opacity }} />
-          ))}
-        </linearGradient>
-        <filter id={`${id}-soft`}>
-          <feGaussianBlur stdDeviation="0.12" />
-        </filter>
-        <clipPath id={`${id}-scoop`}>
-          <path d={art.scoop} />
-        </clipPath>
+        {frontDefs(
+          id,
+          { x1: "0", y1: "0", x2: "0", y2: art.rimFade },
+          { gradientUnits: "userSpaceOnUse", x1: "0", y1: art.feetTop, x2: "0", y2: art.feetBottom },
+          FOOT,
+          0.12,
+          <path d={art.scoop} />,
+        )}
       </defs>
       {art.feet.map((foot) => (
         <g key={foot}>
@@ -603,6 +667,281 @@ function Front({ eye, children, label, handle }: { eye: Straight; label: string;
       <path d={art.scoop} fill={url("floor")} />
       <g clipPath={url("scoop")}>
         <path d={art.walls} fillRule="evenodd" fill={url("wall")} filter={url("soft")} />
+      </g>
+    </Stage>
+  );
+}
+
+/** A free laptop's pose held to its shares, and a laptop that is not free held to the ranges it takes, its roll as its yaw. */
+const loose = (pose: TrickPose, free: boolean): TrickPose => ({
+  ...pose,
+  ...(!free && { ...held(pose), roll: clamp(pose.roll, -YAW, YAW) }),
+  lid: clamp(pose.lid, 0, 1),
+  flat: clamp(pose.flat, 0, 1),
+  scale: Math.max(0, pose.scale),
+});
+
+const FIELDS = ["lid", "yaw", "pitch", "flat", "x", "y", "scale", "roll"] as const;
+
+// A free laptop is silver whatever the page's colors, as FRONT is: its
+// faces take `TONES` of the finish by how the lamp falls on them, its
+// hairlines a darker share, and the parts that are not aluminum their own.
+const LINE = hairline(tone(62));
+const UNDER = tone(TONES[5] ?? 90);
+const FOOT_PAD = tone(28);
+// The feet's tones run over the foot below the face, from 0.3 of FRONT's
+// foot, its top hidden under the face, so they fit the foot's own box.
+const FOOT_BOX = FOOT.map(([offset, share]): readonly [number, number] => [fixed((0.3 + offset * 0.6) / 0.9), share]);
+
+/** The glass's top corners and the notch, from the eye's own at `flat` 0 to FRONT's at 1. */
+function glassLook(flat: number) {
+  const [x, y] = [lerp(CORNER / GLASS.width, FRONT.round / FRONT.glass.width, flat), lerp(CORNER / GLASS.height, FRONT.round / FRONT.glass.height, flat)];
+  const radius = `${across(x)} ${across(x)} 0 0 / ${across(y)} ${across(y)} 0 0`;
+  const notch = lerp(0.125, FRONT.notch.across, flat);
+  return {
+    glass: { borderRadius: radius, clipPath: `inset(0 round ${radius})` },
+    notch: { left: across(0.5 - notch / 2), width: across(notch), height: across(lerp(0.036, FRONT.notch.down, flat)) },
+    sheen: { opacity: String(fixed(1 - flat)) },
+  };
+}
+
+/**
+ * What a frame of a free laptop writes, by node: path data, `fill` as a
+ * style, and the attributes a pose sets on its groups, gradients and blur.
+ */
+function looks(frame: Trick, { flat, y }: TrickPose) {
+  const values: Record<string, Record<string, string>> = Object.fromEntries(Object.entries(frame.d).map(([name, d]) => [name, { d }]));
+  const set = (name: string, more: Record<string, string>) => void (values[name] = { ...values[name], ...more });
+  const edge = (value: number) => String(fixed(value));
+  const high = Math.max(0, y);
+  set("base.top", { fill: tone(TONES[frame.deckTone] ?? 100) });
+  set("base.under", { fill: tone(TONES[frame.underTone] ?? 100) });
+  set("lid.outer", { fill: tone(TONES[frame.outerTone] ?? 100) });
+  set("lid.gasket", { fill: `color-mix(in srgb, ${GASKET} ${fixed(flat * 100)}%, black)` });
+  set("lid.gasketLine", { fill: `color-mix(in srgb, ${GASKET_LINE} ${fixed(flat * 100)}%, black)` });
+  set("edges", { x1: edge(frame.edge.x1), y1: edge(frame.edge.y1), x2: edge(frame.edge.x2), y2: edge(frame.edge.y2) });
+  set("flat", { opacity: String(fixed(flat)) });
+  set("front", { opacity: String(fixed(frame.front)) });
+  set("lines", { opacity: String(fixed(1 - flat)) });
+  // Off the ground the shadow fades and spreads, and the contact under the base goes first.
+  set("shadow", { opacity: String(fixed((1 - flat) / (1 + 5 * high))) });
+  set("shadow.near", { opacity: String(fixed(clamp(1 - high / 0.04, 0, 1))) });
+  set("blur", { stdDeviation: `${fixed(2 + 30 * high)} ${fixed(0.9 + 14 * high)}` });
+  return values;
+}
+
+/** Writes a free laptop's frame straight into the drawing, as a render of it would, writing only what changed since the last. */
+function trickPainter(eye: Perspective, turning: boolean, nodes: Nodes, id: string) {
+  let written = new Map<string, string>();
+  return {
+    /** Forgets what it wrote, after a render that may have written over it. */
+    reset() {
+      written = new Map();
+    },
+    draw(pose: TrickPose) {
+      const frame = eye.trick(pose, turning);
+      for (const [name, attributes] of Object.entries(looks(frame, pose))) {
+        for (const [attribute, value] of Object.entries(attributes)) {
+          if (written.get(`${name} ${attribute}`) === value) continue;
+          written.set(`${name} ${attribute}`, value);
+          for (const node of nodes.all(name)) {
+            if (attribute === "fill" && node instanceof SVGElement) node.style.fill = value;
+            else node.setAttribute(attribute, value);
+          }
+        }
+      }
+      const order = frame.order.join();
+      if (written.get("order") !== order) {
+        written.set("order", order);
+        for (const part of frame.order) for (const node of nodes.all(`part.${part}`)) node.parentNode?.appendChild(node);
+      }
+      const look = glassLook(pose.flat);
+      for (const glass of nodes.all("glass")) {
+        if (!(glass instanceof HTMLElement)) continue;
+        placeScreen(glass, frame.camera, frame.glass, GLASS);
+        Object.assign(glass.style, look.glass);
+      }
+      for (const notch of nodes.all("notch")) if (notch instanceof SVGElement) Object.assign(notch.style, look.notch);
+      for (const sheen of nodes.all("sheen")) if (sheen instanceof HTMLElement) Object.assign(sheen.style, look.sheen);
+    },
+  };
+}
+
+/** The laptop free to turn any way and to ease into FRONT's look, in a pose. */
+function Free({
+  pose,
+  free,
+  turning,
+  eye,
+  children,
+  label,
+  handle,
+}: {
+  pose: TrickPose;
+  free: boolean;
+  turning: boolean;
+  eye: Perspective;
+  label: string;
+  children?: ReactNode;
+  handle?: Ref<LaptopHandle> | undefined;
+}) {
+  const id = `laptop-${eye.id}-${useId().replace(/[^\w-]/g, "")}`;
+  const key = FIELDS.map((field) => pose[field]).join();
+  // `key` is the pose, field by field, so a new pose object with the same fields keeps the frame.
+  const frame = useMemo(() => eye.trick(pose, turning), [eye, turning, key]);
+  const values = looks(frame, pose);
+  const nodes = useNodes();
+  const paint = useMemo(() => trickPainter(eye, turning, nodes, id), [eye, turning, nodes, id]);
+  const set = useRef<{ pose: TrickPose; over: TrickPose; paint: typeof paint } | null>(null);
+  const given = useRef(pose);
+
+  // After every render the frame is drawn whole, the handle's if it still
+  // holds, so nothing a render wrote over is left behind.
+  useLayoutEffect(() => {
+    given.current = pose;
+    const hold = set.current;
+    if (hold && (hold.paint !== paint || FIELDS.some((field) => hold.over[field] !== pose[field]))) set.current = null;
+    paint.reset();
+    paint.draw(set.current?.pose ?? pose);
+  });
+
+  useImperativeHandle(
+    handle,
+    () => ({
+      set(next) {
+        const pose = loose({ ...(set.current?.pose ?? given.current), ...next }, free);
+        set.current = { pose, over: given.current, paint };
+        paint.draw(pose);
+      },
+    }),
+    [paint, free],
+  );
+
+  const bind = (name: string, style?: CSSProperties) => {
+    const { fill, ...rest } = values[name] ?? {};
+    return { ref: nodes.ref(name), ...rest, style: fill ? { ...style, fill } : style };
+  };
+  const url = (name: string) => `url(#${id}-${name})`;
+  const sides = (part: string) => TONES.map((share, step) => <path key={step} {...bind(`${part}.${step}`, { fill: tone(share) })} />);
+  const look = glassLook(pose.flat);
+  const { notch } = FRONT;
+  const holes = turning ? `${HOLES}-${eye.id}` : HOLES;
+
+  const parts = {
+    lid: (
+      <>
+        <path {...bind("lid.hull", { fill: UNDER })} />
+        {sides("lid")}
+        <path {...bind("lid.outer")} />
+        <path {...bind("lid.face", { fill: tone(95) })} />
+        <g {...bind("flat")}>
+          <path {...bind("lid.face")} fill={url("edge")} />
+          <path {...bind("lid.rim")} fill={url("rim")} />
+        </g>
+        <path {...bind("lid.gasket")} />
+        <path {...bind("lid.gasketLine")} />
+        <path {...bind("lid.glass")} fill="black" />
+        <g {...bind("flat")}>
+          <path {...bind("lid.hingeLine")} fill={HINGE_LINE} />
+          <path {...bind("lid.hinge")} fill={url("hinge")} />
+        </g>
+        <g {...bind("lines")}>
+          <path {...bind("lid.lines", LINE)} {...stroke} />
+        </g>
+      </>
+    ),
+    base: (
+      <>
+        <path {...bind("base.hull", { fill: UNDER })} />
+        {sides("base")}
+        <path {...bind("deck.hinge", { fill: HINGE })} />
+        <path {...bind("deck.barrels", { fill: tone(78) })} />
+        <path {...bind("base.top")} />
+        <g clipPath={url("deck")}>
+          {[0, 1, 2].map((coarser) => (
+            <path key={coarser} {...bind(`holes.${coarser}`, { stroke: WELL, fill: "none" })} className={`${holes}-${coarser}`} strokeWidth={HOLE * 2 ** coarser} strokeLinecap="round" />
+          ))}
+        </g>
+        <path {...bind("deck.well", { fill: WELL })} />
+        <path {...bind("deck.keys", { fill: KEY })} />
+        <path {...bind("deck.touchId", { fill: TOUCH_ID })} />
+        <path {...bind("deck.touchIdRing", hairline(KEY))} {...stroke} />
+        <path {...bind("deck.trackpad", shade(0.2))} />
+        <path {...bind("deck.trackpad", hairline(tone(84)))} {...stroke} />
+        <path {...bind("deck.scoop", shade(1))} />
+        <path {...bind("base.under")} />
+        <path {...bind("base.vent", { fill: WELL })} />
+        <path {...bind("base.seam", hairline(tone(74)))} {...stroke} />
+        <path {...bind("base.cover", { fill: HINGE })} />
+        <path {...bind("base.ends", { fill: tone(78) })} />
+        <g {...bind("front")}>
+          <path {...bind("base.front")} fill={url("face")} />
+          <path {...bind("base.front")} fill={url("ends")} />
+          <path {...bind("base.front")} fill={url("streak")} />
+          <path {...bind("base.scoop")} fill={url("floor")} />
+          <g clipPath={url("scoop")}>
+            <path {...bind("base.walls")} fillRule="evenodd" fill={url("wall")} filter={url("soft")} />
+          </g>
+        </g>
+        <g {...bind("lines")}>
+          <path {...bind("base.lines", LINE)} {...stroke} />
+        </g>
+      </>
+    ),
+    feet: (
+      <>
+        {[0, 1, 2, 3].map((foot) => (
+          <path key={foot} {...bind(`foot.${foot}`, { fill: FOOT_PAD })} />
+        ))}
+        <g {...bind("flat")}>
+          {[0, 1, 2, 3].map((foot) => (
+            <g key={foot}>
+              <path {...bind(`foot.${foot}`)} fill={url("feet")} />
+              <path {...bind(`foot.${foot}`)} fill={url("foot")} />
+            </g>
+          ))}
+        </g>
+      </>
+    ),
+  };
+
+  const glass = (
+    <Screen ref={nodes.ref("glass")} camera={frame.camera} pose={frame.glass} rect={GLASS} style={{ ...GLASS_STYLE, ...look.glass }}>
+      <div ref={nodes.ref("sheen")} style={{ ...FILL, ...look.sheen, background: `linear-gradient(110deg, color-mix(in srgb, ${HAIRLINE} 9%, transparent), transparent 35%)` }} />
+      <div style={FILL}>{children}</div>
+      <svg
+        ref={nodes.ref("notch")}
+        viewBox={`0 0 ${fixed(notch.width)} ${notch.height}`}
+        preserveAspectRatio="none"
+        aria-hidden="true"
+        style={{ position: "absolute", top: 0, ...look.notch, overflow: "visible", pointerEvents: "none" }}
+      >
+        <path d={notch.path} fill="black" />
+        <circle cx={notch.lens.x} cy={notch.lens.y} r={0.35} fill="#111112" />
+        <circle cx={notch.lens.x} cy={notch.lens.y} r={0.11} fill="#1b3048" />
+      </svg>
+    </Screen>
+  );
+
+  return (
+    <Stage role={children == null ? "img" : "group"} label={label} camera={frame.camera} overlay={glass}>
+      <defs>
+        {defs(id, frame.camera, holesShown(holes, frame.camera.width), bind("blur"))}
+        {frontDefs(id, bind("edges"), { x1: "0", y1: "0", x2: "0", y2: "1" }, FOOT_BOX, 0.15, <path {...bind("base.scoop")} />)}
+        <clipPath id={`${id}-deck`}>
+          <path {...bind("base.top")} />
+        </clipPath>
+      </defs>
+      <g {...bind("shadow")}>
+        <path {...bind("shadow.far", shade(1))} filter={url("far")} />
+        <path {...bind("shadow.near", shade(1))} filter={url("near")} />
+      </g>
+      <g>
+        {frame.order.map((part) => (
+          <g key={part} ref={nodes.ref(`part.${part}`)}>
+            {part === "lid" ? parts.lid : part === "base" ? parts.base : parts.feet}
+          </g>
+        ))}
       </g>
     </Stage>
   );

@@ -11,7 +11,7 @@ vectoys draws 3D objects as plain SVG paths. An item is a small React component 
 
 1. `npx @vinena/vectoys-cli create <name>` writes `./<name>/` (or under `--dir <dir>`): `item.json`, `src/geometry.ts`, `src/<name>.tsx`, `src/index.ts`, a test, `package.json` and `tsconfig.json`. It renders a shaded, tilted slab. Under `registry/` of a vectoys checkout it uses the workspace's packages, which `bun install` links. Anywhere else it asks for `@vinena/vectoys` and `@vinena/vectoys-react` from npm by version: install them with `npm install` (or your package manager) in the item folder before you check it.
 2. Edit `src/geometry.ts` (parts, camera, poses) and `src/<name>.tsx` (looks, motion, interaction). Write a real `title` and `description` in `item.json`. List every source file in `files`.
-3. `npx @vinena/vectoys-cli check <dir>` runs 8 checks: item.json is valid, the files are under 64 KB together, item.json names no brand, the component renders on the server with no props, the markup has no `NaN` or `Infinity`, two renders give the same markup, the rendered text names no brand, and the root has an accessible name. It needs bun. Fix every FAIL line.
+3. `npx @vinena/vectoys-cli check <dir>` runs 8 checks: item.json is valid, the files are under 96 KB together, item.json names no brand, the component renders on the server with no props, the markup has no `NaN` or `Infinity`, two renders give the same markup, the rendered text names no brand, and the root has an accessible name. It needs bun. Fix every FAIL line.
 4. `npx @vinena/vectoys-cli preview <dir>` writes `<dir>/preview.html` (`--open` opens it): the item rendered on the server in light and dark, and at a row of yaws when the component takes a `yaw` prop. Look at it. Faces drawn in the wrong order, gaps, and parts that float show here, not in the checks.
 5. Iterate on 2 to 4 until it looks right in both themes and at every yaw.
 6. `npx @vinena/vectoys-cli submit <dir>` runs the checks, then opens a pull request (it needs the GitHub CLI, `gh`) that adds the item to vinenastudio/vectoys. If you host your own registry, `npx @vinena/vectoys-cli submit --registry <url>` opens a pull request that lists it. Until submissions open at launch, submit prints what it would send and sends nothing. `--dry-run` does the same at any time.
@@ -82,7 +82,7 @@ The same props must give the same markup on the server and the client, every tim
 ## Rules
 
 - No brand, maker or product names (no trademarked device names) in item.json, the code or the rendered text. Make a generic phone, not a named one.
-- Keep the files under 64 KB together.
+- Keep the files under 96 KB together. Most items need far less; the limit leaves room for a device item with a full 3D model and a hand-drawn front.
 - React 19. Depend only on `@vinena/vectoys`, `@vinena/vectoys-react` and React. No other packages.
 - TypeScript strict. One component per item, named after the item (`my-toy` exports `MyToy`).
 - Props: `label`, `finish`, `yaw` (and `pitch`) for a device that turns, and the state as controlled plus default (`open` and `defaultOpen` with `onOpenChange`), as the registry items do.

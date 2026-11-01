@@ -1,22 +1,37 @@
 import {
+  IDENTITY,
+  add,
   camera,
+  clamp,
+  combine,
+  compose,
+  cross,
+  dot,
   fixed,
   grow,
   hull,
   keep,
+  lerp,
   line,
+  multiply,
   place,
+  rotate,
   rotateX,
+  rotateY,
   rounded,
+  scrub,
   shape,
   slot,
+  subtract,
   toward,
   winding,
   type Box,
   type Camera,
   type CameraOptions,
+  type Easing,
   type Flat,
   type Pose,
+  type Rotation,
   type ScreenRect,
   type Solid,
 } from "@vinena/vectoys";
@@ -431,6 +446,10 @@ function seen<const Id extends string>({ id, ...options }: CameraOptions & { id:
     at({ yaw, pitch }: Omit<LaptopPose, "lid">, boxed = false) {
       return !boxed && yaw === 0 && pitch === -rest.pitch ? own : look(turned(options, { yaw, pitch }, boxed ? fixedBox() : undefined), OPEN);
     },
+    /** The laptop in a free pose, boxed as `at` boxes it: every path, tone and place a frame of it draws. */
+    trick(pose: TrickPose, boxed = false) {
+      return free(options, OPEN, pose, boxed ? fixedBox() : undefined);
+    },
   };
 }
 
@@ -636,3 +655,336 @@ export type View = Perspective | Straight;
  * thumb's scoop.
  */
 export const FRONT = straight();
+
+// A laptop free to turn any way, as a trick takes it. At `flat` 1 the eye is
+// FRONT's, level with the deck, and sees the shapes FRONT draws: the camera,
+// the base's thickness and round underside, the lid's place and the feet are
+// fitted to FRONT's sizes once, on first use. Toward 0 the camera, those
+// sizes and the lid's face ease into the eye's own, so nothing jumps. The
+// laptop rolls about its long axis and turns about its upright one round
+// the middle of the shut slab, then moves and grows on screen.
+
+/** A pose of a laptop free to turn: `flat` from the eye's own look (0) to FRONT's (1), a move `x` and `y` and a `scale` on screen, and a `roll` about its long axis. */
+export type TrickPose = LaptopPose & { flat: number; x: number; y: number; scale: number; roll: number };
+
+const MIDDLE: Solid = [0, 0, (LIFT + LID - BASE) / 2];
+// The side faces' corners stand this far apart, as `rounded` takes it.
+const COARSE = 0.4;
+/** The tones a face takes, as shares of the finish, from the darkest to the finish itself. */
+export const TONES = Array.from({ length: 12 }, (_, step) => fixed(84 + (16 * step) / 11));
+// A lamp over the eye, a little to the left, in the scene's axes.
+const LAMP: Solid = [-0.2, -1, 0.8];
+/** Which of `TONES` a face turned along `normal` takes, as the lamp falls on it. */
+const lit = (eye: Camera, normal: Solid) => {
+  const turned = rotate(eye.rotation, normal);
+  return Math.round(((dot(turned, LAMP) / Math.hypot(...turned) / Math.hypot(...LAMP) + 1) / 2) * (TONES.length - 1));
+};
+const at = (ring: readonly Flat[], z: number) => ring.map(([x, y]): Solid => [x, y, z]);
+const inset = (by: number, step?: number) => rounded([-HALF_WIDTH + by, -HALF_DEPTH + by, HALF_WIDTH - by, HALF_DEPTH - by], [ROUND - by, ROUND - by], [], [], step);
+const DEEP = (DEPTH * 100) / WIDTH;
+
+let fitted: ReturnType<typeof fit> | undefined;
+/** FRONT's sizes as the model's, for the eye level with the deck and the lid upright with its face square to it. */
+function fit() {
+  const plane = -HALF_DEPTH + PIVOT[0] + PIVOT[1];
+  const halve = (lo: number, hi: number, short: (value: number) => boolean) => {
+    for (let step = 0; step < 48; step++) [lo, hi] = short((lo + hi) / 2) ? [(lo + hi) / 2, hi] : [lo, (lo + hi) / 2];
+    return lo;
+  };
+  // How much larger than the lid's face a depth `y` draws, with the eye `far` from the deck's middle.
+  const near = (far: number) => (y: number) => (far - plane) / (far - y);
+  // As far as puts the base's ends where FRONT has them, the lid drawn at its own width.
+  const far = halve(60, 4000, (far) => Math.max(...PLAIN.map(([x, y]) => Math.abs(x) * near(far)(y))) > share(50 + OVERHANG));
+  const k = near(far);
+  const round = share(FACE_ROUND) / k(HALF_DEPTH);
+  const arc = [0, 1, 2, 3, 4, 5, 6].map((step) => (Math.PI / 12) * step);
+  const thick = halve(1, 5, (thick) => Math.max(...arc.map((turn) => (thick - round + round * Math.sin(turn)) * k(HALF_DEPTH - round + round * Math.cos(turn)))) < share(FACE));
+  const [front, deep] = [HALF_DEPTH - round - 0.3, 1.2];
+  return {
+    far,
+    plane,
+    thick,
+    round,
+    face: k(HALF_DEPTH),
+    // How far the lid slides toward its hinge so its top edge stands where FRONT has it.
+    slide: LIFT + PIVOT[1] - PIVOT[0] + DEPTH - share(SHOWN),
+    foot: {
+      x: HALF_WIDTH / k(front),
+      half: share(FOOT_HALF) / k(front),
+      front,
+      deep,
+      low: share(FACE + FOOT_HIGH) / k(front) - thick,
+      high: thick - share(FACE - 0.3) / k(front - deep),
+      taper: share(FOOT_TAPER) / k(front),
+    },
+  };
+}
+
+/**
+ * The eye's camera at `flat`: FRONT's at 1, level with the deck and as far
+ * as `fit` found, drawing FRONT's scene across the eye's own; the eye's own
+ * at 0. Its distance and its scale ease by ratio, so the laptop's size on
+ * screen changes evenly.
+ */
+function eased(options: CameraOptions, pitch: number, flat: number, box?: { width: number; height: number; x: number; y: number }) {
+  const eye = turned(options, { yaw: 0, pitch }, box);
+  const { far, plane } = (fitted ??= fit());
+  const width = options.width ?? 100;
+  const scale = width / share(100 + 2 * OVERHANG);
+  const ratio = (from: number, to: number) => from ** (1 - flat) * to ** flat;
+  const distance = ratio(eye.perspective + eye.back, far);
+  const lens = distance * ratio(eye.perspective / (eye.perspective + eye.back), (scale * (far - plane)) / far);
+  const [middle, level] = [width / 2 + (box?.x ?? 0), share(SHOWN) * scale + (box?.y ?? 0)];
+  return camera({
+    width: eye.width,
+    height: eye.height,
+    perspective: lens,
+    back: distance - lens,
+    originX: lerp(eye.originX, middle, flat),
+    originY: lerp(eye.originY, level, flat),
+    anchorX: lerp(eye.anchorX, middle, flat),
+    anchorY: lerp(eye.anchorY, level, flat),
+    pitch: eye.pitch * (1 - flat),
+  });
+}
+
+/** A camera that sees the model turned by `turn` round its middle, then scaled about the middle and moved on screen. */
+function moved(eye: Camera, turn: Rotation, scale: number, [dx, dy]: Flat): Camera {
+  const [cx, cy] = eye.project(MIDDLE);
+  const model = (point: Solid) => add(rotate(turn, subtract(point, MIDDLE)), MIDDLE);
+  return {
+    ...eye,
+    rotation: multiply(eye.rotation, turn),
+    toView: (point) => eye.toView(model(point)),
+    project(point) {
+      const [x, y] = eye.project(model(point));
+      return [cx + (x - cx) * scale + dx, cy + (y - cy) * scale + dy];
+    },
+    facesEye: (point, normal) => eye.facesEye(model(point), rotate(turn, normal)),
+  };
+}
+
+/**
+ * A convex slab between `rings`, from one face to the other, as the eye
+ * sees it: its outline, and the side faces that face the eye as path data
+ * for each of `TONES`.
+ */
+function slab(rings: readonly (readonly Solid[])[], pose: Pose, eye: Camera, middle: Solid) {
+  const placed = rings.map((ring) => ring.map((point) => place(pose, point)));
+  const drawn = placed.map((ring) => ring.map(eye.project));
+  const center = place(pose, middle);
+  const tones = TONES.map(() => "");
+  placed.forEach((upper, band) => {
+    const lower = placed[band + 1];
+    const [top, bottom] = [drawn[band], drawn[band + 1]];
+    if (!lower || !top || !bottom) return;
+    upper.forEach((a, index) => {
+      const next = (index + 1) % upper.length;
+      const [b, c, d] = [upper[next], lower[next], lower[index]];
+      if (!b || !c || !d) return;
+      const across = cross(subtract(c, a), subtract(d, b));
+      const normal: Solid = dot(across, subtract(a, center)) < 0 ? [-across[0], -across[1], -across[2]] : across;
+      if (!eye.facesEye(a, normal)) return;
+      tones[lit(eye, normal)] += shape([top[index] ?? [0, 0], top[next] ?? [0, 0], bottom[next] ?? [0, 0], bottom[index] ?? [0, 0]]);
+    });
+  });
+  return { hull: shape(hull(drawn.flat())), tones };
+}
+
+/** A box in FRONT's hundredths of the lid's width, from the lid's top edge down, in the lid's plane. */
+const onLid = ([left, top, right, bottom]: Box): Box => [share(left) - HALF_WIDTH, share(top) - DEPTH, share(right) - HALF_WIDTH, share(bottom) - DEPTH];
+const BEZEL_BOX: Box = [-HALF_WIDTH + RIM, -DEPTH + RIM, HALF_WIDTH - RIM, -RIM];
+
+/** Everything a frame of a free laptop draws: the paths by name, the tones and weights that change, the order of its parts and the glass's pose. */
+function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: { width: number; height: number; x: number; y: number }) {
+  const { thick: fat, round: fillet, slide, foot, face: kh } = (fitted ??= fit());
+  const flat = pose.flat;
+  const ground = eased(options, pose.pitch, flat, box);
+  const turn = combine(rotateX(-90), rotateY(pose.yaw), rotateX(90), rotateX(pose.roll));
+  const eye = moved(ground, turn, pose.scale, [pose.x * WIDTH, -pose.y * WIDTH]);
+  const project = (points: readonly Solid[]) => shape(points.map(eye.project));
+  // Facing the eye by a margin, so a face seen edge on, as the deck is level with FRONT's eye, does not draw.
+  const shows = (point: Solid, normal: Solid) => {
+    const toward = subtract([eye.originX, eye.originY, eye.perspective], eye.toView(point));
+    return dot(rotate(eye.rotation, normal), toward) > 1e-4 * Math.hypot(...normal) * Math.hypot(...toward);
+  };
+  const mix = (a: Box, b: Box): Box => [lerp(a[0], b[0], flat), lerp(a[1], b[1], flat), lerp(a[2], b[2], flat), lerp(a[3], b[3], flat)];
+
+  // The base: its thickness and the round of its underside's edge are FRONT's at flat 1.
+  const thick = lerp(BASE, fat, flat);
+  const round = fillet * flat;
+  const arc = round > 0.01 ? [0, 1, 2, 3, 4, 5, 6].map((step) => (Math.PI / 12) * step) : [Math.PI / 2];
+  const rings = [at(inset(0, COARSE), 0), ...arc.map((turn) => at(inset(round * (1 - Math.cos(turn)), COARSE), round - thick - round * Math.sin(turn)))];
+  const base = slab(rings, { position: [0, 0, 0], rotation: IDENTITY }, eye, [0, 0, -thick / 2]);
+  const top = shows([0, 0, 0], [0, 0, 1]);
+  const under = shows([0, 0, -thick], [0, 0, -1]);
+  const back = shows([0, -HALF_DEPTH, -thick / 2], [0, -1, 0]);
+  const deck = top ? look(eye, OPEN).DECK : null;
+  const bottom = (ring: readonly Flat[]) => (under ? project(at(ring, -thick)) : "");
+  // FRONT's thumb scoop on the base's front face, its walls quarter ellipses `end` across down to a flat floor.
+  const QUARTER = [0, 1, 2, 3, 4, 5, 6].map((step) => (Math.PI / 12) * step);
+  const scoop = (end: number, inset: number) => {
+    const [left, right, across, down] = [share(inset - SCOOP_HALF), share(SCOOP_HALF - inset), share(end), share(SCOOP_DEPTH)];
+    const wall = (x: number, v: number): Solid => [x / kh, HALF_DEPTH, -v / kh];
+    return project([
+      ...QUARTER.map((turn) => wall(left + across - across * Math.cos(turn), down * Math.sin(turn))),
+      ...QUARTER.map((turn) => wall(right - across + across * Math.sin(turn), down * Math.cos(turn))),
+    ]);
+  };
+  const rear = (left: number, right: number) => project([left, right, right, left].map((x, index): Solid => [x, -HALF_DEPTH, index < 2 ? 0 : -1.1]));
+
+  // The lid opens as far as the eye's own lid, or upright at flat 1, and its
+  // corners and its face's rings go from the eye's own to FRONT's.
+  const { lidWorld } = joint(lerp(OPEN, -90, flat));
+  const closed = 1 - pose.lid;
+  const lid = compose(lidWorld(closed), { position: [0, slide * flat, 0], rotation: IDENTITY });
+  const radii: Flat = [lerp(ROUND, share(LID_ROUND), flat), lerp(ROUND, 1.2, flat)];
+  const ring = (step?: number) => rounded([-HALF_WIDTH, -DEPTH, HALF_WIDTH, 0], radii, [], [], step);
+  const coarse = ring(COARSE);
+  const skirt = LIFT * clamp((closed - 0.9) / 0.1, 0, 1);
+  const shell = slab([at(coarse, skirt), at(coarse, 0), at(coarse, -LID)], lid, eye, [0, -DEPTH / 2, -LID / 2]);
+  const normal = rotate(lid.rotation, [0, 0, 1]);
+  const facing = shows(place(lid, [0, -DEPTH / 2, 0]), normal);
+  const outer = shows(place(lid, [0, -DEPTH / 2, -LID]), [-normal[0], -normal[1], -normal[2]]);
+  const plate = (box: Box, [high, low]: Flat, z = 0) => (facing || z ? project(at(rounded(box, [high, low]), z).map((point) => place(lid, point))) : "");
+  const ringed = (inset: number, bottom: number, low: number) =>
+    plate(mix(BEZEL_BOX, onLid([inset, inset, 100 - inset, bottom])), [lerp(ROUND - RIM, share(LID_ROUND - inset), flat), lerp(ROUND - RIM, share(low), flat)]);
+  const face = plate([-HALF_WIDTH, -DEPTH, HALF_WIDTH, 0], radii);
+  const lidPoint = (y: number) => eye.project(place(lid, [0, y, 0]));
+
+  // The glass, FRONT's display at flat 1: the eye's own glass mapped onto it, so the content lays out the same.
+  const [left, high, right, low] = onLid(DISPLAY);
+  const want = { x: lerp(GLASS.x, left, flat), y: lerp(GLASS.y, high, flat), width: lerp(GLASS.width, right - left, flat), height: lerp(GLASS.height, low - high, flat) };
+  // Shut over the deck, or seen past the base from under the deck, the
+  // display is hidden even where it faces the eye, so the glass goes with it.
+  const [sx, sy] = facing && !under && closed < 0.98 ? [want.width / GLASS.width, want.height / GLASS.height] : [0, 0];
+
+  // The feet: under the base's corners, the front two where FRONT draws them.
+  const feet = [-1, 1].flatMap((side) =>
+    [foot.front - foot.deep, -foot.front].map((near) => {
+      const pad: Box = [side * foot.x - foot.half, near, side * foot.x + foot.half, near + foot.deep];
+      const sole: Box = [pad[0] + foot.taper, pad[1] + foot.taper, pad[2] - foot.taper, pad[3] - foot.taper];
+      return shape(hull([...at(rounded(pad, [0.6, 0.6], [], [], COARSE), foot.high - thick), ...at(rounded(sole, [0.5, 0.5], [], [], COARSE), -thick - foot.low)].map(eye.project)));
+    }),
+  );
+
+  // The shadow lies on the ground, so it turns with the laptop but moves only across.
+  const shadow = (outline: readonly Flat[]) =>
+    shape(
+      hull(
+        outline.map(([x, y]) => {
+          const [gx, gy] = add(rotate(turn, subtract([x, y, -BASE], MIDDLE)), MIDDLE);
+          const [sx, sy] = ground.project([gx, gy, GROUND]);
+          return [sx + pose.x * WIDTH, sy];
+        }),
+      ),
+    );
+
+  const ahead = rotate(eye.rotation, [0, 1, 0]);
+  const parts = under ? ["base", "feet"] : ["feet", "base"];
+  return {
+    camera: eye,
+    glass: compose(lid, { position: [want.x - sx * GLASS.x, want.y - sy * GLASS.y, 0], rotation: [sx, 0, 0, 0, sy, 0, 0, 0, 1] }),
+    /** The parts far to near: the lid in front once its back faces the eye, the feet once the underside does. */
+    order: outer ? [...parts, "lid"] : ["lid", ...parts],
+    /** How much FRONT's tones show on the base's front: all at flat 1 while it faces the eye. */
+    front: flat * clamp((ahead[2] / Math.hypot(...ahead) - 0.6) / 0.4, 0, 1),
+    /** The tones of the deck and the underside, as indexes into `TONES`. */
+    deckTone: lit(eye, [0, 0, 1]),
+    underTone: lit(eye, [0, 0, -1]),
+    outerTone: lit(eye, [-normal[0], -normal[1], -normal[2]]),
+    /** Where FRONT's lid edge gradient runs, from the lid's top edge down. */
+    edge: { x1: lidPoint(-DEPTH)[0], y1: lidPoint(-DEPTH)[1], x2: lidPoint(share(LID_ROUND) - DEPTH)[0], y2: lidPoint(share(LID_ROUND) - DEPTH)[1] },
+    d: {
+      "shadow.far": shadow(MODEL.ground),
+      "shadow.near": shadow(MODEL.contact),
+      "base.hull": base.hull,
+      // The base's front, for FRONT's tones: straight on, the whole of its outline.
+      "base.front": shape(hull(rings.flatMap((ring) => ring.filter(([, y]) => y > HALF_DEPTH - ROUND - 0.01)).map(eye.project))),
+      ...Object.fromEntries(base.tones.map((d, step) => [`base.${step}`, d])),
+      "base.top": deck?.top ?? "",
+      "base.under": bottom(inset(round)),
+      "base.seam": bottom(inset(round + 1.1)),
+      "base.vent": bottom(rounded([-18, 2.6 - HALF_DEPTH, 18, 3.2 - HALF_DEPTH], [0.3, 0.3])),
+      "base.cover": back ? rear(BARREL - CUT / 2, CUT / 2 - BARREL) : "",
+      "base.ends": back ? rear(-CUT / 2, BARREL - CUT / 2) + rear(CUT / 2 - BARREL, CUT / 2) : "",
+      "base.lines": (deck?.lines ?? base.hull) + bottom(inset(round)),
+      "base.scoop": scoop(SCOOP_END, 0),
+      "base.walls": scoop(SCOOP_END, 0) + scoop(SCOOP_END - SCOOP_WALL, SCOOP_WALL),
+      "deck.well": deck?.well ?? "",
+      "deck.keys": deck?.keys ?? "",
+      "deck.touchId": deck?.touchId ?? "",
+      "deck.touchIdRing": deck?.touchIdRing ?? "",
+      "deck.trackpad": deck?.trackpad ?? "",
+      "deck.scoop": deck?.scoop ?? "",
+      "deck.hinge": deck?.hinge ?? "",
+      "deck.barrels": deck?.barrels ?? "",
+      ...Object.fromEntries([0, 1, 2].map((coarser) => [`holes.${coarser}`, deck?.holes[coarser] ?? ""])),
+      ...Object.fromEntries(feet.map((d, index) => [`foot.${index}`, d])),
+      "lid.hull": shell.hull,
+      ...Object.fromEntries(shell.tones.map((d, step) => [`lid.${step}`, d])),
+      "lid.face": face,
+      "lid.outer": outer ? plate([-HALF_WIDTH, -DEPTH, HALF_WIDTH, 0], radii, -LID) : "",
+      "lid.rim": plate(onLid([RIM_LINE, RIM_LINE, 100 - RIM_LINE, DEEP]), [share(LID_ROUND - RIM_LINE), radii[1]]),
+      "lid.gasket": ringed(GASKET, SHOWN, HINGE_ROUND + BLACK - GASKET),
+      "lid.gasketLine": ringed(GASKET_LINE, SHOWN, HINGE_ROUND + BLACK - GASKET_LINE),
+      "lid.glass": ringed(BLACK, SHOWN, HINGE_ROUND),
+      "lid.hingeLine": plate(onLid([BLACK, HINGE_LINE, 100 - BLACK, SHOWN]), [0, share(HINGE_ROUND)]),
+      "lid.hinge": plate(onLid([BLACK, HINGE, 100 - BLACK, SHOWN]), [0, share(HINGE_ROUND)]),
+      "lid.lines": shell.hull + (facing ? face : ""),
+    },
+  };
+}
+
+/** A frame of a free laptop, as `trick` gives it. */
+export type Trick = ReturnType<typeof free>;
+
+// The kickflip's moves, one track a field, each eased its own way: the lid
+// shuts, the laptop comes down to the ground, crouches with its front drawn
+// back, pops up flipping and turning, hangs at the top, falls, catches the
+// flip just before the ground, lands with a small bounce, and opens. The eye
+// starts to rise as it comes down, so the shut slab shows its top before the
+// pop instead of an edge level with the eye.
+const LID_TRACK = [{ at: 0, lid: 1 }, { at: 0.12, lid: 0, ease: "ease" }, { at: 0.84, lid: 0 }, { at: 1, lid: 1, ease: [0.4, 0, 0.2, 1] }] as const;
+const Y_TRACK = [
+  { at: 0.12, y: 0.6 },
+  { at: 0.3, y: 0, ease: [0.5, 0, 0.3, 1] },
+  { at: 0.36, y: -0.03, ease: [0.3, 0, 0.3, 1] },
+  { at: 0.5, y: 0.5, ease: [0.1, 0.6, 0.35, 1] },
+  { at: 0.62, y: 0, ease: [0.6, 0, 0.85, 0.5] },
+  { at: 0.655, y: 0.035, ease: [0.2, 0.6, 0.4, 1] },
+  { at: 0.78, y: 0, ease: "settle" },
+] as const;
+const ROLL_TRACK = [{ at: 0.3, roll: 0 }, { at: 0.37, roll: -12, ease: [0.3, 0, 0.4, 1] }, { at: 0.6, roll: 360, ease: [0.3, 0.15, 0.35, 1.04] }] as const;
+const YAW_TRACK = [{ at: 0.37, yaw: 0 }, { at: 0.6, yaw: 360, ease: [0.35, 0.1, 0.45, 1] }] as const;
+const SCALE_TRACK = [
+  { at: 0.3, scale: 1 },
+  { at: 0.36, scale: 0.97, ease: "ease" },
+  { at: 0.5, scale: 1.1, ease: [0.2, 0.6, 0.4, 1] },
+  { at: 0.62, scale: 1, ease: [0.5, 0, 0.7, 1] },
+] as const;
+const FLAT_TRACK = [{ at: 0.12, flat: 1 }, { at: 0.37, flat: 0.65, ease: [0.4, 0, 0.6, 1] }, { at: 0.62, flat: 0, ease: [0.45, 0, 0.4, 1] }] as const;
+
+/**
+ * A kickflip with a shove-it for a free laptop, from FRONT's look high over
+ * the ground to the eye's own, open on the ground, over a progress from 0 to
+ * 1: pass `scrub(t, KICKFLIP)` to the laptop's handle. Each field moves on
+ * its own eased track, baked here into short straight keyframes, so one
+ * `scrub` reads them all. It leaves `pitch` to the laptop, and `y` starts at
+ * 0.6, so give the stage room above it.
+ */
+export const KICKFLIP: readonly ({ at: number; ease: Easing } & Pick<TrickPose, "lid" | "flat" | "x" | "y" | "scale" | "roll" | "yaw">)[] = [
+  ...new Set([...Array.from({ length: 241 }, (_, step) => step / 240), ...[LID_TRACK, Y_TRACK, ROLL_TRACK, YAW_TRACK, SCALE_TRACK, FLAT_TRACK].flat().map(({ at }) => at)]),
+]
+  .sort((a, b) => a - b)
+  .map((at) => ({
+    at,
+    ease: "linear",
+    lid: fixed(scrub(at, LID_TRACK).lid),
+    flat: fixed(scrub(at, FLAT_TRACK).flat),
+    x: 0,
+    y: fixed(scrub(at, Y_TRACK).y),
+    scale: fixed(scrub(at, SCALE_TRACK).scale),
+    roll: fixed(scrub(at, ROLL_TRACK).roll),
+    yaw: fixed(scrub(at, YAW_TRACK).yaw),
+  }));

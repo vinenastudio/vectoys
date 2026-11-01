@@ -22,7 +22,24 @@ export {
   type Slab,
 } from "./parts.ts";
 export { screenQuad, type ScreenQuad, type ScreenRect } from "./screen.ts";
-export { clamp, ease, lerp, scrub, segment, type Keyframe, type ScrubOptions, type Scrubbed } from "./scrub.ts";
+export {
+  EASES,
+  backIn,
+  backInOut,
+  backOut,
+  clamp,
+  cubicBezier,
+  ease,
+  easing,
+  lerp,
+  scrub,
+  segment,
+  settle,
+  type Easing,
+  type Keyframe,
+  type ScrubOptions,
+  type Scrubbed,
+} from "./scrub.ts";
 export {
   IDENTITY,
   REST,
