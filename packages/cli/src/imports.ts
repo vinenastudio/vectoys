@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, posix, resolve } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join, posix, resolve } from "node:path";
 import type { Placed } from "./files";
 
 /** What relative imports end with in the project: `.js`, the file's own `.ts`/`.tsx`, or nothing. */
@@ -56,25 +56,47 @@ function nearest(from: string, name: string): string | undefined {
 
 type Options = Record<string, unknown>;
 
-// The file's compilerOptions over those of the configs it extends by a
-// relative path. Configs extended from packages are not followed.
+// The file's compilerOptions over those of the configs it extends, by a
+// path or from a package, later ones over earlier. `seen` holds the configs
+// on the way here, so only a cycle stops the walk.
 function compilerOptions(path: string, seen: Set<string>): Options {
   if (seen.has(path) || !existsSync(path)) return {};
-  seen.add(path);
   let config: { extends?: unknown; compilerOptions?: Options };
   try {
     config = JSON.parse(jsonc(readFileSync(path, "utf8")));
   } catch {
     return {};
   }
-  const parents = (Array.isArray(config.extends) ? config.extends : [config.extends]).filter(
-    (parent): parent is string => typeof parent === "string" && /^\.\.?\//.test(parent),
-  );
+  const parents = (Array.isArray(config.extends) ? config.extends : [config.extends]).filter((parent): parent is string => typeof parent === "string");
   const inherited = parents.reduce<Options>((options, parent) => {
-    const file = resolve(dirname(path), parent);
-    return { ...options, ...compilerOptions(existsSync(file) || file.endsWith(".json") ? file : `${file}.json`, seen) };
+    const file = extended(path, parent);
+    return file ? { ...options, ...compilerOptions(file, new Set([...seen, path])) } : options;
   }, {});
   return { ...inherited, ...config.compilerOptions };
+}
+
+// The config `parent` names from the config at `path`: a file by its path,
+// with or without .json, or one in a package in a node_modules up the tree,
+// by its path in the package, or the package's `tsconfig` field, or its
+// tsconfig.json.
+function extended(path: string, parent: string): string | undefined {
+  const named = (file: string) => [file, `${file}.json`].find((candidate) => existsSync(candidate) && statSync(candidate).isFile());
+  if (/^\.\.?\//.test(parent) || isAbsolute(parent)) return named(resolve(dirname(path), parent));
+  for (let dir = dirname(path); ; dir = dirname(dir)) {
+    const base = join(dir, "node_modules", parent);
+    const found = named(base) ?? named(join(base, packageConfig(base)));
+    if (found) return found;
+    if (dirname(dir) === dir) return undefined;
+  }
+}
+
+function packageConfig(folder: string): string {
+  try {
+    const { tsconfig } = JSON.parse(readFileSync(join(folder, "package.json"), "utf8"));
+    return typeof tsconfig === "string" ? tsconfig : "tsconfig.json";
+  } catch {
+    return "tsconfig.json";
+  }
 }
 
 // tsconfig.json as plain JSON: comments and trailing commas dropped.

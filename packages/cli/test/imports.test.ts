@@ -73,3 +73,40 @@ test("bundler and esnext projects are left alone", () => {
   expect(importExtension(project("esnext", { "tsconfig.json": '{ "compilerOptions": { "module": "ESNext" } }' }))).toBeUndefined();
   expect(withExtensions(files, undefined)).toBe(files);
 });
+
+test("configs extended from packages count, by their path in the package, its tsconfig field or its tsconfig.json", () => {
+  const nodenext = '{ "compilerOptions": { "module": "nodenext" } }';
+  const byPath = project("package-path", {
+    "node_modules/@tsconfig/node20/tsconfig.json": nodenext,
+    "apps/web/tsconfig.json": '{ "extends": "@tsconfig/node20/tsconfig.json" }',
+  });
+  expect(importExtension(join(byPath, "apps/web"))).toBe("js");
+  const byField = project("package-field", {
+    "node_modules/@acme/config/package.json": '{ "name": "@acme/config", "tsconfig": "base.json" }',
+    "node_modules/@acme/config/base.json": '{ "compilerOptions": { "moduleResolution": "node16", "allowImportingTsExtensions": true } }',
+    "tsconfig.json": '{ "extends": "@acme/config" }',
+  });
+  expect(importExtension(byField)).toBe("ts");
+  const byDefault = project("package-default", {
+    "node_modules/shared-config/tsconfig.json": nodenext,
+    "tsconfig.json": '{ "extends": ["shared-config"] }',
+  });
+  expect(importExtension(byDefault)).toBe("js");
+  expect(importExtension(project("package-missing", { "tsconfig.json": '{ "extends": "@tsconfig/none" }' }))).toBeUndefined();
+});
+
+test("a config reached through two parents counts in each, and a cycle ends", () => {
+  // The later parent's own base, nodenext, wins over the earlier parent's bundler.
+  const root = project("diamond", {
+    "base.json": '{ "compilerOptions": { "module": "nodenext", "moduleResolution": "nodenext" } }',
+    "bundler.json": '{ "extends": "./base.json", "compilerOptions": { "moduleResolution": "bundler" } }',
+    "node.json": '{ "extends": "./base" }',
+    "tsconfig.json": '{ "extends": ["./bundler.json", "./node.json"] }',
+  });
+  expect(importExtension(root)).toBe("js");
+  const cycle = project("cycle", {
+    "a.json": '{ "extends": "./tsconfig.json", "compilerOptions": { "module": "nodenext" } }',
+    "tsconfig.json": '{ "extends": "./a.json" }',
+  });
+  expect(importExtension(cycle)).toBe("js");
+});
