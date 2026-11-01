@@ -145,7 +145,7 @@ pre {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 68px;
+  height: 4rem;
 }
 
 .wordmark {
@@ -156,16 +156,26 @@ pre {
   text-decoration: none;
 }
 
+/*
+  At large text sizes the nav's links wrap onto a second row inside the
+  header instead of running past the page's edge. The header's height is in
+  rem so it grows with the text, and the hero below starts under it by the
+  same amount.
+*/
 .site-nav {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 4px;
+  min-width: 0;
   margin-left: auto;
+  font-size: 15px;
 }
 
 .site-nav a {
   padding: 8px 10px;
   border-radius: 10px;
-  font-size: 15px;
+  white-space: nowrap;
   color: var(--muted);
   text-decoration: none;
   transition: color 150ms var(--ease);
@@ -299,9 +309,11 @@ code.inline {
   align-items: center;
   gap: 8px;
   height: 36px;
+  flex-shrink: 0;
   padding: 0 14px 0 12px;
   border-radius: 10px;
   font-size: 15px;
+  white-space: nowrap;
   color: var(--ink);
   /* The page color, so it stays a filled button on the hero band, like the install command. */
   background: var(--page);
@@ -347,15 +359,15 @@ code.inline {
 
 /* Hero: a full-width band, the phone very large and cut off at its bottom */
 
-/* The band starts under the 68 pixel header, so header and hero are one surface with no seam. */
+/* The band starts under the header (68 pixels at the default text size), so header and hero are one surface with no seam. */
 .site-header {
   position: relative;
   z-index: 3;
 }
 
 .hero {
-  margin-top: -68px;
-  padding-top: 68px;
+  margin-top: -4rem;
+  padding-top: 4rem;
   background:
     radial-gradient(50% 60% at 72% 45%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
     var(--card);
@@ -364,7 +376,7 @@ code.inline {
 
 /* The hero fills the first screen under the 68 pixel header, and never gets so short that its copy clips. */
 .hero-inner {
-  --hero-height: max(600px, calc(100dvh - 68px));
+  --hero-height: max(600px, calc(100dvh - 4rem));
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
