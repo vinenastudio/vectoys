@@ -24,6 +24,7 @@
         "@vectoys/keyboard": "workspace:*",
         "@vectoys/keycap": "workspace:*",
         "@vectoys/laptop": "workspace:*",
+        "@vectoys/laptop-front": "workspace:*",
         "@vectoys/monitor": "workspace:*",
         "@vectoys/phone": "workspace:*",
         "@vectoys/tablet": "workspace:*",
@@ -213,6 +214,23 @@
     },
     "registry/laptop": {
       "name": "@vectoys/laptop",
+      "version": "0.0.0",
+      "dependencies": {
+        "@vinena/vectoys": "workspace:*",
+        "@vinena/vectoys-react": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/react": "19.0.0",
+        "@types/react-dom": "19.0.0",
+        "react": "19.0.0",
+        "react-dom": "19.0.0",
+      },
+      "peerDependencies": {
+        "react": ">=19",
+      },
+    },
+    "registry/laptop-front": {
+      "name": "@vectoys/laptop-front",
       "version": "0.0.0",
       "dependencies": {
         "@vinena/vectoys": "workspace:*",
@@ -543,6 +561,8 @@
     "@vectoys/keycap": ["@vectoys/keycap@workspace:registry/keycap"],
 
     "@vectoys/laptop": ["@vectoys/laptop@workspace:registry/laptop"],
+
+    "@vectoys/laptop-front": ["@vectoys/laptop-front@workspace:registry/laptop-front"],
 
     "@vectoys/monitor": ["@vectoys/monitor@workspace:registry/monitor"],
 

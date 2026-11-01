@@ -154,6 +154,7 @@ const USES: Record<string, { imports: string[]; jsx: string }> = {
     imports: ['import { Laptop } from "./components/vectoys/laptop/laptop";', 'import { DESK } from "./components/vectoys/laptop/geometry";'],
     jsx: "<Laptop eye={DESK} closed={0.5}><p>a</p></Laptop>",
   },
+  "laptop-front": { imports: ['import { LaptopFront } from "./components/vectoys/laptop-front/laptop-front";'], jsx: '<LaptopFront finish="black" label="App"><p>a</p></LaptopFront>' },
   monitor: { imports: ['import { Monitor } from "./components/vectoys/monitor/monitor";'], jsx: "<Monitor tilt={10}><p>a</p></Monitor>" },
   phone: { imports: ['import { Phone } from "./components/vectoys/phone/phone";'], jsx: "<Phone yaw={30}><p>b</p></Phone>" },
   tablet: { imports: ['import { Tablet } from "./components/vectoys/tablet/tablet";'], jsx: "<Tablet><p>c</p></Tablet>" },

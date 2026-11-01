@@ -22,6 +22,7 @@
     "@vectoys/keyboard": "workspace:*",
     "@vectoys/keycap": "workspace:*",
     "@vectoys/laptop": "workspace:*",
+    "@vectoys/laptop-front": "workspace:*",
     "@vectoys/monitor": "workspace:*",
     "@vectoys/phone": "workspace:*",
     "@vinena/vectoys-react": "workspace:*",

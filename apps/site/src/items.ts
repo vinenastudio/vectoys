@@ -8,6 +8,7 @@ import { GiftPreview } from "./previews/gift";
 import { KeyboardPreview } from "./previews/keyboard";
 import { KeycapPreview } from "./previews/keycap";
 import { LaptopPreview } from "./previews/laptop";
+import { LaptopFrontPreview } from "./previews/laptop-front";
 import { MonitorPreview } from "./previews/monitor";
 import { PhonePreview } from "./previews/phone";
 import { TabletPreview } from "./previews/tablet";
@@ -28,6 +29,7 @@ export const PREVIEWS: Readonly<Record<string, ComponentType>> = {
   keyboard: KeyboardPreview,
   keycap: KeycapPreview,
   laptop: LaptopPreview,
+  "laptop-front": LaptopFrontPreview,
   monitor: MonitorPreview,
   phone: PhonePreview,
   tablet: TabletPreview,
