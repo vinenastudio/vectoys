@@ -251,14 +251,19 @@ test("the kickflip shuts the lid straight on, flips and turns once round, lands 
   for (let step = 1; step < KICKFLIP.length; step++) expect(KICKFLIP[step]?.at ?? 0).toBeGreaterThan(KICKFLIP[step - 1]?.at ?? 1);
 });
 
-// A hash of the default markup across eyes and poses, taken before the
-// realistic look was added: without `look`, every laptop draws as it did.
-// Since then the glass's matrix writes terms under a billionth as 0; the
-// five matrices that changed had only such terms (1e-16 to 1e-20), and
-// nothing else in the markup did.
-test("without a look, the markup is what it was before the realistic look", async () => {
-  const { createHash } = await import("node:crypto");
-  const html = [
+// The laptop as it was before the realistic look, copied unchanged from
+// that commit into fixtures/simple and imported by a computed name, as the
+// parity test imports its original. Without `look`, every laptop draws
+// exactly as that code draws it, rendered here on the same machine: the
+// math library's last bits differ between platforms and can tip a hull's
+// point on a straight edge in or out, so a hash taken on one machine does
+// not hold on another (on macOS both give efec156e...).
+const SIMPLE = "./fixtures/simple/index.ts";
+type Drawn = Pick<typeof import("../src"), "Laptop" | "DESK" | "PHONE" | "FRONT" | "KICKFLIP">;
+const before: Drawn = await import(SIMPLE);
+
+test("without a look, the markup is what it was before the realistic look", () => {
+  const markup = ({ Laptop, DESK, PHONE, FRONT, KICKFLIP }: Drawn) => [
     ...[DESK, PHONE, FRONT].flatMap((eye) => [
       renderToString(<Laptop eye={eye} />),
       renderToString(
@@ -278,8 +283,10 @@ test("without a look, the markup is what it was before the realistic look", asyn
     ),
     renderToString(<Laptop eye={DESK} free flat={1} />),
     renderToString(<Laptop eye={PHONE} roll={20} y={0.2} />),
-  ].join("\n");
-  expect(createHash("sha256").update(html).digest("hex")).toBe("efec156ec07b6b780134062da9d9857058b143c48f1b24fac197eaaf95573d3f");
+  ];
+  const [now, then] = [markup({ Laptop, DESK, PHONE, FRONT, KICKFLIP }), markup(before)];
+  expect(now).toHaveLength(then.length);
+  now.forEach((html, index) => expect([index, html]).toEqual([index, then[index] ?? ""]));
   expect(renderToString(<Laptop eye={DESK} look="simple" />)).toBe(renderToString(<Laptop eye={DESK} />));
 });
 
