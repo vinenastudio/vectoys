@@ -1,7 +1,7 @@
 import { clamp, fixed, lerp } from "@vinena/vectoys";
 import { Glare, Gradient, Grain, Screen, Stage, mirrored, placeScreen, useNodes, type Nodes, type Stop } from "@vinena/vectoys-react";
 import { memo, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, type CSSProperties, type ReactNode, type Ref, type SVGProps } from "react";
-import { BEZEL, DESK, FRONT, GLASS, HOLE, PITCH, ROUND, SHADES, TONES, YAW, type LaptopPose, type Perspective, type Posed, type Straight, type Trick, type TrickPose, type View } from "./geometry";
+import { BEZEL, DEPTH, DESK, FRONT, GLASS, HOLE, PITCH, ROUND, SHADES, TONES, WIDTH, YAW, type LaptopPose, type Perspective, type Posed, type Straight, type Trick, type TrickPose, type View } from "./geometry";
 
 // The page's colors, as CSS variables, each with the light tone of the site
 // this laptop was first drawn for, so it shows as meant before they are set.
@@ -673,6 +673,15 @@ const REAL = {
   far: "rgba(0, 0, 0, 0.2)",
 };
 
+// The bezel's glass catching the light from above, down the lid from its top edge, gone at flat 1 as FRONT has none.
+const PANE: Stop[] = [
+  [0, "white", 0.13],
+  [0.25, "white", 0.04],
+  [0.6, "white", 0],
+];
+// The lid's top edge and its hinge in the notch's units, hundredths of the lid's width down from the display's top edge.
+const LID_SPAN = [-FRONT.glass.y, DEPTH - FRONT.glass.y].map((y) => fixed((y * 100) / WIDTH));
+
 /** The glass's top corners and the notch, from the eye's own at `flat` 0 to FRONT's at 1. */
 function glassLook(flat: number) {
   const [x, y] = [lerp(CORNER / GLASS.width, FRONT.round / FRONT.glass.width, flat), lerp(CORNER / GLASS.height, FRONT.round / FRONT.glass.height, flat)];
@@ -937,7 +946,9 @@ function Free({
         <path {...bind("lid.gasket")} />
         <path {...bind("lid.gasketLine")} />
         <path {...bind("lid.glass")} fill="black" />
-        <path {...bind("lid.glass")} fill={url("pane")} />
+        <g {...bind("lines")}>
+          <path {...bind("lid.glass")} fill={url("pane")} />
+        </g>
         {lidHinge}
       </>
     ),
@@ -1005,6 +1016,13 @@ function Free({
         style={{ position: "absolute", top: 0, ...look.notch, overflow: "visible", pointerEvents: "none" }}
       >
         <path d={notch.path} fill="black" />
+        {/* Realistic, the notch is the bezel's glass, under the same light down the lid. */}
+        {real && (
+          <g {...bind("lines")}>
+            <Gradient id={`${id}-notch`} gradientUnits="userSpaceOnUse" x1="0" y1={LID_SPAN[0]} x2="0" y2={LID_SPAN[1]} stops={PANE} />
+            <path d={notch.path} fill={url("notch")} />
+          </g>
+        )}
         <circle cx={notch.lens.x} cy={notch.lens.y} r={0.35} fill="#111112" />
         <circle cx={notch.lens.x} cy={notch.lens.y} r={0.11} fill="#1b3048" />
       </svg>
@@ -1051,12 +1069,7 @@ function Free({
               [0.7, "#abacae"],
               [1, "#c6c7c9"],
             ])}
-            {/* The bezel's glass catching the light from above. */}
-            {sheen("pane", [
-              [0, "white", 0.13],
-              [0.25, "white", 0.04],
-              [0.6, "white", 0],
-            ])}
+            {sheen("pane", PANE)}
             <Grain id={`${id}-grain`} size={2.4} count={160} speck={0.05} strength={0.045} stretch={2} />
           </>
         )}

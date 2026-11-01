@@ -9,6 +9,7 @@ import {
   compose,
   dot,
   fixed,
+  gradientSpace,
   grow,
   hull,
   keep,
@@ -842,15 +843,7 @@ function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: Boxed
     const [[x1, y1], [x2, y2]] = [eye.project(from), eye.project(to)];
     return { x1: fixed(x1), y1: fixed(y1), x2: fixed(x2), y2: fixed(y2) };
   };
-  // A sheen's own space on screen: 0 at `from` and 1 at `to` along its y, its
-  // lines along the laptop's width where the face's middle is, so they lie
-  // square across the face however it turns, as plain ends on screen do not.
-  const sheet = (from: Solid, to: Solid) => {
-    const [[ox, oy], [tx, ty]] = [eye.project(from), eye.project(to)];
-    const side = (x: number) => eye.project(add(from, [x, (to[1] - from[1]) / 2, (to[2] - from[2]) / 2]));
-    const [[lx, ly], [rx, ry]] = [side(-1), side(1)];
-    return { gradientTransform: `matrix(${[rx - lx, ry - ly, tx - ox, ty - oy, ox, oy].map(fixed).join(" ")})` };
-  };
+  const sheet = (from: Solid, to: Solid) => gradientSpace(eye, from, to);
   // The realistic look's extra parts: the underside's intake slots along its
   // sides and its eight screws, the feet's soles and rings, and copies of the
   // faces that carry a sheen or a highlight.

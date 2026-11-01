@@ -369,6 +369,25 @@ test("realistic, the aluminum has its grain, the glass its glare, and at flat 1 
   expect(html).toMatch(/<linearGradient id="[^"]+-top" gradientTransform="matrix\([-\d. ]+\)" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="1">/);
 });
 
+test("realistic, the notch is the bezel's glass under the same light down the lid, fading with it toward flat 1; elsewhere it stays black", () => {
+  const notchOf = (html: string) => html.match(/<g opacity="([\d.]+)"><linearGradient id="[^"]+-notch" gradientUnits="userSpaceOnUse" x1="0" y1="([-\d.]+)" x2="0" y2="([-\d.]+)">(.*?)<\/linearGradient>/);
+  const pane = (html: string) => html.match(/-pane"[^>]*>(.*?)<\/linearGradient>/)?.[1];
+  const html = renderToString(
+    <Laptop eye={DESK} look="realistic">
+      <p>live</p>
+    </Laptop>,
+  );
+  const notch = notchOf(html);
+  expect(notch?.[1]).toBe("1");
+  // From the lid's top edge to its hinge in the notch's units, hundredths of the lid's width from the display's top edge.
+  expect(Number(notch?.[2])).toBeCloseTo(-1.75, 6);
+  expect(Number(notch?.[3])).toBeCloseTo((46.7 * 100) / WIDTH - 1.75, 3);
+  expect(notch?.[4]).toBe(pane(html));
+  expect(notchOf(renderToString(<Laptop eye={DESK} look="realistic" free flat={0.5} />))?.[1]).toBe("0.5");
+  expect(renderToString(<Laptop eye={DESK} free flat={0.5} />)).not.toContain("-notch");
+  expect(renderToString(<Laptop eye={FRONT} />)).not.toContain("-notch");
+});
+
 test.each([DESK, PHONE])("LAPTOP_BOX gives where the eye's own scene sits in the box: its own drawing lands x right and y down", (eye) => {
   const box = LAPTOP_BOX[eye.id];
   expect(Object.keys(box)).toEqual(["width", "height", "x", "y"]);

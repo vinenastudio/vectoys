@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { camera, type Flat, type Solid } from "../src";
+import { camera, gradientSpace, type Flat, type Solid } from "../src";
 
 type Eye = { height: number; perspective: number; camera: number; back: number; origin: number; anchor: number };
 
@@ -110,4 +110,22 @@ test("moved turns the model round a middle, then grows it about the middle on sc
   const turned = moved(eye, rotateZ(180), 1, [0, 0], middle);
   const [a, b] = [turned.toView([10, 0, -1]), eye.toView([-10, 0, -1])];
   a.forEach((value, axis) => expect(value).toBeCloseTo(b[axis] ?? 0, 9));
+});
+
+test("a gradient space runs from one point to the other, its lines along the model's x where the span's middle is", () => {
+  const eye = camera({ height: 60, perspective: 300, yaw: -30, pitch: -20 });
+  const [from, to] = [[0, -10, 0], [0, 10, 0]] as const;
+  const values = gradientSpace(eye, from, to).gradientTransform.match(/[-\d.]+/g)?.map(Number) ?? [];
+  const [a, b, c, d, e, f] = values;
+  expect(values).toHaveLength(6);
+  const [[ox, oy], [tx, ty]] = [eye.project(from), eye.project(to)];
+  // (0, 0) lands on `from` and (0, 1) on `to`.
+  expect(e).toBeCloseTo(ox, 3);
+  expect(f).toBeCloseTo(oy, 3);
+  expect((c ?? 0) + (e ?? 0)).toBeCloseTo(tx, 3);
+  expect((d ?? 0) + (f ?? 0)).toBeCloseTo(ty, 3);
+  // Its x runs along the model's x at the middle.
+  const [[lx, ly], [rx, ry]] = [eye.project([-1, 0, 0]), eye.project([1, 0, 0])];
+  expect(a).toBeCloseTo(rx - lx, 3);
+  expect(b).toBeCloseTo(ry - ly, 3);
 });
