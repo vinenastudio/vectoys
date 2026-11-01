@@ -146,7 +146,15 @@ Pushing to main deploys vectoys.com through GitHub Actions. The deploy then noti
 
 ## Release
 
-`bun run release` is the only way to publish. It builds the packages, then runs `bun publish` in `packages/engine`, `packages/react` and `packages/cli`, in that order. `bun publish` turns the `workspace:` ranges into real versions; `npm publish` would ship them as they are. Bump the version in all three `package.json` files first, as they share one.
+1. Bump the version in `packages/engine`, `packages/react` and `packages/cli`. The three `package.json` files share one version.
+2. Merge the change to main.
+3. Push a tag `vectoys@<version>`, for example `git tag vectoys@0.3.0 && git push origin vectoys@0.3.0`.
+
+The Release workflow (`.github/workflows/release.yml`) checks that the tag matches all three versions, then typechecks, builds and tests. It publishes the engine, then the React package, then the CLI through npm trusted publishing, so it needs no npm token and npm adds provenance. A version with a `-` goes out under the `next` tag. A version that is already on npm is skipped, so you can run a failed release again.
+
+`bun pm pack` makes each tarball, because it turns the `workspace:` ranges into real versions; `npm publish` alone would ship them as they are.
+
+`bun run release` stays as the manual fallback. It builds the packages and runs `bun publish` in the same order, with your own npm login and no provenance.
 
 ## License
 
