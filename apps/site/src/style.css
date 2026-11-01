@@ -1342,6 +1342,164 @@ code.inline {
   translate: 2px -2px;
 }
 
+/* Scrub it with the scroll: the scene stays pinned for a few screens while the scroll draws it. */
+
+.scrub-track {
+  position: relative;
+}
+
+.scrub-pin {
+  position: sticky;
+  top: 0;
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  height: 100svh;
+}
+
+/* The laptop's stage, which the scroll slides from side to side; its box is a little wider than tall. */
+.scrub-glide {
+  width: min(100%, calc((100svh - 240px) * 1.08));
+  will-change: transform;
+}
+
+.scrub-chapter {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 360px;
+}
+
+.scrub-chapter h3 {
+  font-size: clamp(24px, 2.6vw, 32px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.scrub-chapter p {
+  color: var(--muted);
+}
+
+/* On a narrow page the words stand under the laptop, one chapter at a time. */
+.scrub-pin .scrub-chapter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(24px, 5svh);
+  margin-inline: auto;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (min-width: 900px) {
+  .scrub-glide {
+    width: min(64%, calc((100svh - 96px) * 1.08));
+  }
+
+  .scrub-pin .scrub-chapter {
+    top: 50%;
+    bottom: auto;
+    width: 30%;
+    margin: 0;
+    text-align: left;
+    translate: 0 -50%;
+  }
+
+  .scrub-pin .scrub-chapter-left {
+    right: auto;
+  }
+
+  .scrub-pin .scrub-chapter-right {
+    left: auto;
+  }
+}
+
+/* The display, laid out about 1280 pixels across. */
+.scrub-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 80px 96px;
+  background:
+    radial-gradient(80% 60% at 25% 15%, rgba(140, 180, 255, 0.9), transparent 70%),
+    linear-gradient(160deg, #3d5cc4 0%, #1b2557 60%, #0d1126 100%);
+  color: #ffffff;
+}
+
+.scrub-screen-label {
+  font-size: 40px;
+  opacity: 0.7;
+}
+
+.scrub-screen-count {
+  font-family: var(--display);
+  font-size: 240px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.scrub-screen-steps {
+  display: grid;
+  gap: 14px;
+  margin: auto 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 40px;
+}
+
+.scrub-screen-steps li {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  opacity: 0.4;
+}
+
+.scrub-screen-steps li::before {
+  content: "";
+  width: 28px;
+  height: 28px;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+}
+
+.scrub-screen-steps li[data-done] {
+  opacity: 1;
+}
+
+.scrub-screen-steps li[data-done]::before {
+  background: currentColor;
+}
+
+/* With reduced motion: still frames in the page's flow, each beside its words. */
+.scrub-frames {
+  display: grid;
+  gap: 56px;
+}
+
+.scrub-frame {
+  display: grid;
+  gap: 24px;
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .scrub-frame {
+    grid-template-columns: 7fr 5fr;
+    gap: 64px;
+  }
+
+  .scrub-frame:nth-child(even) {
+    grid-template-columns: 5fr 7fr;
+  }
+
+  .scrub-frame:nth-child(even) > :first-child {
+    order: 2;
+  }
+}
+
 /* All toys: the band under the header, then every item. */
 
 .toys-intro {

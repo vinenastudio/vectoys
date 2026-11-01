@@ -9,7 +9,7 @@ Status: early.
 ## Packages
 
 - `packages/engine` (`@vinena/vectoys`): a perspective camera, 3D rotations and poses, 2D outline helpers and compact SVG path output. Zero runtime dependencies.
-- `packages/react` (`@vinena/vectoys-react`): `Stage`, `Faces` and `Screen`, the React pieces any item draws with, and the motion hooks `useSpring`, `useFrames` and `useReducedMotion`. MIT.
+- `packages/react` (`@vinena/vectoys-react`): `Stage`, `Faces` and `Screen`, the React pieces any item draws with, and the motion hooks `useSpring`, `useFrames`, `useReducedMotion` and `useScrub`. MIT.
 - `packages/cli` (`@vinena/vectoys-cli`, command `vectoys`): the CLI that copies items into a project. MIT.
 - `packages/registry-build`: writes the registry JSON the site serves at `/r`.
 - `apps/site`: vectoys.com, the landing page and the gallery, which also serves the registry at `/r`.
@@ -23,6 +23,23 @@ Besides the camera, poses and paths, the engine has:
 - `rotateAxis(axis, degrees)`: a turn about any axis.
 - `slerp(from, to, share)`: the rotation a share of the way between two, turning the short way round.
 - `spring(state, target, seconds, { stiffness, damping })` and `settled(state, target)`: a value on a spring, stepped in small fixed steps so any frame rate gives the same path. `useSpring(target)` in `@vinena/vectoys-react` follows a target on it.
+- `clamp(v, lo, hi)`, `lerp(a, b, t)` and `ease(t)`, which eases a share from 0 to 1 in and out. `segment(p, i, n)` is how far a progress `p` is through segment `i` of `n` equal ones, from 0 to 1.
+- `scrub(t, keys, { ease })`: every number the keyframes set, at progress `t`. Keys are sorted by `at`, such as `[{ at: 0, lid: 0, yaw: 0 }, { at: 0.12, lid: 1 }, { at: 0.3, yaw: -20 }]`. Each segment between two keys eases on its own, with `ease` unless you pass another. A key that leaves a field out keeps the value from the key before, and before a field's first key it holds that first value.
+
+### Scroll scenes
+
+`useScrub(ref, { screens })` in `@vinena/vectoys-react` follows a tall track element as the page scrolls, for a scene pinned inside it with `position: sticky`. The track is `screens` times the viewport's height, set by your CSS. It returns `{ progress, reduced }`. `progress.get()` is 0 while the track's top is at the viewport's top, and 1 once its bottom reaches the viewport's bottom. `progress.subscribe(fn)` calls `fn` with each new value, at most once a frame, and causes no React render. It does not call `fn` with the current value, so draw that first, for a page opened partway down. On the server `progress` is 0. `reduced` is true when the page asks for less motion, so you can show still frames with no pinning instead.
+
+```tsx
+const { progress } = useScrub(track, { screens: 4 });
+useEffect(() => {
+  const draw = (t: number) => laptop.current?.set(scrub(t, KEYS));
+  draw(progress.get());
+  return progress.subscribe(draw);
+}, [progress]);
+```
+
+`placeScreen(element, camera, pose, rect)` lays a `Screen`'s element, which its `ref` gives you, onto a new pose without a render.
 
 ## Registry
 
@@ -32,6 +49,7 @@ Devices:
 
 - `registry/laptop`: a 14 inch laptop with a lid that opens and closes and live HTML on its display.
   `<Laptop eye={FRONT}>` shows it straight on, as a product shot drawn flat to sizes measured on product renders: the open lid with its notch, over the base's front face with the thumb's scoop and two feet. The lid is always open there, and its aluminum takes `--vectoys-finish`, silver by default (`#3d3b3e` reads as space black). The scene is the laptop's own bounds. Laptop takes no style or className, so to let a frame cut it, put it in a div with `width: 121.4%; margin-inline: -10.7%; margin-bottom: -3%` inside a wrapper with `overflow: hidden`. The lid then fills the wrapper's width, the base's ends are cut flush with the lid's sides, and the base's face just under the thumb's scoop.
+  `<Laptop eye={DESK} lid={1} yaw={-20} pitch={15}>` turns the laptop in perspective, from either `DESK` or `PHONE`. `lid` runs from 0 (shut) to 1 (open), and `closed`, its opposite, still works but is deprecated; `lid` wins when you pass both. `yaw` turns the laptop about its own upright axis, from -35 to 35 degrees; positive turns the display toward the page's right. `pitch` is the eye's height in degrees, from 5 to 30, 15 for `DESK` and 12 for `PHONE` by default. With none of these, the laptop draws exactly as before. `turning` draws in a fixed box that holds every pose, `LAPTOP_BOX[eye.id]` (`{ width, height }` in scene units), so the stage keeps one size while the laptop opens and turns. Pass `ref` for a `LaptopHandle`: `ref.current.set({ lid, yaw, pitch })` moves the laptop at once with no React render, changing only the fields you pass. That fits a pose that changes every frame, such as one driven by the scroll. The handle owns the pose from its first `set` until a `lid`, `closed`, `yaw` or `pitch` prop changes, and then the props win. Renders for anything else, such as new content on the display, keep the handle's pose.
 - `registry/laptop-front`: the same laptop straight on as its own item, `<LaptopFront>`, with live HTML on its display and `finish="silver"` or `finish="black"` for space black.
 - `registry/phone`: a modern flagship phone that turns any way, with side buttons, a camera bump and live HTML on its display.
 - `registry/tablet`: an 11 inch tablet that turns any way, upright or on its side, with live HTML on its display.

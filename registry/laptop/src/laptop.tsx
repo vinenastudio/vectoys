@@ -1,7 +1,7 @@
-import { fixed } from "@vinena/vectoys";
-import { Screen, Stage } from "@vinena/vectoys-react";
-import { memo, useId, useMemo, type CSSProperties, type ReactNode } from "react";
-import { BEZEL, DESK, GLASS, HOLE, ROUND, type Perspective, type Straight, type View } from "./geometry";
+import { clamp, fixed } from "@vinena/vectoys";
+import { Screen, Stage, placeScreen } from "@vinena/vectoys-react";
+import { memo, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
+import { BEZEL, DESK, GLASS, HOLE, PITCH, ROUND, YAW, type LaptopPose, type Perspective, type Posed, type Straight, type View } from "./geometry";
 
 // The page's colors, as CSS variables, each with the light tone of the site
 // this laptop was first drawn for, so it shows as meant before they are set.
@@ -37,54 +37,89 @@ const stroke = {
 
 // Which field of holes shows: the full one where a hole is about a device
 // pixel (a scene 560px wide at two pixels a px), the half one down to half
-// that, the quarter one below. The stage is the container these ask about.
+// that, the quarter one below. The stage is the container these ask about;
+// in a wider scene, as `turning` draws, the laptop is smaller in it, so the
+// widths grow with the scene and the fields go by names of their own.
 const HOLES = "vectoys-laptop-holes";
-const HOLES_SHOWN = `
-.${HOLES}-0, .${HOLES}-2 { display: none; }
-@media (min-resolution: 2dppx) { @container (min-width: 560px) { .${HOLES}-0 { display: inline; } .${HOLES}-1 { display: none; } } }
-@media (max-resolution: 1.99dppx) { @container (max-width: 559.98px) { .${HOLES}-1 { display: none; } .${HOLES}-2 { display: inline; } } }
-@container (max-width: 279.98px) { .${HOLES}-1 { display: none; } .${HOLES}-2 { display: inline; } }
+const holesShown = (name: string, scene: number) => {
+  const [fine, coarse] = [fixed((560 * scene) / 100), fixed((280 * scene) / 100)];
+  return `
+.${name}-0, .${name}-2 { display: none; }
+@media (min-resolution: 2dppx) { @container (min-width: ${fine}px) { .${name}-0 { display: inline; } .${name}-1 { display: none; } } }
+@media (max-resolution: 1.99dppx) { @container (max-width: ${fixed(fine - 0.02)}px) { .${name}-1 { display: none; } .${name}-2 { display: inline; } } }
+@container (max-width: ${fixed(coarse - 0.02)}px) { .${name}-1 { display: none; } .${name}-2 { display: inline; } }
 `;
+};
+
+/**
+ * The elements a pose writes to, by name, so a laptop's handle redraws it
+ * without a render. `ref(name)` is the same callback every render.
+ */
+function useNodes() {
+  const [nodes] = useState(() => {
+    const named = new Map<string, Set<Element>>();
+    const refs = new Map<string, (node: Element | null) => () => void>();
+    return {
+      all: (name: string) => named.get(name) ?? [],
+      ref(name: string) {
+        const known = refs.get(name);
+        if (known) return known;
+        const bound = (node: Element | null) => {
+          if (!node) return () => {};
+          const set = named.get(name) ?? new Set<Element>();
+          named.set(name, set.add(node));
+          return () => void set.delete(node);
+        };
+        refs.set(name, bound);
+        return bound;
+      },
+    };
+  });
+  return nodes;
+}
+
+type Nodes = ReturnType<typeof useNodes>;
 
 /** The base, which never changes as the lid moves. */
-const Base = memo(function Base({ id, view: { DECK } }: { id: string; view: Perspective }) {
+const Base = memo(function Base({ id, deck: DECK, holes: name, node }: { id: string; deck: Posed["DECK"]; holes: string; node: Nodes["ref"] }) {
   return (
     <>
-      <path d={DECK.ground} filter={`url(#${id}-far)`} style={shade(1)} />
-      <path d={DECK.contact} filter={`url(#${id}-near)`} style={shade(1)} />
-      <path d={DECK.hull} style={SURFACE} />
-      <path d={DECK.hull} style={shade(SIDE)} />
-      <path d={DECK.hinge} style={{ fill: HINGE }} />
-      <path d={DECK.barrels} style={{ fill: BARREL }} />
-      <path d={DECK.top} style={SURFACE} />
+      <path ref={node("deck.ground")} d={DECK.ground} filter={`url(#${id}-far)`} style={shade(1)} />
+      <path ref={node("deck.contact")} d={DECK.contact} filter={`url(#${id}-near)`} style={shade(1)} />
+      <path ref={node("deck.hull")} d={DECK.hull} style={SURFACE} />
+      <path ref={node("deck.hull")} d={DECK.hull} style={shade(SIDE)} />
+      <path ref={node("deck.hinge")} d={DECK.hinge} style={{ fill: HINGE }} />
+      <path ref={node("deck.barrels")} d={DECK.barrels} style={{ fill: BARREL }} />
+      <path ref={node("deck.top")} d={DECK.top} style={SURFACE} />
       <g clipPath={`url(#${id}-deck)`}>
         {DECK.holes.map((holes, coarser) => (
           <path
             key={coarser}
+            ref={node(`holes.${coarser}`)}
             d={holes}
-            className={`${HOLES}-${coarser}`}
+            className={`${name}-${coarser}`}
             strokeWidth={HOLE * 2 ** coarser}
             strokeLinecap="round"
             style={{ stroke: WELL, fill: "none" }}
           />
         ))}
       </g>
-      <path d={DECK.well} style={{ fill: WELL }} />
-      <path d={DECK.keys} style={{ fill: KEY }} />
-      <path d={DECK.touchId} style={{ fill: TOUCH_ID }} />
-      <path d={DECK.touchIdRing} {...stroke} style={hairline(KEY)} />
-      <path d={DECK.trackpad} style={shade(0.2)} />
-      <path d={DECK.trackpad} {...stroke} style={hairline(BORDER)} />
-      <path d={DECK.scoop} style={shade(1)} />
-      <path d={DECK.lines} {...stroke} style={hairline(HAIRLINE)} />
+      <path ref={node("deck.well")} d={DECK.well} style={{ fill: WELL }} />
+      <path ref={node("deck.keys")} d={DECK.keys} style={{ fill: KEY }} />
+      <path ref={node("deck.touchId")} d={DECK.touchId} style={{ fill: TOUCH_ID }} />
+      <path ref={node("deck.touchIdRing")} d={DECK.touchIdRing} {...stroke} style={hairline(KEY)} />
+      <path ref={node("deck.trackpad")} d={DECK.trackpad} style={shade(0.2)} />
+      <path ref={node("deck.trackpad")} d={DECK.trackpad} {...stroke} style={hairline(BORDER)} />
+      <path ref={node("deck.scoop")} d={DECK.scoop} style={shade(1)} />
+      <path ref={node("deck.lines")} d={DECK.lines} {...stroke} style={hairline(HAIRLINE)} />
     </>
   );
 });
 
 /** What the drawing refers to, under names of its own so any number of laptops share a page. */
-const defs = (id: string, { width, height }: Perspective["camera"]) => (
+const defs = (id: string, { width, height }: Perspective["camera"], holes: string) => (
   <>
-    <style>{HOLES_SHOWN}</style>
+    <style>{holes}</style>
     <filter id={`${id}-near`} filterUnits="userSpaceOnUse" x="0" y="0" width={width} height={height}>
       <feGaussianBlur stdDeviation="0.4 0.2" />
     </filter>
@@ -112,15 +147,40 @@ const GLASS_STYLE: CSSProperties = {
 };
 const FILL: CSSProperties = { position: "absolute", inset: 0 };
 
+/** Moves a laptop to a new pose at once, without a render; any of the three left out stays as it is. */
+export type LaptopHandle = { set(pose: Partial<LaptopPose>): void };
+
 type LaptopProps = {
-  /** How far the lid has closed, from 0 (open) to 1 (shut on the base); open by default. `FRONT` is always open. */
+  /** How far the lid is open, from 0 (shut on the base) to 1 (open); open by default. `FRONT` is always open. */
+  lid?: number;
+  /** @deprecated Use `lid`. How far the lid has closed, from 0 (open) to 1 (shut); `lid` wins when both are given. */
   closed?: number;
+  /** How far the laptop turns about its own upright axis, from -35 to 35 degrees; positive turns its display toward the page's right. */
+  yaw?: number;
+  /** How high the eye looks down from, from 5 to 30 degrees; the eye's own by default, 15 for `DESK` and 12 for `PHONE`. */
+  pitch?: number;
+  /**
+   * Draws in the eye's fixed box that holds every pose, `LAPTOP_BOX`, in
+   * place of its own scene, so the stage keeps one size while the laptop
+   * turns, opens and closes. Off by default, which keeps the eye's own view
+   * and crop.
+   */
+  turning?: boolean;
   /** The eye that sees it: `DESK`, `PHONE` or `FRONT`; `DESK` by default. */
   eye?: View;
   /** The laptop's name for assistive technology. */
   label?: string;
   /** Live content on the display, laid out as on a screen about 1280 pixels wide. */
   children?: ReactNode;
+  /**
+   * A handle whose `set({ lid, yaw, pitch })` redraws the laptop in a new
+   * pose without a render, for a pose that moves every frame, as a scroll
+   * does. The handle owns the pose from its first `set` until a `lid`,
+   * `closed`, `yaw` or `pitch` prop changes; then the props' pose is drawn.
+   * Renders for anything else, such as new content on the display, keep
+   * the handle's pose. `FRONT` does not move, so there it does nothing.
+   */
+  ref?: Ref<LaptopHandle>;
 };
 
 /**
@@ -128,26 +188,141 @@ type LaptopProps = {
  * drawn from the laptop's projected outline, and the display's glass laid onto the lid with
  * live content on it, hidden while the lid faces away.
  */
-export const Laptop = memo(function Laptop({ closed = 0, eye = DESK, children, label = "Laptop" }: LaptopProps) {
-  return "art" in eye ? (
-    <Front eye={eye} label={label}>
-      {children}
-    </Front>
-  ) : (
-    <Angled closed={closed} eye={eye} label={label}>
+export const Laptop = memo(function Laptop({ lid, closed = 0, yaw, pitch, turning = false, eye = DESK, children, label = "Laptop", ref }: LaptopProps) {
+  if ("art" in eye) {
+    return (
+      <Front eye={eye} label={label} handle={ref}>
+        {children}
+      </Front>
+    );
+  }
+  // With none of the pose's props, a handle or `turning`, the markup is the
+  // eye's own still drawing, as it always was; otherwise every part a pose
+  // can show or hide is drawn, so the handle has it to write to.
+  const live = turning || lid !== undefined || yaw !== undefined || pitch !== undefined || ref != null;
+  const pose = held({ lid: lid ?? 1 - closed, yaw: yaw ?? 0, pitch: pitch ?? eye.pitch });
+  return (
+    <Angled pose={pose} closed={lid === undefined ? closed : 1 - pose.lid} live={live} turning={turning} eye={eye} label={label} handle={ref}>
       {children}
     </Angled>
   );
 });
 
-/** The laptop in perspective, its lid swung to `closed`. */
-function Angled({ closed, eye, children, label }: { closed: number; eye: Perspective; label: string; children?: ReactNode }) {
-  const id = `laptop-${eye.id}-${useId().replace(/[^\w-]/g, "")}`;
-  const { DECK, camera } = eye;
-  const lid = useMemo(() => eye.lidArt(closed), [eye, closed]);
+/** A pose held to the ranges a laptop takes. */
+const held = ({ lid, yaw, pitch }: LaptopPose): LaptopPose => ({ lid: clamp(lid, 0, 1), yaw: clamp(yaw, -YAW, YAW), pitch: clamp(pitch, ...PITCH) });
 
+const same = (a: LaptopPose, b: LaptopPose) => a.lid === b.lid && a.yaw === b.yaw && a.pitch === b.pitch;
+
+/** The lid shadow's gradient, along the way toward the deck's front. */
+const along = ({ ahead }: Posed, shadow: { from: number; to: number } | null) => {
+  const [from, to] = shadow ? [shadow.from, shadow.to] : [0, 0];
+  return { x1: fixed(ahead[0] * from), x2: fixed(ahead[0] * to), y1: fixed(ahead[1] * from), y2: fixed(ahead[1] * to) };
+};
+
+/**
+ * Writes a pose straight into the drawing, as a render of it would: the
+ * paths, the lid's mask and shadow, which face shows, and the glass. The
+ * base is written only when the turn or the eye's height changes.
+ */
+function painter(eye: Perspective, turning: boolean, nodes: Nodes, id: string) {
+  let shown: { view: Posed; closed: number } | null = null;
+  const write = (name: string, attribute: string, value: string | null) => {
+    for (const node of nodes.all(name)) {
+      if (value === null) node.removeAttribute(attribute);
+      else node.setAttribute(attribute, value);
+    }
+  };
+  return {
+    /** What the page shows after a render, so a pose after it writes only what changed. */
+    rendered(view: Posed, closed: number) {
+      shown = { view, closed };
+    },
+    draw({ lid, yaw, pitch }: LaptopPose) {
+      const view = shown && shown.view.camera.yaw === yaw && shown.view.camera.pitch === -pitch ? shown.view : eye.at({ yaw, pitch }, turning);
+      const closed = 1 - lid;
+      if (shown && shown.view === view && shown.closed === closed) return;
+      if (view !== shown?.view) {
+        const { holes, ...paths } = view.DECK;
+        for (const [name, d] of Object.entries(paths)) write(`deck.${name}`, "d", d);
+        write("lid.shade", "d", paths.top);
+        holes.forEach((d, coarser) => write(`holes.${coarser}`, "d", d));
+      }
+      const art = view.lidArt(closed);
+      write("lid.hull", "d", art.hull);
+      write("lid.face", "d", art.face);
+      write("lid.bezel", "d", art.bezel ?? "");
+      write("lid.lines", "d", art.lines);
+      for (const node of nodes.all("lid.face")) if (node instanceof SVGElement) node.style.fill = art.facing ? RIM_TONE : `url(#${id}-sheen)`;
+      write("lid.group", "mask", art.cut ? `url(#${id}-lid-cut)` : null);
+      write("cut.hidden", "d", art.cut?.hidden ?? "");
+      write("cut.clear", "d", art.cut?.clear ?? "");
+      for (const [name, value] of Object.entries(along(view, art.shadow))) write("lid.shadow", name, String(value));
+      write("lid.shade", "opacity", String(fixed(closed)));
+      for (const glass of nodes.all("glass")) if (glass instanceof HTMLElement) placeScreen(glass, view.camera, view.lidWorld(closed), GLASS);
+      shown = { view, closed };
+    },
+  };
+}
+
+/** The laptop in perspective, in a pose. */
+function Angled({
+  pose,
+  closed,
+  live,
+  turning,
+  eye,
+  children,
+  label,
+  handle,
+}: {
+  pose: LaptopPose;
+  closed: number;
+  live: boolean;
+  turning: boolean;
+  eye: Perspective;
+  label: string;
+  children?: ReactNode;
+  handle?: Ref<LaptopHandle> | undefined;
+}) {
+  const id = `laptop-${eye.id}-${useId().replace(/[^\w-]/g, "")}`;
+  const { yaw, pitch } = pose;
+  const view = useMemo(() => eye.at({ yaw, pitch }, turning), [eye, yaw, pitch, turning]);
+  const { DECK, camera } = view;
+  const lid = useMemo(() => view.lidArt(closed), [view, closed]);
+  const nodes = useNodes();
+  const paint = useMemo(() => painter(eye, turning, nodes, id), [eye, turning, nodes, id]);
+  // The handle's pose, the props' pose it was set over and the painter that
+  // drew it: when the props' pose changes, or the eye or `turning` does, the
+  // props win, drawn whole so nothing of the handle's pose is left behind.
+  const set = useRef<{ pose: LaptopPose; over: LaptopPose; paint: typeof paint } | null>(null);
+  const given = useRef(pose);
+
+  useLayoutEffect(() => {
+    given.current = pose;
+    const hold = set.current;
+    if (hold && (hold.paint !== paint || !same(hold.over, pose))) {
+      set.current = null;
+      paint.draw(pose);
+    } else if (!hold) paint.rendered(view, closed);
+  });
+
+  useImperativeHandle(
+    handle,
+    () => ({
+      set(next) {
+        const from = set.current?.pose ?? given.current;
+        const pose = held({ ...from, ...next });
+        set.current = { pose, over: given.current, paint };
+        paint.draw(pose);
+      },
+    }),
+    [paint],
+  );
+
+  const holes = turning ? `${HOLES}-${eye.id}` : HOLES;
+  const shadow = along(view, lid.shadow);
   const glass = (
-    <Screen camera={camera} pose={eye.lidWorld(closed)} rect={GLASS} style={GLASS_STYLE}>
+    <Screen ref={nodes.ref("glass")} camera={camera} pose={view.lidWorld(closed)} rect={GLASS} style={GLASS_STYLE}>
       <div style={{ ...FILL, background: `linear-gradient(110deg, color-mix(in srgb, ${HAIRLINE} 9%, transparent), transparent 35%)` }} />
       <div style={FILL}>{children}</div>
       <div
@@ -175,12 +350,12 @@ function Angled({ closed, eye, children, label }: { closed: number; eye: Perspec
   return (
     <Stage role={children == null ? "img" : "group"} label={label} camera={camera} overlay={glass}>
       <defs>
-        {defs(id, camera)}
+        {defs(id, camera, holesShown(holes, camera.width))}
         <clipPath id={`${id}-deck`}>
-          <path d={DECK.top} />
+          <path ref={nodes.ref("deck.top")} d={DECK.top} />
         </clipPath>
-        {lid.shadow && (
-          <linearGradient id={`${id}-lid-shadow`} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1={lid.shadow.from} y2={lid.shadow.to}>
+        {(live || lid.shadow) && (
+          <linearGradient ref={nodes.ref("lid.shadow")} id={`${id}-lid-shadow`} gradientUnits="userSpaceOnUse" {...shadow}>
             <stop offset="0" style={{ stopColor: SHADOW }} />
             <stop offset="1" style={{ stopColor: SHADOW, stopOpacity: 0 }} />
           </linearGradient>
@@ -190,20 +365,25 @@ function Angled({ closed, eye, children, label }: { closed: number; eye: Perspec
           outline runs does not matter. As two paths of one clip path the lid went missing for single frames of
           its swing, at the angles where the outline that clears it happened to run the other way.
         */}
-        {lid.cut && (
-          <mask id={`${id}-lid-cut`} maskUnits="userSpaceOnUse" x="-50" y="-50" width="200" height="170">
-            <rect x="-50" y="-50" width="200" height="170" fill="white" />
-            <path d={lid.cut.hidden} fill="black" />
-            <path d={lid.cut.clear} fill="white" />
+        {(live || lid.cut) && (
+          <mask id={`${id}-lid-cut`} maskUnits="userSpaceOnUse" x="-50" y="-50" width={fixed(camera.width + 100)} height={fixed(Math.max(170, camera.height + 100))}>
+            <rect x="-50" y="-50" width={fixed(camera.width + 100)} height={fixed(Math.max(170, camera.height + 100))} fill="white" />
+            <path ref={nodes.ref("cut.hidden")} d={lid.cut?.hidden ?? ""} fill="black" />
+            <path ref={nodes.ref("cut.clear")} d={lid.cut?.clear ?? ""} fill="white" />
           </mask>
         )}
       </defs>
-      <Base id={id} view={eye} />
-      {lid.shadow && <path d={DECK.top} fill={`url(#${id}-lid-shadow)`} opacity={fixed(closed)} />}
-      <g mask={lid.cut ? `url(#${id}-lid-cut)` : undefined}>
-        <path d={lid.hull} style={SURFACE} />
-        <path d={lid.hull} style={shade(SIDE)} />
-        {lid.facing ? (
+      <Base id={id} deck={DECK} holes={holes} node={nodes.ref} />
+      {(live || lid.shadow) && <path ref={nodes.ref("lid.shade")} d={DECK.top} fill={`url(#${id}-lid-shadow)`} opacity={fixed(closed)} />}
+      <g ref={nodes.ref("lid.group")} mask={lid.cut ? `url(#${id}-lid-cut)` : undefined}>
+        <path ref={nodes.ref("lid.hull")} d={lid.hull} style={SURFACE} />
+        <path ref={nodes.ref("lid.hull")} d={lid.hull} style={shade(SIDE)} />
+        {live ? (
+          <>
+            <path ref={nodes.ref("lid.face")} d={lid.face} style={{ fill: lid.facing ? RIM_TONE : `url(#${id}-sheen)` }} />
+            <path ref={nodes.ref("lid.bezel")} d={lid.bezel ?? ""} fill="black" />
+          </>
+        ) : lid.facing ? (
           <>
             <path d={lid.face} style={{ fill: RIM_TONE }} />
             {lid.bezel && <path d={lid.bezel} fill="black" />}
@@ -211,7 +391,7 @@ function Angled({ closed, eye, children, label }: { closed: number; eye: Perspec
         ) : (
           <path d={lid.face} fill={`url(#${id}-sheen)`} />
         )}
-        <path d={lid.lines} {...stroke} style={hairline(HAIRLINE)} />
+        <path ref={nodes.ref("lid.lines")} d={lid.lines} {...stroke} style={hairline(HAIRLINE)} />
       </g>
     </Stage>
   );
@@ -312,8 +492,9 @@ const frontGlass = ({ glass, round }: Straight): CSSProperties => {
 };
 
 /** The laptop straight on, drawn flat, with live content on its display under the notch. */
-function Front({ eye, children, label }: { eye: Straight; label: string; children?: ReactNode }) {
+function Front({ eye, children, label, handle }: { eye: Straight; label: string; children?: ReactNode; handle?: Ref<LaptopHandle> | undefined }) {
   const id = `laptop-${eye.id}-${useId().replace(/[^\w-]/g, "")}`;
+  useImperativeHandle(handle, () => ({ set() {} }), []);
   const { art, notch, camera } = eye;
   const url = (name: string) => `url(#${id}-${name})`;
 

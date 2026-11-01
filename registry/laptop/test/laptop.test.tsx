@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { fixed, screenQuad } from "@vinena/vectoys";
 import { renderToString } from "react-dom/server";
-import { DESK, FRONT, GLASS, Laptop, PHONE, WIDTH } from "../src";
+import { DESK, FRONT, GLASS, LAPTOP_BOX, Laptop, PHONE, PITCH, WIDTH, YAW } from "../src";
 
 test.each([
   [DESK, "0 0 100 70"],
@@ -101,4 +101,80 @@ test.each([DESK, FRONT])("the glass clips live HTML to its rounded top corners",
     expect(styles[0]).toContain(`border-radius:${across} ${across} 0 0 /`);
     expect(html).toMatch(/<svg viewBox="[^"]*" preserveAspectRatio="none" aria-hidden="true" style="[^"]*pointer-events:none/);
   }
+});
+
+/** Every point of some path data, as (x, y). */
+const points = (d: string) => [...d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((match): readonly [number, number] => [Number(match[1]), Number(match[2])]);
+
+test.each([DESK, PHONE])("the fixed box holds the whole laptop in every pose, with it in the middle", (eye) => {
+  const box = LAPTOP_BOX[eye.id === "desk" ? "desk" : "phone"];
+  let [left, right, top, bottom] = [Infinity, -Infinity, Infinity, -Infinity];
+  for (let yaw = -YAW; yaw <= YAW; yaw += 2.5) {
+    for (let pitch = PITCH[0]; pitch <= PITCH[1]; pitch += 2.5) {
+      const view = eye.at({ yaw, pitch }, true);
+      expect([view.camera.width, view.camera.height]).toEqual([box.width, box.height]);
+      for (let lid = 0; lid <= 1; lid += 0.05) {
+        const art = view.lidArt(1 - lid);
+        for (const [x, y] of [...points(view.DECK.hull), ...points(art.hull), ...points(view.DECK.ground)]) {
+          [left, right, top, bottom] = [Math.min(left, x), Math.max(right, x), Math.min(top, y), Math.max(bottom, y)];
+        }
+      }
+    }
+  }
+  expect(left).toBeGreaterThan(0);
+  expect(top).toBeGreaterThan(0);
+  expect(right).toBeLessThan(box.width);
+  expect(bottom).toBeLessThan(box.height);
+  expect(Math.abs(left - (box.width - right))).toBeLessThan(0.5);
+  expect(Math.abs(top - (box.height - bottom))).toBeLessThan(3);
+});
+
+test("turning draws in the fixed box, and a turned laptop's markup is the same twice", () => {
+  const render = () =>
+    renderToString(
+      <Laptop eye={DESK} turning lid={0.6} yaw={-20} pitch={24}>
+        <p>live</p>
+      </Laptop>,
+    );
+  expect(render()).toContain(`<svg viewBox="0 0 ${LAPTOP_BOX.desk.width} ${LAPTOP_BOX.desk.height}"`);
+  expect(render()).toBe(render());
+  expect(render()).not.toContain("NaN");
+});
+
+test("lid is how far open, closed is still read, and lid wins over it", () => {
+  const render = (props: { lid?: number; closed?: number }) => renderToString(<Laptop eye={DESK} yaw={0} {...props} />);
+  expect(render({ lid: 0.3 })).toBe(render({ closed: 0.7 }));
+  expect(render({ lid: 0.3, closed: 0 })).toBe(render({ lid: 0.3 }));
+  expect(render({ lid: 2 })).toBe(render({ lid: 1 }));
+});
+
+test("the eye's own pitch and no turn draw the laptop as it always was", () => {
+  for (const eye of [DESK, PHONE]) {
+    expect(eye.at({ yaw: 0, pitch: eye.pitch }).DECK).toBe(eye.DECK);
+    expect(eye.at({ yaw: 0, pitch: eye.pitch + 1 }).DECK).not.toEqual(eye.DECK);
+  }
+  expect([DESK.pitch, PHONE.pitch]).toEqual([15, 12]);
+});
+
+test.each([-35, -20, 20, 35])("turned %p degrees, the glass lies inside the lid's face", (yaw) => {
+  const view = DESK.at({ yaw, pitch: 15 }, true);
+  const quad = screenQuad(view.camera, view.lidWorld(0), GLASS, { width: 1, height: 1 });
+  expect(quad.facing).toBe(true);
+  const face = points(view.lidArt(0).face);
+  const [xs, ys] = [face.map(([x]) => x), face.map(([, y]) => y)];
+  for (const [x, y] of quad.corners) {
+    expect(x).toBeGreaterThan(Math.min(...xs));
+    expect(x).toBeLessThan(Math.max(...xs));
+    expect(y).toBeGreaterThan(Math.min(...ys));
+    expect(y).toBeLessThan(Math.max(...ys));
+  }
+});
+
+test("an eye's id keys its box, which the type checker knows", () => {
+  const boxes: { width: number; height: number }[] = [DESK, PHONE].map((eye) => LAPTOP_BOX[eye.id]);
+  expect(boxes).toEqual([LAPTOP_BOX.desk, LAPTOP_BOX.phone]);
+  const desk: "desk" = DESK.id;
+  expect(desk).toBe("desk");
+  // @ts-expect-error FRONT does not turn, so it has no box.
+  expect(LAPTOP_BOX[FRONT.id]).toBeUndefined();
 });

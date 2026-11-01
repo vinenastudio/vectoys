@@ -22,6 +22,7 @@ export {
   type Slab,
 } from "./parts.ts";
 export { screenQuad, type ScreenQuad, type ScreenRect } from "./screen.ts";
+export { clamp, ease, lerp, scrub, segment, type Keyframe, type ScrubOptions, type Scrubbed } from "./scrub.ts";
 export {
   IDENTITY,
   REST,

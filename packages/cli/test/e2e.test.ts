@@ -152,7 +152,7 @@ const USES: Record<string, { imports: string[]; jsx: string }> = {
   keycap: { imports: ['import { Keycap, KeycapRow } from "./components/vectoys/keycap/keycap";'], jsx: '<Keycap onPress={() => {}}>Go</Keycap><KeycapRow keys={["a", "b"]} />' },
   laptop: {
     imports: ['import { Laptop } from "./components/vectoys/laptop/laptop";', 'import { DESK } from "./components/vectoys/laptop/geometry";'],
-    jsx: "<Laptop eye={DESK} closed={0.5}><p>a</p></Laptop>",
+    jsx: "<Laptop eye={DESK} closed={0.5}><p>a</p></Laptop><Laptop eye={DESK} lid={0.5} yaw={-20} pitch={20} turning ref={(handle) => handle?.set({ yaw: 10 })}><p>a</p></Laptop>",
   },
   "laptop-front": { imports: ['import { LaptopFront } from "./components/vectoys/laptop-front/laptop-front";'], jsx: '<LaptopFront finish="black" label="App"><p>a</p></LaptopFront>' },
   monitor: { imports: ['import { Monitor } from "./components/vectoys/monitor/monitor";'], jsx: "<Monitor tilt={10}><p>a</p></Monitor>" },

@@ -5,6 +5,7 @@ import {
   hull,
   keep,
   line,
+  place,
   rotateX,
   rounded,
   shape,
@@ -12,6 +13,7 @@ import {
   toward,
   winding,
   type Box,
+  type Camera,
   type CameraOptions,
   type Flat,
   type Pose,
@@ -126,97 +128,64 @@ const BEZEL_RING = rounded([-HALF_WIDTH + RIM, -DEPTH + RIM, HALF_WIDTH - RIM, -
 
 const cut = (value: number) => Math.round(value * 100) / 100 || 0;
 
-/** The laptop as one eye sees it: what never moves, and the lid for each frame. */
-function seen({ id, ...options }: CameraOptions & { id: string }) {
-  const eye = camera(options);
-  const { project } = eye;
-  // The open lid faces the eye, so its glass is a plain rectangle on screen.
-  const OPEN = -90 - eye.pitch;
+// The base's model, in the laptop's space, which no pose changes: its
+// outline at the deck and at the bottom, the deck's top with the slot cut
+// into its front edge and the hinge's cut into its back edge, and the slot's
+// dip down the front face.
+const SLAB: Box = [-HALF_WIDTH, -HALF_DEPTH, HALF_WIDTH, HALF_DEPTH];
+const PLAIN = rounded(SLAB, [ROUND, ROUND]);
+const RIMS: Solid[] = [...PLAIN.map(([x, y]): Solid => [x, y, 0]), ...PLAIN.map(([x, y]): Solid => [x, y, -BASE])];
+const SCOOP_EDGE = slot(NOTCH, SCOOP, SCOOP - FILLET, FILLET).map(([x, y]): Flat => [x, HALF_DEPTH - y]);
+const DIP_LINE: Solid[] = slot(NOTCH, DIP, END, FILLET).map(([x, w]) => [x, HALF_DEPTH, -w]);
+const CUT_EDGE = slot(CUT, CUT_DEPTH, CUT_ROUND, FILLET).map(([x, y]): Flat => [x, y - HALF_DEPTH]);
+const DECK_OUTLINE = rounded(SLAB, [ROUND, ROUND], [...SCOOP_EDGE].reverse(), CUT_EDGE);
 
-  const onDeck = ([x, y]: Flat, z = 0) => project([x, y, z]);
+/** A rounded rectangle on the deck, as its outline. */
+const ring = (box: Box, radius: number) => rounded(box, [radius, radius]);
 
-  // The body of the base: its outline on screen, the deck's top with the slot
-  // cut into its front edge and the hinge's cut into its back edge, and the
-  // slot's dip down the front face.
-  const SLAB: Box = [-HALF_WIDTH, -HALF_DEPTH, HALF_WIDTH, HALF_DEPTH];
-  const PLAIN = rounded(SLAB, [ROUND, ROUND]);
-  const SCOOP_EDGE = slot(NOTCH, SCOOP, SCOOP - FILLET, FILLET).map(([x, y]): Flat => [x, HALF_DEPTH - y]);
-  const DIP_EDGE = slot(NOTCH, DIP, END, FILLET).map(([x, w]) => project([x, HALF_DEPTH, -w]));
-  const CUT_EDGE = slot(CUT, CUT_DEPTH, CUT_ROUND, FILLET).map(([x, y]): Flat => [x, y - HALF_DEPTH]);
-  const DECK_RING = rounded(SLAB, [ROUND, ROUND], [...SCOOP_EDGE].reverse(), CUT_EDGE).map((point) => onDeck(point));
-  const BASE_HULL = hull([...PLAIN.map((point) => onDeck(point)), ...PLAIN.map((point) => onDeck(point, -BASE))]);
-  // The base's outline without its back edge, which the deck's top draws with the cut.
-  const BACK_EDGE = BASE_HULL.reduce(
-    (back, [, y], index) =>
-      y + BASE_HULL[(index + 1) % BASE_HULL.length]![1] < BASE_HULL[back]![1] + BASE_HULL[(back + 1) % BASE_HULL.length]![1] ? index : back,
-    0,
+/** The speaker grilles' holes on the deck, `columns` across and `rows` down beside the keyboard. */
+function holes(columns: number, rows: number): Flat[] {
+  return [-1, 1].flatMap((side) =>
+    Array.from({ length: rows * columns }, (_, index): Flat => {
+      const across = WELL[2] + GRILLE_GAP + ((HALF_WIDTH - WELL[2] - 2 * GRILLE_GAP) * (index % columns)) / (columns - 1);
+      const along = WELL[1] + GRILLE_END + ((WELL[3] - WELL[1] - 2 * GRILLE_END) * Math.floor(index / columns)) / (rows - 1);
+      return [side * across, along];
+    }),
   );
-  const BASE_LINE = [...BASE_HULL.slice(BACK_EDGE + 1), ...BASE_HULL.slice(0, BACK_EDGE + 1)];
+}
 
-  /** A rounded rectangle on the deck. */
-  const patch = (box: Box, radius: number) => shape(rounded(box, [radius, radius]).map((point) => onDeck(point)));
+// The shadow on the ground: the base's footprint, a little in from its edge.
+const footprint = (spread: number, ahead: number) =>
+  ring([-HALF_WIDTH + 1.32 - spread, -HALF_DEPTH + 0.93 - spread + ahead, HALF_WIDTH - 1.32 + spread, HALF_DEPTH - 0.93 + spread + ahead], ROUND);
+const GROUND = -BASE - 0.1;
 
-  function holes(columns: number, rows: number): string {
-    return [-1, 1]
-      .flatMap((side) =>
-        Array.from({ length: rows * columns }, (_, index) => {
-          const across = WELL[2] + GRILLE_GAP + ((HALF_WIDTH - WELL[2] - 2 * GRILLE_GAP) * (index % columns)) / (columns - 1);
-          const along = WELL[1] + GRILLE_END + ((WELL[3] - WELL[1] - 2 * GRILLE_END) * Math.floor(index / columns)) / (rows - 1);
-          const [x, y] = onDeck([side * across, along]);
-          return `M${cut(x)} ${cut(y)}h0`;
-        }),
-      )
-      .join("");
-  }
+/** Everything on the base, as outlines on the deck. */
+const MODEL = {
+  well: ring(WELL, 0.8),
+  keys: [...KEYS.filter((key) => key !== TOUCH_ID), ...ARROWS].map((key) => ring(key, key[3] - key[1] < 2 ? 0.25 : 0.38)),
+  touchId: ring(TOUCH_ID, 0.38),
+  touchIdRing: ring([TOUCH_ID[0] + 0.45, TOUCH_ID[1] + 0.45, TOUCH_ID[2] - 0.45, TOUCH_ID[3] - 0.45], 0.3),
+  // The same field of holes at full, half and quarter density, for scenes
+  // too small to keep the finer ones apart.
+  holes: [holes(15, 47), holes(8, 24), holes(4, 12)],
+  trackpad: ring(TRACKPAD, 1),
+  // The hinge in its cut, a little past the cut's edges so the deck's top and
+  // the lid overlap it.
+  hinge: ring([-CUT / 2, -HALF_DEPTH - 0.15, CUT / 2, -HALF_DEPTH + CUT_DEPTH + 0.3], 0),
+  barrels: [-CUT / 2, CUT / 2 - BARREL].map((left) => ring([left, -HALF_DEPTH - 0.15, left + BARREL, -HALF_DEPTH + CUT_DEPTH + 0.3], 0)),
+  contact: footprint(0, 0.3),
+  ground: footprint(0.8, 1.2),
+};
 
-  // The shadow on the ground: the base's footprint, a little in from its edge.
-  const FOOTPRINT = (spread: number, ahead: number) =>
-    shape(
-      rounded(
-        [-HALF_WIDTH + 1.32 - spread, -HALF_DEPTH + 0.93 - spread + ahead, HALF_WIDTH - 1.32 + spread, HALF_DEPTH - 0.93 + spread + ahead],
-        [ROUND, ROUND],
-      ).map((point) => onDeck(point, -BASE - 0.1)),
-    );
+/** Where a point lies along a segment on screen, as its squared distance to it. */
+function distance([px, py]: Flat, [ax, ay]: Flat, [bx, by]: Flat): number {
+  const [dx, dy] = [bx - ax, by - ay];
+  const share = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
+  return (ax + dx * share - px) ** 2 + (ay + dy * share - py) ** 2;
+}
 
-  /** Everything that never moves, as SVG path data in the scene's units. */
-  const DECK = {
-    hull: shape(BASE_HULL),
-    top: shape(DECK_RING),
-    lines: `${line(BASE_LINE)}${shape(DECK_RING)}${line(DIP_EDGE)}`,
-    scoop: shape([...SCOOP_EDGE.map((point) => onDeck(point)), ...[...DIP_EDGE].reverse()]),
-    well: patch(WELL, 0.8),
-    keys: [...KEYS.filter((key) => key !== TOUCH_ID), ...ARROWS].map((key) => patch(key, key[3] - key[1] < 2 ? 0.25 : 0.38)).join(""),
-    touchId: patch(TOUCH_ID, 0.38),
-    touchIdRing: patch([TOUCH_ID[0] + 0.45, TOUCH_ID[1] + 0.45, TOUCH_ID[2] - 0.45, TOUCH_ID[3] - 0.45], 0.3),
-    // The same field of holes at full, half and quarter density, for scenes
-    // too small to keep the finer ones apart.
-    holes: [holes(15, 47), holes(8, 24), holes(4, 12)],
-    trackpad: patch(TRACKPAD, 1),
-    // The hinge in its cut, a little past the cut's edges so the deck's top and
-    // the lid overlap it.
-    hinge: patch([-CUT / 2, -HALF_DEPTH - 0.15, CUT / 2, -HALF_DEPTH + CUT_DEPTH + 0.3], 0),
-    barrels: [-CUT / 2, CUT / 2 - BARREL]
-      .map((left) => patch([left, -HALF_DEPTH - 0.15, left + BARREL, -HALF_DEPTH + CUT_DEPTH + 0.3], 0))
-      .join(""),
-    contact: FOOTPRINT(0, 0.3),
-    ground: FOOTPRINT(0.8, 1.2),
-  };
-
-  // Which way round `hull` runs, as the sign of its outlines' area.
-  const TURN = winding(BASE_HULL);
-
-  // The base's outline on screen grown by half a hairline, so the lid stops at
-  // the deck's line instead of covering half of it.
-  const GROWN_HULL = grow(BASE_HULL, 0.06);
-
-  /** What of a hull on screen, grown past its hairline, the base covers. */
-  function behindBase(points: readonly Flat[]): Flat[] {
-    return GROWN_HULL.reduce<Flat[]>((kept, [ax, ay], index) => {
-      const [bx, by] = GROWN_HULL[(index + 1) % GROWN_HULL.length]!;
-      return keep(kept, ([x, y]) => -TURN * ((bx - ax) * (y - ay) - (by - ay) * (x - ax)), toward);
-    }, grow(points, 0.2));
-  }
-
+/** The lid's joint, which opens to `OPEN` degrees: where it is for each frame, whatever the camera. */
+function joint(OPEN: number) {
   /**
    * The lid's place for one frame, `closed` from 0 (open) to 1 (shut on the
    * base): its angle in degrees, from OPEN to -180 when shut, about the back
@@ -244,6 +213,84 @@ function seen({ id, ...options }: CameraOptions & { id: string }) {
     return { position: [0, -HALF_DEPTH + along, LIFT + up], rotation: rotateX(angle) };
   }
 
+  return { lidPose, lidWorld };
+}
+
+/**
+ * The laptop as one camera sees it: the base, and the lid for each frame.
+ * `OPEN` is the open lid's angle, which stays the eye's own whatever the pose.
+ */
+function look(eye: Camera, OPEN: number) {
+  const { project } = eye;
+  const { lidPose, lidWorld } = joint(OPEN);
+  const onDeck = ([x, y]: Flat, z = 0) => project([x, y, z]);
+  const outline = (points: readonly Flat[], z = 0) => shape(points.map((point) => onDeck(point, z)));
+
+  const DIP_EDGE = DIP_LINE.map(project);
+  const DECK_RING = DECK_OUTLINE.map((point) => onDeck(point));
+  const BASE_HULL = hull(RIMS.map(project));
+  // The base's outline without its back edge, which the deck's top draws with
+  // the cut: the edge through the middle of the deck's back.
+  const back = onDeck([0, -HALF_DEPTH]);
+  const BACK_EDGE = BASE_HULL.reduce(
+    (best, point, index, all) => {
+      const far = distance(back, point, all[(index + 1) % all.length] ?? point);
+      return far < best.far ? { index, far } : best;
+    },
+    { index: 0, far: Infinity },
+  ).index;
+  const BASE_LINE = [...BASE_HULL.slice(BACK_EDGE + 1), ...BASE_HULL.slice(0, BACK_EDGE + 1)];
+  const top = shape(DECK_RING);
+
+  const field = (points: readonly Flat[]) =>
+    points
+      .map((point) => {
+        const [x, y] = onDeck(point);
+        return `M${cut(x)} ${cut(y)}h0`;
+      })
+      .join("");
+
+  /** Everything that never moves as the lid does, as SVG path data in the scene's units. */
+  const DECK = {
+    hull: shape(BASE_HULL),
+    top,
+    lines: `${line(BASE_LINE)}${top}${line(DIP_EDGE)}`,
+    scoop: shape([...SCOOP_EDGE.map((point) => onDeck(point)), ...[...DIP_EDGE].reverse()]),
+    well: outline(MODEL.well),
+    keys: MODEL.keys.map((key) => outline(key)).join(""),
+    touchId: outline(MODEL.touchId),
+    touchIdRing: outline(MODEL.touchIdRing),
+    holes: MODEL.holes.map(field),
+    trackpad: outline(MODEL.trackpad),
+    hinge: outline(MODEL.hinge),
+    barrels: MODEL.barrels.map((barrel) => outline(barrel)).join(""),
+    contact: outline(MODEL.contact, GROUND),
+    ground: outline(MODEL.ground, GROUND),
+  };
+
+  // Which way round `hull` runs, as the sign of its outlines' area.
+  const TURN = winding(BASE_HULL);
+
+  // The base's outline on screen grown by half a hairline, so the lid stops at
+  // the deck's line instead of covering half of it.
+  const GROWN_HULL = grow(BASE_HULL, 0.06);
+
+  /** What of a hull on screen, grown past its hairline, the base covers. */
+  function behindBase(points: readonly Flat[]): Flat[] {
+    return GROWN_HULL.reduce<Flat[]>((kept, [ax, ay], index) => {
+      const [bx, by] = GROWN_HULL[(index + 1) % GROWN_HULL.length] ?? [ax, ay];
+      return keep(kept, ([x, y]) => -TURN * ((bx - ax) * (y - ay) - (by - ay) * (x - ax)), toward);
+    }, grow(points, 0.2));
+  }
+
+  // The way toward the deck's front on screen, square to its sides' line, so
+  // the lid's shadow lies across the deck however it has turned.
+  const [ax, ay] = onDeck([-1, 0]);
+  const [bx, by] = onDeck([1, 0]);
+  const across = Math.hypot(bx - ax, by - ay);
+  const ahead: Flat = [-(by - ay) / across, (bx - ax) / across];
+  const along = ([x, y]: Flat) => x * ahead[0] + y * ahead[1];
+
   /** The lid's paths for one frame, `closed` from 0 (open) to 1 (shut on the base). */
   function lidArt(closed: number) {
     const pose = lidPose(closed);
@@ -266,7 +313,8 @@ function seen({ id, ...options }: CameraOptions & { id: string }) {
     const part = (side: number) => [0, LID].flatMap((behind) => keep(LID_RING.map(at(behind)), ([, , z]) => side * z, toward).map(project));
     const sunk = part(1);
     const hidden = sunk.length > 2 ? behindBase(hull(sunk)) : [];
-    // How far over the deck the lid reaches, as a share of its depth, for its shadow.
+    // How far over the deck the lid reaches, as a share of its depth, for its
+    // shadow, which runs from `from` to `to` along `ahead`.
     const reach = Math.max(0, -cos);
     return {
       facing,
@@ -278,18 +326,119 @@ function seen({ id, ...options }: CameraOptions & { id: string }) {
       shadow:
         closed > 0
           ? {
-              from: cut(onDeck([0, -HALF_DEPTH + DEPTH * (reach - 0.1)])[1]),
-              to: cut(onDeck([0, -HALF_DEPTH + DEPTH * (reach + 0.15)])[1]),
+              from: cut(along(onDeck([0, -HALF_DEPTH + DEPTH * (reach - 0.1)]))),
+              to: cut(along(onDeck([0, -HALF_DEPTH + DEPTH * (reach + 0.15)]))),
             }
           : null,
     };
   }
 
-  return { id, camera: eye, DECK, lidPose, lidWorld, lidArt };
+  return { camera: eye, DECK, ahead, lidPose, lidWorld, lidArt };
+}
+
+/** One pose of the laptop: the lid's open share from 0 (shut) to 1, its turn and the eye's height, in degrees. */
+export type LaptopPose = { lid: number; yaw: number; pitch: number };
+
+/** How far the laptop turns either way, and how high the eye goes, in degrees. */
+export const YAW = 35;
+export const PITCH: readonly [number, number] = [5, 30];
+
+// The points that bound the laptop on screen in any pose: the corners of the
+// base's box at the deck and the bottom, its shadow's on the ground, and the
+// lid's at both its faces.
+const CORNERS = (box: Box, z: number): Solid[] => [
+  [box[0], box[1], z],
+  [box[2], box[1], z],
+  [box[2], box[3], z],
+  [box[0], box[3], z],
+];
+const GROUND_BOX: Box = [-HALF_WIDTH + 0.52, -HALF_DEPTH + 1.33, HALF_WIDTH - 0.52, HALF_DEPTH + 1.07];
+// How far the ground shadow's blur reaches past it, at two of its deviations, and the margin round all.
+const BLUR: Flat = [4, 1.8];
+const MARGIN = 1.5;
+const up = (value: number) => Math.ceil(value * 100) / 100;
+
+/**
+ * An eye's camera turned to a pose. Boxed, the scene is the one fixed box
+ * that holds the laptop in every pose, with it in the middle: the same box
+ * moved, so a pose draws the same in it, only shifted.
+ */
+function turned(options: CameraOptions, { yaw, pitch }: Omit<LaptopPose, "lid">, box?: { width: number; height: number; x: number; y: number }) {
+  const { width = 100, height } = options;
+  const [originX, originY] = [options.originX ?? width / 2, options.originY ?? height / 2];
+  const [anchorX, anchorY] = [options.anchorX ?? width / 2, options.anchorY ?? height / 2];
+  const [x, y] = box ? [box.x, box.y] : [0, 0];
+  return camera({
+    ...options,
+    ...(box && { width: box.width, height: box.height }),
+    originX: originX + x,
+    originY: originY + y,
+    anchorX: anchorX + x,
+    anchorY: anchorY + y,
+    yaw,
+    pitch: -pitch,
+  });
+}
+
+/** The fixed box round every pose an eye can take, found by trying poses across the ranges. */
+function boxFor(options: CameraOptions, OPEN: number) {
+  const { lidWorld } = joint(OPEN);
+  const bounds = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
+  const take = ([x, y]: Flat, [spreadX, spreadY]: Flat = [0, 0]) => {
+    bounds.left = Math.min(bounds.left, x - spreadX);
+    bounds.right = Math.max(bounds.right, x + spreadX);
+    bounds.top = Math.min(bounds.top, y - spreadY);
+    bounds.bottom = Math.max(bounds.bottom, y + spreadY);
+  };
+  for (let yaw = -YAW; yaw <= YAW; yaw += 5) {
+    for (let pitch = PITCH[0]; pitch <= PITCH[1]; pitch += 5) {
+      const eye = turned(options, { yaw, pitch });
+      for (const z of [0, -BASE]) for (const point of CORNERS(SLAB, z)) take(eye.project(point));
+      for (const point of CORNERS(GROUND_BOX, GROUND)) take(eye.project(point), BLUR);
+      for (let step = 0; step <= 10; step++) {
+        const pose = lidWorld(step / 10);
+        for (const z of [0, -LID]) for (const point of CORNERS([-HALF_WIDTH, -DEPTH, HALF_WIDTH, 0], z)) take(eye.project(place(pose, point)));
+      }
+    }
+  }
+  const anchorX = options.anchorX ?? (options.width ?? 100) / 2;
+  // Even about the laptop's middle across, and rounded up.
+  const half = Math.max(anchorX - bounds.left, bounds.right - anchorX) + MARGIN;
+  return { width: up(2 * half), height: up(bounds.bottom - bounds.top + 2 * MARGIN), x: half - anchorX, y: MARGIN - bounds.top };
+}
+
+/** The laptop as one eye sees it: what never moves, and the lid for each frame, at the eye's own pose or any other. */
+function seen<const Id extends string>({ id, ...options }: CameraOptions & { id: Id }) {
+  const rest = camera(options);
+  // The open lid faces the eye at its own pitch, so its glass is a plain
+  // rectangle on screen there; it opens as far in every pose.
+  const OPEN = -90 - rest.pitch;
+  const own = look(rest, OPEN);
+  // Found on first use, so a page that never turns the laptop never pays for it.
+  let found: ReturnType<typeof boxFor> | undefined;
+  const fixedBox = () => (found ??= boxFor(options, OPEN));
+  return {
+    id,
+    ...own,
+    /** The eye's own height, the pitch of `LaptopPose`. */
+    pitch: -rest.pitch,
+    /** The fixed box that holds every pose, in scene units. */
+    get box() {
+      const { width, height } = fixedBox();
+      return { width, height };
+    },
+    /** The laptop turned to `yaw` and seen from `pitch`, boxed in the fixed box that holds every pose, or in the eye's own scene. */
+    at({ yaw, pitch }: Omit<LaptopPose, "lid">, boxed = false) {
+      return !boxed && yaw === 0 && pitch === -rest.pitch ? own : look(turned(options, { yaw, pitch }, boxed ? fixedBox() : undefined), OPEN);
+    },
+  };
 }
 
 /** An eye that sees the laptop in perspective, with a lid that opens and closes. */
 export type Perspective = ReturnType<typeof seen>;
+
+/** The laptop as an eye sees it in one pose: its camera, the base's paths and the lid's for each frame. */
+export type Posed = ReturnType<typeof look>;
 
 /**
  * Beside the words, on a wide page: the eye is near, so the deck comes
@@ -307,6 +456,22 @@ export const DESK = seen({ id: "desk", height: 70, perspective: 200, pitch: -15,
  * DESK has it, so one glass serves both. The lid opens to 102 degrees.
  */
 export const PHONE = seen({ id: "phone", height: 59, perspective: 600, pitch: -12, back: 88.07, originY: 0.22 * 70, anchorY: 53.43 });
+
+/**
+ * The fixed box, in scene units, that holds the whole laptop in every pose an
+ * eye can take: yaw from -35 to 35, pitch from 5 to 30, the lid shut to open,
+ * with its shadow, and the laptop in the middle. A `Laptop` passed `turning`
+ * draws in it, so its stage keeps one size while a scroll turns it; its
+ * aspect ratio is `width / height`.
+ */
+export const LAPTOP_BOX = {
+  get desk() {
+    return DESK.box;
+  },
+  get phone() {
+    return PHONE.box;
+  },
+};
 
 
 // Straight on, as product shots draw the machine. Every size here is in

@@ -1,5 +1,5 @@
 import { fixed, screenQuad, type Camera, type Pose, type ScreenRect } from "@vinena/vectoys";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode, Ref } from "react";
 
 /**
  * CSS pixels per scene unit in the layer screens are laid out in. Any
@@ -22,7 +22,29 @@ type ScreenProps = {
   children?: ReactNode;
   className?: string;
   style?: CSSProperties;
+  /** The element the content is laid out in, for `placeScreen`. */
+  ref?: Ref<HTMLDivElement>;
 };
+
+/** The size the content lays out at, and where the camera puts it. */
+function placement(camera: Camera, pose: Pose, rect: ScreenRect, width?: number) {
+  const across = fixed(width ?? rect.width * PIXELS_PER_UNIT);
+  const element = { width: across, height: fixed((across * rect.height) / rect.width) };
+  return { element, quad: screenQuad(camera, pose, rect, element, PIXELS_PER_UNIT) };
+}
+
+/**
+ * Lays a `Screen`'s element, from its `ref`, onto a new pose at once, as a
+ * render with that pose would, for a face that moves every frame without a
+ * render. The camera's size and `rect` must be the ones the Screen rendered
+ * with; a later render with the same props as before leaves this pose be.
+ */
+export function placeScreen(element: HTMLElement, camera: Camera, pose: Pose, rect: ScreenRect, width?: number) {
+  const { quad } = placement(camera, pose, rect, width);
+  element.style.transform = quad.matrix ?? "";
+  element.style.visibility = quad.facing ? "visible" : "hidden";
+  element.style.pointerEvents = quad.facing ? "auto" : "none";
+}
 
 /**
  * Live HTML laid onto a part's face, for use as a `Stage`'s overlay.
@@ -37,10 +59,8 @@ type ScreenProps = {
  * While the face turns away the content stays mounted but is hidden, and
  * takes no pointer events; the layer never takes any.
  */
-export function Screen({ camera, pose, rect, width, children, className, style }: ScreenProps) {
-  const across = fixed(width ?? rect.width * PIXELS_PER_UNIT);
-  const element = { width: across, height: fixed((across * rect.height) / rect.width) };
-  const quad = screenQuad(camera, pose, rect, element, PIXELS_PER_UNIT);
+export function Screen({ camera, pose, rect, width, children, className, style, ref }: ScreenProps) {
+  const { element, quad } = placement(camera, pose, rect, width);
   const layer = fixed(camera.width * PIXELS_PER_UNIT);
   return (
     <div
@@ -56,6 +76,7 @@ export function Screen({ camera, pose, rect, width, children, className, style }
       }}
     >
       <div
+        ref={ref}
         className={className}
         style={{
           ...style,
