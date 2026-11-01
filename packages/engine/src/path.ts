@@ -14,3 +14,19 @@ export const line = (points: readonly Flat[]) => `M${points.map(([x, y]) => `${c
 
 /** A closed outline as SVG path data. */
 export const shape = (points: readonly Flat[]) => `${line(points)}Z`;
+
+/** A rectangle (left, top, right, bottom) as closed path data, its top corners round by `high` and its bottom ones by `low`. */
+export function panel([left, top, right, bottom]: readonly [number, number, number, number], high: number, low = 0): string {
+  const corner = (radius: number, x: number, y: number) => (radius > 0 ? `A${fixed(radius)} ${fixed(radius)} 0 0 1 ${fixed(x)} ${fixed(y)}` : "");
+  return [
+    `M${fixed(left + high)} ${fixed(top)}H${fixed(right - high)}`,
+    corner(high, right, top + high),
+    `V${fixed(bottom - low)}`,
+    corner(low, right - low, bottom),
+    `H${fixed(left + low)}`,
+    corner(low, left, bottom - low),
+    `V${fixed(top + high)}`,
+    corner(high, left + high, top),
+    "Z",
+  ].join("");
+}

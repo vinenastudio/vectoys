@@ -1621,8 +1621,17 @@ code.inline {
   color: var(--ink);
 }
 
+/* The laptop with its look below it, the pair centered in the well. */
 .toy-preview .preview-laptop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
   width: 92%;
+}
+
+.toy-preview .preview-laptop > :first-child {
+  width: 100%;
 }
 
 /* The laptop with its finish below it, the pair centered in the well. */
@@ -1638,10 +1647,12 @@ code.inline {
   width: 100%;
 }
 
+.toy-preview .preview-laptop .segmented,
 .toy-preview .preview-laptop-front .segmented {
   height: 40px;
 }
 
+.toy-preview .preview-laptop .segmented button,
 .toy-preview .preview-laptop-front .segmented button {
   padding: 0 12px;
   font-size: 14px;

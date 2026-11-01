@@ -250,3 +250,88 @@ test("the kickflip shuts the lid straight on, flips and turns once round, lands 
   expect(Math.min(...landing)).toBeGreaterThanOrEqual(0);
   for (let step = 1; step < KICKFLIP.length; step++) expect(KICKFLIP[step]?.at ?? 0).toBeGreaterThan(KICKFLIP[step - 1]?.at ?? 1);
 });
+
+// A hash of the default markup across eyes and poses, taken before the
+// realistic look was added: without `look`, every laptop draws as it did.
+test("without a look, the markup is what it was before the realistic look", async () => {
+  const { createHash } = await import("node:crypto");
+  const html = [
+    ...[DESK, PHONE, FRONT].flatMap((eye) => [
+      renderToString(<Laptop eye={eye} />),
+      renderToString(
+        <Laptop eye={eye} closed={0.5}>
+          <p>live</p>
+        </Laptop>,
+      ),
+    ]),
+    renderToString(<Laptop eye={DESK} turning lid={0.6} yaw={-20} pitch={24} />),
+    renderToString(<Laptop eye={PHONE} lid={0.2} yaw={30} />),
+    ...[0, 0.1, 0.3, 0.45, 0.5, 0.62, 0.8, 1].map((t) =>
+      renderToString(
+        <Laptop eye={DESK} free turning {...scrub(t, KICKFLIP)}>
+          <p>x</p>
+        </Laptop>,
+      ),
+    ),
+    renderToString(<Laptop eye={DESK} free flat={1} />),
+    renderToString(<Laptop eye={PHONE} roll={20} y={0.2} />),
+  ].join("\n");
+  expect(createHash("sha256").update(html).digest("hex")).toBe("6ee0f8c8e2aba27c850fea9722a0d3444d996fdc643c1f460c3ac0e72747c0b1");
+  expect(renderToString(<Laptop eye={DESK} look="simple" />)).toBe(renderToString(<Laptop eye={DESK} />));
+});
+
+test.each([DESK, PHONE])("the realistic look renders on the server the same twice in every mode, with no NaN, in the machine's own colors", (eye) => {
+  for (const props of [{}, { lid: 0, pitch: 30 }, { turning: true, yaw: -30, pitch: 22 }, { free: true, flat: 1 }, { free: true, ...scrub(0.45, KICKFLIP) }, { free: true, roll: 200, lid: 0 }]) {
+    const render = () =>
+      renderToString(
+        <Laptop eye={eye} look="realistic" {...props}>
+          <p>live</p>
+        </Laptop>,
+      );
+    expect(render()).toBe(render());
+    expect(render()).not.toMatch(/NaN|Infinity/);
+    expect(render()).not.toMatch(/(fill|stroke):[^;"]*--vectoys-(surface|border|hairline)/);
+  }
+});
+
+test("straight on, the realistic look is FRONT's product shot", () => {
+  expect(renderToString(<Laptop eye={FRONT} look="realistic" />)).toBe(renderToString(<Laptop eye={FRONT} />));
+});
+
+test.each([DESK, PHONE])("realistic, the glass lies where FRONT puts the display on the lid in any look, and at flat 1 where FRONT draws it", (eye) => {
+  const pose = { lid: 1, yaw: 0, pitch: eye.pitch, flat: 1, x: 0, y: 0, scale: 1, roll: 0 };
+  const real = eye.trick(pose, false, true);
+  const simple = eye.trick(pose);
+  const [a, b] = [screenQuad(real.camera, real.glass, GLASS, { width: 1, height: 1 }), screenQuad(simple.camera, simple.glass, GLASS, { width: 1, height: 1 })];
+  a.corners.forEach(([x, y], index) => {
+    expect(x).toBeCloseTo(b.corners[index]?.[0] ?? 0, 4);
+    expect(y).toBeCloseTo(b.corners[index]?.[1] ?? 0, 4);
+  });
+  // At the eye's own look the lid is still the machine's: the glass is FRONT's display on it, not the simple look's.
+  const own = { ...pose, flat: 0 };
+  const quad = screenQuad(eye.trick(own, false, true).camera, eye.trick(own, false, true).glass, GLASS, { width: 1, height: 1 });
+  const plain = screenQuad(eye.trick(own).camera, eye.trick(own).glass, GLASS, { width: 1, height: 1 });
+  expect(quad.facing).toBe(true);
+  expect(quad.corners).not.toEqual(plain.corners);
+});
+
+test("realistic, the underside shows four round feet in rings, its slots and screws, and the keys their bevels", () => {
+  const paths = (frame: { d: Record<string, string> }) => frame.d;
+  const under = paths(DESK.trick({ lid: 0, yaw: 0, pitch: 15, flat: 0, x: 0, y: 0, scale: 1, roll: 180 }, false, true));
+  for (const foot of [0, 1, 2, 3]) {
+    expect(under[`sole.${foot}`]).toMatch(/^M/);
+    expect(under[`bezel.${foot}`]).toMatch(/^M/);
+  }
+  expect(under["base.slits"]).toMatch(/^M/);
+  expect(under["base.screws"]?.match(/h0/g)).toHaveLength(8);
+  const open = DESK.trick({ lid: 1, yaw: 0, pitch: 15, flat: 0, x: 0, y: 0, scale: 1, roll: 0 }, false, true);
+  expect(paths(open)["base.screws"]).toBe("");
+  expect(paths(open)["base.slits"]).toBe("");
+  // Seen from above, the keys' bevel stands a little up the screen from them, toward the deck's back.
+  expect(open.bevel.y2).toBeLessThan(open.bevel.y1);
+  expect(paths(DESK.trick({ lid: 1, yaw: 0, pitch: 15, flat: 0, x: 0, y: 0, scale: 1, roll: 0 }))["base.slits"]).toBeUndefined();
+  const html = renderToString(<Laptop eye={DESK} look="realistic" />);
+  const keys = html.match(/<g id="([^"]+-keys)">/)?.[1];
+  expect(html).toContain(`style="fill:#5b5c5e;stroke:none" href="#${keys}"`);
+  expect(html).toMatch(/<use transform="translate\([-\d.]+ -[\d.]+\)"/);
+});

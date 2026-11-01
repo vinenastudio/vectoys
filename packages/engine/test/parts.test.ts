@@ -219,3 +219,18 @@ test("an outline draws in place of the rounded box", () => {
   const sticker = plate({ name: "sticker", box: [-5, 0, 5, 4], outline: triangle, lift: 0.1 });
   expect(faces(sticker)[0]!.points).toEqual(triangle.map(([x, y]) => [x, y, 0.1]));
 });
+
+test("banded draws the side faces between rings that face the eye, each in the tone it picks", async () => {
+  const { banded, rounded } = await import("../src");
+  const ring = rounded([-5, -5, 5, 5], [1, 1]);
+  const rings = [0, -2].map((z) => ring.map(([x, y]): Solid => [x, y, z]));
+  const pose: Pose = { position: [0, 0, 0], rotation: rotateZ(0) };
+  const { hull: outline, tones } = banded(rings, pose, CORNER, [0, 0, -1], 3, (normal) => (normal[0] > 0.5 ? 2 : normal[1] > 0.5 ? 1 : 0));
+  expect(tones).toHaveLength(3);
+  expect(outline).toMatch(/^M.*Z$/);
+  // From above and to the side, the eye sees the +x side and the front, never the faces turned away.
+  expect(tones[2]).not.toBe("");
+  const all = tones.join("").match(/Z/g)?.length ?? 0;
+  expect(all).toBeLessThan(ring.length);
+  expect(all).toBeGreaterThan(0);
+});

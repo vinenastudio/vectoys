@@ -1,7 +1,7 @@
 import { clamp, fixed, lerp } from "@vinena/vectoys";
-import { Screen, Stage, placeScreen } from "@vinena/vectoys-react";
-import { memo, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type Ref, type SVGProps } from "react";
-import { BEZEL, DESK, FRONT, GLASS, HOLE, PITCH, ROUND, TONES, YAW, type LaptopPose, type Perspective, type Posed, type Straight, type Trick, type TrickPose, type View } from "./geometry";
+import { Screen, Stage, placeScreen, useNodes, type Nodes } from "@vinena/vectoys-react";
+import { memo, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, type CSSProperties, type ReactNode, type Ref, type SVGProps } from "react";
+import { BEZEL, DESK, FRONT, GLASS, HOLE, PITCH, ROUND, SHADES, TONES, YAW, type LaptopPose, type Perspective, type Posed, type Straight, type Trick, type TrickPose, type View } from "./geometry";
 
 // The page's colors, as CSS variables, each with the light tone of the site
 // this laptop was first drawn for, so it shows as meant before they are set.
@@ -50,35 +50,6 @@ const holesShown = (name: string, scene: number) => {
 @container (max-width: ${fixed(coarse - 0.02)}px) { .${name}-1 { display: none; } .${name}-2 { display: inline; } }
 `;
 };
-
-/**
- * The elements a pose writes to, by name, so a laptop's handle redraws it
- * without a render. `ref(name)` is the same callback every render.
- */
-function useNodes() {
-  const [nodes] = useState(() => {
-    const named = new Map<string, Set<Element>>();
-    const refs = new Map<string, (node: Element | null) => () => void>();
-    return {
-      all: (name: string) => named.get(name) ?? [],
-      ref(name: string) {
-        const known = refs.get(name);
-        if (known) return known;
-        const bound = (node: Element | null) => {
-          if (!node) return () => {};
-          const set = named.get(name) ?? new Set<Element>();
-          named.set(name, set.add(node));
-          return () => void set.delete(node);
-        };
-        refs.set(name, bound);
-        return bound;
-      },
-    };
-  });
-  return nodes;
-}
-
-type Nodes = ReturnType<typeof useNodes>;
 
 /** The base, which never changes as the lid moves. */
 const Base = memo(function Base({ id, deck: DECK, holes: name, node }: { id: string; deck: Posed["DECK"]; holes: string; node: Nodes["ref"] }) {
@@ -157,6 +128,9 @@ const FILL: CSSProperties = { position: "absolute", inset: 0 };
 /** Moves a laptop to a new pose at once, without a render; any field left out stays as it is. */
 export type LaptopHandle = { set(pose: Partial<TrickPose>): void };
 
+/** How the laptop is drawn: `simple` in the page's own tones, or `realistic`, the machine's own silver with its edges, keys and feet. */
+export type LaptopLook = "simple" | "realistic";
+
 type LaptopProps = {
   /** How far the lid is open, from 0 (shut on the base) to 1 (open); open by default. `FRONT` is always open. */
   lid?: number;
@@ -198,6 +172,15 @@ type LaptopProps = {
   free?: boolean;
   /** The eye that sees it: `DESK`, `PHONE` or `FRONT`; `DESK` by default. */
   eye?: View;
+  /**
+   * `simple` by default, drawn in the page's tones. `realistic` draws the
+   * machine as it is, silver on any page: carved aluminum lit from above,
+   * black keys in a black well, speaker grilles, the trackpad, round feet in
+   * rings and the underside's slots and screws. It turns and moves as `free`
+   * does in every pose, and the handle sets it the same way. `FRONT` is
+   * already the product shot, so it draws the same in both.
+   */
+  look?: LaptopLook;
   /** The laptop's name for assistive technology. */
   label?: string;
   /** Live content on the display, laid out as on a screen about 1280 pixels wide. */
@@ -221,7 +204,8 @@ type LaptopProps = {
  * live content on it, hidden while the lid faces away.
  */
 export const Laptop = memo(function Laptop(props: LaptopProps) {
-  const { lid, closed = 0, yaw, pitch, flat, x, y, scale, roll, free = false, turning = false, eye = DESK, children, label = "Laptop", ref } = props;
+  const { lid, closed = 0, yaw, pitch, flat, x, y, scale, roll, free = false, turning = false, eye = DESK, look = "simple", children, label = "Laptop", ref } = props;
+  const real = look === "realistic";
   if ("art" in eye) {
     return (
       <Front eye={eye} label={label} handle={ref}>
@@ -229,10 +213,10 @@ export const Laptop = memo(function Laptop(props: LaptopProps) {
       </Front>
     );
   }
-  if (free || [flat, x, y, scale, roll].some((value) => value !== undefined)) {
+  if (real || free || [flat, x, y, scale, roll].some((value) => value !== undefined)) {
     const pose = loose({ lid: lid ?? 1 - closed, yaw: yaw ?? 0, pitch: pitch ?? eye.pitch, flat: flat ?? 0, x: x ?? 0, y: y ?? 0, scale: scale ?? 1, roll: roll ?? 0 }, free);
     return (
-      <Free pose={pose} free={free} turning={turning} eye={eye} label={label} handle={ref}>
+      <Free pose={pose} free={free} real={real} turning={turning} eye={eye} label={label} handle={ref}>
         {children}
       </Free>
     );
@@ -694,6 +678,38 @@ const FOOT_PAD = tone(28);
 // foot, its top hidden under the face, so they fit the foot's own box.
 const FOOT_BOX = FOOT.map(([offset, share]): readonly [number, number] => [fixed((0.3 + offset * 0.6) / 0.9), share]);
 
+// The realistic look's own colors, measured on product renders and photos of
+// the silver machine, whatever the page's colors: the aluminum's `SHADES` from
+// the darkest turn of a side to a highlight, a bright line where an edge
+// catches the light, black key caps with a bevel's highlight on a black well,
+// the gasket, the hinge, the feet's rubber in bright rings, the underside's
+// slots and screws.
+const RGB = [
+  [0x6e, 0x6f, 0x71],
+  [0xf3, 0xf4, 0xf6],
+] as const;
+const SHADE = Array.from({ length: SHADES }, (_, step) => `rgb(${RGB[0].map((from, channel) => Math.round(lerp(from, RGB[1][channel] ?? from, step / (SHADES - 1)))).join(" ")})`);
+const REAL = {
+  edge: "#f6f7f9",
+  rim: "#a7a8aa",
+  well: "#1c1d1e",
+  key: "#29292b",
+  bevel: "#5b5c5e",
+  ring: "#3d3e40",
+  holes: "#8f9092",
+  pad: "rgba(0, 0, 0, 0.02)",
+  padLine: "#b3b4b6",
+  scoop: "#bdbec0",
+  hinge: "#141414",
+  barrel: "#77787a",
+  seam: "#9d9ea0",
+  slit: "#2a2a2d",
+  screw: "#626365",
+  rubber: "#343536",
+  sole: "#454647",
+  bezel: "#c9cacc",
+};
+
 /** The glass's top corners and the notch, from the eye's own at `flat` 0 to FRONT's at 1. */
 function glassLook(flat: number) {
   const [x, y] = [lerp(CORNER / GLASS.width, FRONT.round / FRONT.glass.width, flat), lerp(CORNER / GLASS.height, FRONT.round / FRONT.glass.height, flat)];
@@ -710,16 +726,22 @@ function glassLook(flat: number) {
  * What a frame of a free laptop writes, by node: path data, `fill` as a
  * style, and the attributes a pose sets on its groups, gradients and blur.
  */
-function looks(frame: Trick, { flat, y }: TrickPose) {
+function looks(frame: Trick, { flat, y }: TrickPose, real = false) {
   const values: Record<string, Record<string, string>> = Object.fromEntries(Object.entries(frame.d).map(([name, d]) => [name, { d }]));
   const set = (name: string, more: Record<string, string>) => void (values[name] = { ...values[name], ...more });
   const edge = (value: number) => String(fixed(value));
   const high = Math.max(0, y);
-  set("base.top", { fill: tone(TONES[frame.deckTone] ?? 100) });
-  set("base.under", { fill: tone(TONES[frame.underTone] ?? 100) });
-  set("lid.outer", { fill: tone(TONES[frame.outerTone] ?? 100) });
-  set("lid.gasket", { fill: `color-mix(in srgb, ${GASKET} ${fixed(flat * 100)}%, black)` });
-  set("lid.gasketLine", { fill: `color-mix(in srgb, ${GASKET_LINE} ${fixed(flat * 100)}%, black)` });
+  const fill = (step: number) => (real ? (SHADE[step] ?? REAL.edge) : tone(TONES[step] ?? 100));
+  set("base.top", { fill: fill(frame.deckTone) });
+  set("base.under", { fill: fill(frame.underTone) });
+  set("lid.outer", { fill: fill(frame.outerTone) });
+  set("lid.gasket", { fill: real ? GASKET : `color-mix(in srgb, ${GASKET} ${fixed(flat * 100)}%, black)` });
+  set("lid.gasketLine", { fill: real ? GASKET_LINE : `color-mix(in srgb, ${GASKET_LINE} ${fixed(flat * 100)}%, black)` });
+  if (real) {
+    for (const [name, span] of Object.entries(frame.sheen)) set(`sheen.${name}`, Object.fromEntries(Object.entries(span).map(([key, value]) => [key, String(value)])));
+    const { x1, y1, x2, y2 } = frame.bevel;
+    set("bevel", { transform: `translate(${fixed(x2 - x1)} ${fixed(y2 - y1)})` });
+  }
   set("edges", { x1: edge(frame.edge.x1), y1: edge(frame.edge.y1), x2: edge(frame.edge.x2), y2: edge(frame.edge.y2) });
   set("flat", { opacity: String(fixed(flat)) });
   set("front", { opacity: String(fixed(frame.front)) });
@@ -732,7 +754,7 @@ function looks(frame: Trick, { flat, y }: TrickPose) {
 }
 
 /** Writes a free laptop's frame straight into the drawing, as a render of it would, writing only what changed since the last. */
-function trickPainter(eye: Perspective, turning: boolean, nodes: Nodes, id: string) {
+function trickPainter(eye: Perspective, turning: boolean, nodes: Nodes, real: boolean) {
   let written = new Map<string, string>();
   return {
     /** Forgets what it wrote, after a render that may have written over it. */
@@ -740,8 +762,8 @@ function trickPainter(eye: Perspective, turning: boolean, nodes: Nodes, id: stri
       written = new Map();
     },
     draw(pose: TrickPose) {
-      const frame = eye.trick(pose, turning);
-      for (const [name, attributes] of Object.entries(looks(frame, pose))) {
+      const frame = eye.trick(pose, turning, real);
+      for (const [name, attributes] of Object.entries(looks(frame, pose, real))) {
         for (const [attribute, value] of Object.entries(attributes)) {
           if (written.get(`${name} ${attribute}`) === value) continue;
           written.set(`${name} ${attribute}`, value);
@@ -756,7 +778,7 @@ function trickPainter(eye: Perspective, turning: boolean, nodes: Nodes, id: stri
         written.set("order", order);
         for (const part of frame.order) for (const node of nodes.all(`part.${part}`)) node.parentNode?.appendChild(node);
       }
-      const look = glassLook(pose.flat);
+      const look = glassLook(real ? 1 : pose.flat);
       for (const glass of nodes.all("glass")) {
         if (!(glass instanceof HTMLElement)) continue;
         placeScreen(glass, frame.camera, frame.glass, GLASS);
@@ -772,6 +794,7 @@ function trickPainter(eye: Perspective, turning: boolean, nodes: Nodes, id: stri
 function Free({
   pose,
   free,
+  real,
   turning,
   eye,
   children,
@@ -780,6 +803,7 @@ function Free({
 }: {
   pose: TrickPose;
   free: boolean;
+  real: boolean;
   turning: boolean;
   eye: Perspective;
   label: string;
@@ -789,10 +813,10 @@ function Free({
   const id = `laptop-${eye.id}-${useId().replace(/[^\w-]/g, "")}`;
   const key = FIELDS.map((field) => pose[field]).join();
   // `key` is the pose, field by field, so a new pose object with the same fields keeps the frame.
-  const frame = useMemo(() => eye.trick(pose, turning), [eye, turning, key]);
-  const values = looks(frame, pose);
+  const frame = useMemo(() => eye.trick(pose, turning, real), [eye, turning, real, key]);
+  const values = looks(frame, pose, real);
   const nodes = useNodes();
-  const paint = useMemo(() => trickPainter(eye, turning, nodes, id), [eye, turning, nodes, id]);
+  const paint = useMemo(() => trickPainter(eye, turning, nodes, real), [eye, turning, nodes, real]);
   const set = useRef<{ pose: TrickPose; over: TrickPose; paint: typeof paint; free: boolean } | null>(null);
   const given = useRef(pose);
 
@@ -824,8 +848,51 @@ function Free({
     return { ref: nodes.ref(name), ...rest, style: fill ? { ...style, fill } : style };
   };
   const url = (name: string) => `url(#${id}-${name})`;
-  const sides = (part: string) => TONES.map((share, step) => <path key={step} {...bind(`${part}.${step}`, { fill: tone(share) })} />);
-  const look = glassLook(pose.flat);
+  const sides = (part: string) =>
+    real ? SHADE.map((fill, step) => <path key={step} {...bind(`${part}.${step}`, { fill })} />) : TONES.map((share, step) => <path key={step} {...bind(`${part}.${step}`, { fill: tone(share) })} />);
+  const look = glassLook(real ? 1 : pose.flat);
+  const edge = hairline(REAL.edge);
+  const sheen = (name: string, stops: readonly (readonly [number, string, number])[]) => (
+    <linearGradient {...bind(`sheen.${name}`)} id={`${id}-${name}`} gradientUnits="userSpaceOnUse">
+      {stops.map(([offset, stopColor, stopOpacity]) => (
+        <stop key={offset} offset={offset} style={{ stopColor, stopOpacity }} />
+      ))}
+    </linearGradient>
+  );
+  const flatFeet = (
+    <g {...bind("flat")}>
+      {[0, 1, 2, 3].map((foot) => (
+        <g key={foot}>
+          <path {...bind(`foot.${foot}`)} fill={url("feet")} />
+          <path {...bind(`foot.${foot}`)} fill={url("foot")} />
+        </g>
+      ))}
+    </g>
+  );
+  const frontFace = (
+    <g {...bind("front")}>
+      <path {...bind("base.front")} fill={url("face")} />
+      <path {...bind("base.front")} fill={url("ends")} />
+      <path {...bind("base.front")} fill={url("streak")} />
+      <path {...bind("base.scoop")} fill={url("floor")} />
+      <g clipPath={url("scoop")}>
+        <path {...bind("base.walls")} fillRule="evenodd" fill={url("wall")} filter={url("soft")} />
+      </g>
+    </g>
+  );
+  const holeField = (color: string) => (
+    <g clipPath={url("deck")}>
+      {[0, 1, 2].map((coarser) => (
+        <path key={coarser} {...bind(`holes.${coarser}`, { stroke: color, fill: "none" })} className={`${holes}-${coarser}`} strokeWidth={HOLE * 2 ** coarser} strokeLinecap="round" />
+      ))}
+    </g>
+  );
+  const lidHinge = (
+    <g {...bind(real ? "solid" : "flat")}>
+      <path {...bind("lid.hingeLine")} fill={HINGE_LINE} />
+      <path {...bind("lid.hinge")} fill={url("hinge")} />
+    </g>
+  );
   const { notch } = FRONT;
   const holes = turning ? `${HOLES}-${eye.id}` : HOLES;
 
@@ -843,10 +910,7 @@ function Free({
         <path {...bind("lid.gasket")} />
         <path {...bind("lid.gasketLine")} />
         <path {...bind("lid.glass")} fill="black" />
-        <g {...bind("flat")}>
-          <path {...bind("lid.hingeLine")} fill={HINGE_LINE} />
-          <path {...bind("lid.hinge")} fill={url("hinge")} />
-        </g>
+        {lidHinge}
         <g {...bind("lines")}>
           <path {...bind("lid.lines", LINE)} {...stroke} />
         </g>
@@ -859,11 +923,7 @@ function Free({
         <path {...bind("deck.hinge", { fill: HINGE })} />
         <path {...bind("deck.barrels", { fill: tone(78) })} />
         <path {...bind("base.top")} />
-        <g clipPath={url("deck")}>
-          {[0, 1, 2].map((coarser) => (
-            <path key={coarser} {...bind(`holes.${coarser}`, { stroke: WELL, fill: "none" })} className={`${holes}-${coarser}`} strokeWidth={HOLE * 2 ** coarser} strokeLinecap="round" />
-          ))}
-        </g>
+        {holeField(WELL)}
         <path {...bind("deck.well", { fill: WELL })} />
         <path {...bind("deck.keys", { fill: KEY })} />
         <path {...bind("deck.touchId", { fill: TOUCH_ID })} />
@@ -876,15 +936,7 @@ function Free({
         <path {...bind("base.seam", hairline(tone(74)))} {...stroke} />
         <path {...bind("base.cover", { fill: HINGE })} />
         <path {...bind("base.ends", { fill: tone(78) })} />
-        <g {...bind("front")}>
-          <path {...bind("base.front")} fill={url("face")} />
-          <path {...bind("base.front")} fill={url("ends")} />
-          <path {...bind("base.front")} fill={url("streak")} />
-          <path {...bind("base.scoop")} fill={url("floor")} />
-          <g clipPath={url("scoop")}>
-            <path {...bind("base.walls")} fillRule="evenodd" fill={url("wall")} filter={url("soft")} />
-          </g>
-        </g>
+        {frontFace}
         <g {...bind("lines")}>
           <path {...bind("base.lines", LINE)} {...stroke} />
         </g>
@@ -895,17 +947,79 @@ function Free({
         {[0, 1, 2, 3].map((foot) => (
           <path key={foot} {...bind(`foot.${foot}`, { fill: FOOT_PAD })} />
         ))}
-        <g {...bind("flat")}>
-          {[0, 1, 2, 3].map((foot) => (
-            <g key={foot}>
-              <path {...bind(`foot.${foot}`)} fill={url("feet")} />
-              <path {...bind(`foot.${foot}`)} fill={url("foot")} />
-            </g>
-          ))}
-        </g>
+        {flatFeet}
       </>
     ),
   };
+
+  // Realistic: the machine's own colors in every pose, the lid's true face
+  // and hinge band always, highlights on the edges and no outlines.
+  const realParts = {
+    lid: (
+      <>
+        <path {...bind("lid.hull", { fill: SHADE[5] })} />
+        {sides("lid")}
+        <path {...bind("lid.outer")} />
+        <path {...bind("lid.sheen")} fill={url("outer")} />
+        <path {...bind("lid.edge", edge)} {...stroke} />
+        <path {...bind("lid.face", { fill: REAL.rim })} />
+        <g {...bind("flat")}>
+          <path {...bind("lid.face")} fill={url("edge")} />
+          <path {...bind("lid.rim")} fill={url("rim")} />
+        </g>
+        <path {...bind("lid.gasket")} />
+        <path {...bind("lid.gasketLine")} />
+        <path {...bind("lid.glass")} fill="black" />
+        {lidHinge}
+      </>
+    ),
+    base: (
+      <>
+        <path {...bind("base.hull", { fill: SHADE[5] })} />
+        {sides("base")}
+        <path {...bind("deck.hinge", { fill: REAL.hinge })} />
+        <path {...bind("deck.barrels", { fill: REAL.barrel })} />
+        <path {...bind("base.top")} />
+        <path {...bind("base.sheen")} fill={url("top")} />
+        {holeField(REAL.holes)}
+        <path {...bind("deck.well", { fill: REAL.well, stroke: "black" })} {...stroke} />
+        {/* Each key's bevel catches the light on its back edge: the keys again, a little toward the deck's back, under them. */}
+        <use {...bind("bevel")} href={`#${id}-keys`} style={{ fill: REAL.bevel, stroke: "none" }} />
+        <g style={{ fill: REAL.key, stroke: "black" }} strokeWidth={0.07}>
+          <g id={`${id}-keys`}>
+            <path {...bind("deck.keys")} />
+            <path {...bind("deck.touchId")} />
+          </g>
+        </g>
+        <path {...bind("deck.touchIdRing", hairline(REAL.ring))} {...stroke} />
+        <path {...bind("deck.trackpad", { fill: REAL.pad })} />
+        <path {...bind("deck.trackpad", hairline(REAL.padLine))} {...stroke} />
+        <path {...bind("deck.scoop", { fill: REAL.scoop })} />
+        <path {...bind("base.edge", edge)} {...stroke} />
+        <path {...bind("base.under")} />
+        <path {...bind("base.underSheen")} fill={url("under")} />
+        <path {...bind("base.seam", hairline(REAL.seam))} {...stroke} />
+        <path {...bind("base.slits", { fill: REAL.slit })} />
+        <path {...bind("base.screws", { stroke: REAL.screw, fill: "none" })} strokeWidth={0.32} strokeLinecap="round" />
+        <path {...bind("base.cover", { fill: REAL.hinge })} />
+        <path {...bind("base.ends", { fill: REAL.barrel })} />
+        {frontFace}
+      </>
+    ),
+    feet: (
+      <>
+        {[0, 1, 2, 3].map((foot) => (
+          <g key={foot}>
+            <path {...bind(`bezel.${foot}`, { fill: REAL.bezel })} />
+            <path {...bind(`foot.${foot}`, { fill: REAL.rubber })} />
+            <path {...bind(`sole.${foot}`, { fill: REAL.sole })} />
+          </g>
+        ))}
+        {flatFeet}
+      </>
+    ),
+  };
+  const drawn = real ? realParts : parts;
 
   const glass = (
     <Screen ref={nodes.ref("glass")} camera={frame.camera} pose={frame.glass} rect={GLASS} style={{ ...GLASS_STYLE, ...look.glass }}>
@@ -930,6 +1044,24 @@ function Free({
       <defs>
         {defs(id, frame.camera, holesShown(holes, frame.camera.width), bind("blur"))}
         {frontDefs(id, bind("edges"), { x1: "0", y1: "0", x2: "0", y2: "1" }, FOOT_BOX, 0.15, <path {...bind("base.scoop")} />)}
+        {real && (
+          <>
+            {sheen("top", [
+              [0, "black", 0.1],
+              [0.55, "black", 0],
+              [1, "white", 0.22],
+            ])}
+            {sheen("outer", [
+              [0, "white", 0.2],
+              [0.45, "white", 0],
+              [1, "black", 0.3],
+            ])}
+            {sheen("under", [
+              [0, "black", 0.12],
+              [1, "white", 0.1],
+            ])}
+          </>
+        )}
         <clipPath id={`${id}-deck`}>
           <path {...bind("base.top")} />
         </clipPath>
@@ -941,7 +1073,7 @@ function Free({
       <g>
         {frame.order.map((part) => (
           <g key={part} ref={nodes.ref(`part.${part}`)}>
-            {part === "lid" ? parts.lid : part === "base" ? parts.base : parts.feet}
+            {part === "lid" ? drawn.lid : part === "base" ? drawn.base : drawn.feet}
           </g>
         ))}
       </g>

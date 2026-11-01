@@ -1,11 +1,12 @@
 import {
   IDENTITY,
   add,
+  aimed,
+  banded,
   camera,
   clamp,
   combine,
   compose,
-  cross,
   dot,
   fixed,
   grow,
@@ -13,7 +14,9 @@ import {
   keep,
   lerp,
   line,
-  multiply,
+  moved,
+  nearness,
+  panel,
   place,
   rotate,
   rotateX,
@@ -26,12 +29,12 @@ import {
   toward,
   winding,
   type Box,
+  type Boxed,
   type Camera,
   type CameraOptions,
   type Easing,
   type Flat,
   type Pose,
-  type Rotation,
   type ScreenRect,
   type Solid,
 } from "@vinena/vectoys";
@@ -192,13 +195,6 @@ const MODEL = {
   ground: footprint(0.8, 1.2),
 };
 
-/** Where a point lies along a segment on screen, as its squared distance to it. */
-function distance([px, py]: Flat, [ax, ay]: Flat, [bx, by]: Flat): number {
-  const [dx, dy] = [bx - ax, by - ay];
-  const share = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
-  return (ax + dx * share - px) ** 2 + (ay + dy * share - py) ** 2;
-}
-
 /** The lid's joint, which opens to `OPEN` degrees: where it is for each frame, whatever the camera. */
 function joint(OPEN: number) {
   /**
@@ -249,7 +245,7 @@ function look(eye: Camera, OPEN: number) {
   const back = onDeck([0, -HALF_DEPTH]);
   const BACK_EDGE = BASE_HULL.reduce(
     (best, point, index, all) => {
-      const far = distance(back, point, all[(index + 1) % all.length] ?? point);
+      const far = nearness(back, point, all[(index + 1) % all.length] ?? point);
       return far < best.far ? { index, far } : best;
     },
     { index: 0, far: Infinity },
@@ -378,22 +374,7 @@ const up = (value: number) => Math.ceil(value * 100) / 100;
  * that holds the laptop in every pose, with it in the middle: the same box
  * moved, so a pose draws the same in it, only shifted.
  */
-function turned(options: CameraOptions, { yaw, pitch }: Omit<LaptopPose, "lid">, box?: { width: number; height: number; x: number; y: number }) {
-  const { width = 100, height } = options;
-  const [originX, originY] = [options.originX ?? width / 2, options.originY ?? height / 2];
-  const [anchorX, anchorY] = [options.anchorX ?? width / 2, options.anchorY ?? height / 2];
-  const [x, y] = box ? [box.x, box.y] : [0, 0];
-  return camera({
-    ...options,
-    ...(box && { width: box.width, height: box.height }),
-    originX: originX + x,
-    originY: originY + y,
-    anchorX: anchorX + x,
-    anchorY: anchorY + y,
-    yaw,
-    pitch: -pitch,
-  });
-}
+const turned = (options: CameraOptions, { yaw, pitch }: Omit<LaptopPose, "lid">, box?: Boxed) => aimed(options, { yaw, pitch: -pitch }, box);
 
 /** The fixed box round every pose an eye can take, found by trying poses across the ranges. */
 function boxFor(options: CameraOptions, OPEN: number) {
@@ -446,9 +427,9 @@ function seen<const Id extends string>({ id, ...options }: CameraOptions & { id:
     at({ yaw, pitch }: Omit<LaptopPose, "lid">, boxed = false) {
       return !boxed && yaw === 0 && pitch === -rest.pitch ? own : look(turned(options, { yaw, pitch }, boxed ? fixedBox() : undefined), OPEN);
     },
-    /** The laptop in a free pose, boxed as `at` boxes it: every path, tone and place a frame of it draws. */
-    trick(pose: TrickPose, boxed = false) {
-      return free(options, OPEN, pose, boxed ? fixedBox() : undefined);
+    /** The laptop in a free pose, boxed as `at` boxes it: every path, tone and place a frame of it draws, `real` as the realistic look draws it. */
+    trick(pose: TrickPose, boxed = false, real = false) {
+      return free(options, OPEN, pose, boxed ? fixedBox() : undefined, real);
     },
   };
 }
@@ -538,27 +519,11 @@ const SHOULDER = 0.29;
 const FLARE = 0.19;
 const LENS_AT = 0.54;
 
-/** A rectangle's outline as path data, its top corners round by `high` and its bottom ones by `low`. */
-function box([left, top, right, bottom]: Box, high: number, low = 0): string {
-  const corner = (radius: number, x: number, y: number) => (radius > 0 ? `A${fixed(radius)} ${fixed(radius)} 0 0 1 ${fixed(x)} ${fixed(y)}` : "");
-  return [
-    `M${fixed(left + high)} ${fixed(top)}H${fixed(right - high)}`,
-    corner(high, right, top + high),
-    `V${fixed(bottom - low)}`,
-    corner(low, right - low, bottom),
-    `H${fixed(left + low)}`,
-    corner(low, left, bottom - low),
-    `V${fixed(top + high)}`,
-    corner(high, left + high, top),
-    "Z",
-  ].join("");
-}
-
 /** The laptop straight on, drawn flat: its paths, the display's place and the notch. */
 function straight() {
   const x = (hundredths: number) => share(OVERHANG + hundredths);
   const at = ([left, top, right, bottom]: Box): Box => [x(left), share(top), x(right), share(bottom)];
-  const plate = (outline: Box, high: number, low = 0) => box(at(outline), share(high), share(low));
+  const plate = (outline: Box, high: number, low = 0) => panel(at(outline), share(high), share(low));
   const BASE_TOP = SHOWN;
   const BASE_BOTTOM = BASE_TOP + FACE;
   const FEET = BASE_BOTTOM + FOOT_HIGH;
@@ -622,7 +587,7 @@ function straight() {
       glass: plate([BLACK, BLACK, 100 - BLACK, SHOWN], LID_ROUND - BLACK, HINGE_ROUND),
       hingeLine: plate([BLACK, HINGE_LINE, 100 - BLACK, SHOWN], 0, HINGE_ROUND),
       hinge: plate([BLACK, HINGE, 100 - BLACK, SHOWN], 0, HINGE_ROUND),
-      base: box([0, share(BASE_TOP), share(100 + 2 * OVERHANG), share(BASE_BOTTOM)], 0, share(FACE_ROUND)),
+      base: panel([0, share(BASE_TOP), share(100 + 2 * OVERHANG), share(BASE_BOTTOM)], 0, share(FACE_ROUND)),
       scoop: scoop(SCOOP_END, 0),
       // The scoop's walls, from its edge to a narrower scoop inside it, to fill even-odd.
       walls: scoop(SCOOP_END, 0) + scoop(SCOOP_END - SCOOP_WALL, SCOOP_WALL),
@@ -679,6 +644,18 @@ const lit = (eye: Camera, normal: Solid) => {
   const turned = rotate(eye.rotation, normal);
   return Math.round(((dot(turned, LAMP) / Math.hypot(...turned) / Math.hypot(...LAMP) + 1) / 2) * (TONES.length - 1));
 };
+// The realistic look's shades, from the darkest turn of a side to a highlight:
+// the lamp's light over an even share of light all round, and a highlight
+// where a face mirrors the lamp toward the eye.
+export const SHADES = 16;
+const SHINE: Solid = [-0.2, -1, 2.1];
+const glint = (eye: Camera, normal: Solid) => {
+  const turned = rotate(eye.rotation, normal);
+  const length = Math.hypot(...turned);
+  const light = dot(turned, LAMP) / length / Math.hypot(...LAMP);
+  const shine = Math.max(0, dot(turned, SHINE) / length / Math.hypot(...SHINE)) ** 10;
+  return Math.round(clamp(0.52 + 0.4 * light + 0.3 * shine, 0, 1) * (SHADES - 1));
+};
 const at = (ring: readonly Flat[], z: number) => ring.map(([x, y]): Solid => [x, y, z]);
 const inset = (by: number, step?: number) => rounded([-HALF_WIDTH + by, -HALF_DEPTH + by, HALF_WIDTH - by, HALF_DEPTH - by], [ROUND - by, ROUND - by], [], [], step);
 const DEEP = (DEPTH * 100) / WIDTH;
@@ -726,7 +703,7 @@ function fit() {
  * at 0. Its distance and its scale ease by ratio, so the laptop's size on
  * screen changes evenly.
  */
-function eased(options: CameraOptions, pitch: number, flat: number, box?: { width: number; height: number; x: number; y: number }) {
+function eased(options: CameraOptions, pitch: number, flat: number, box?: Boxed) {
   const eye = turned(options, { yaw: 0, pitch }, box);
   const { far, plane } = (fitted ??= fit());
   const width = options.width ?? 100;
@@ -748,74 +725,39 @@ function eased(options: CameraOptions, pitch: number, flat: number, box?: { widt
   });
 }
 
-/** A camera that sees the model turned by `turn` round its middle, then scaled about the middle and moved on screen. */
-function moved(eye: Camera, turn: Rotation, scale: number, [dx, dy]: Flat): Camera {
-  const [cx, cy] = eye.project(MIDDLE);
-  const model = (point: Solid) => add(rotate(turn, subtract(point, MIDDLE)), MIDDLE);
-  return {
-    ...eye,
-    rotation: multiply(eye.rotation, turn),
-    toView: (point) => eye.toView(model(point)),
-    project(point) {
-      const [x, y] = eye.project(model(point));
-      return [cx + (x - cx) * scale + dx, cy + (y - cy) * scale + dy];
-    },
-    facesEye: (point, normal) => eye.facesEye(model(point), rotate(turn, normal)),
-  };
-}
-
-/**
- * A convex slab between `rings`, from one face to the other, as the eye
- * sees it: its outline, and the side faces that face the eye as path data
- * for each of `TONES`.
- */
-function slab(rings: readonly (readonly Solid[])[], pose: Pose, eye: Camera, middle: Solid) {
-  const placed = rings.map((ring) => ring.map((point) => place(pose, point)));
-  const drawn = placed.map((ring) => ring.map(eye.project));
-  const center = place(pose, middle);
-  const tones = TONES.map(() => "");
-  placed.forEach((upper, band) => {
-    const lower = placed[band + 1];
-    const [top, bottom] = [drawn[band], drawn[band + 1]];
-    if (!lower || !top || !bottom) return;
-    upper.forEach((a, index) => {
-      const next = (index + 1) % upper.length;
-      const [b, c, d] = [upper[next], lower[next], lower[index]];
-      if (!b || !c || !d) return;
-      const across = cross(subtract(c, a), subtract(d, b));
-      const normal: Solid = dot(across, subtract(a, center)) < 0 ? [-across[0], -across[1], -across[2]] : across;
-      if (!eye.facesEye(a, normal)) return;
-      tones[lit(eye, normal)] += shape([top[index] ?? [0, 0], top[next] ?? [0, 0], bottom[next] ?? [0, 0], bottom[index] ?? [0, 0]]);
-    });
-  });
-  return { hull: shape(hull(drawn.flat())), tones };
-}
+/** A convex slab between `rings`, from one face to the other, as the eye sees it: its outline, and the side faces that face the eye as path data for each of `TONES`, or of `SHADES` when `real`. */
+const slab = (rings: readonly (readonly Solid[])[], pose: Pose, eye: Camera, middle: Solid, real: boolean) =>
+  banded(rings, pose, eye, middle, real ? SHADES : TONES.length, (normal) => (real ? glint : lit)(eye, normal));
 
 /** A box in FRONT's hundredths of the lid's width, from the lid's top edge down, in the lid's plane. */
 const onLid = ([left, top, right, bottom]: Box): Box => [share(left) - HALF_WIDTH, share(top) - DEPTH, share(right) - HALF_WIDTH, share(bottom) - DEPTH];
 const BEZEL_BOX: Box = [-HALF_WIDTH + RIM, -DEPTH + RIM, HALF_WIDTH - RIM, -RIM];
 
 /** Everything a frame of a free laptop draws: the paths by name, the tones and weights that change, the order of its parts and the glass's pose. */
-function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: { width: number; height: number; x: number; y: number }) {
+function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: Boxed, real = false) {
   const { thick: fat, round: fillet, slide, foot, face: kh } = (fitted ??= fit());
   const flat = pose.flat;
+  // Realistic, the lid is always the machine's own, as FRONT measures it, whatever the camera.
+  const trim = real ? 1 : flat;
+  const shade = real ? glint : lit;
   const ground = eased(options, pose.pitch, flat, box);
   const turn = combine(rotateX(-90), rotateY(pose.yaw), rotateX(90), rotateX(pose.roll));
-  const eye = moved(ground, turn, pose.scale, [pose.x * WIDTH, -pose.y * WIDTH]);
+  const eye = moved(ground, turn, pose.scale, [pose.x * WIDTH, -pose.y * WIDTH], MIDDLE);
   const project = (points: readonly Solid[]) => shape(points.map(eye.project));
   // Facing the eye by a margin, so a face seen edge on, as the deck is level with FRONT's eye, does not draw.
   const shows = (point: Solid, normal: Solid) => {
     const toward = subtract([eye.originX, eye.originY, eye.perspective], eye.toView(point));
     return dot(rotate(eye.rotation, normal), toward) > 1e-4 * Math.hypot(...normal) * Math.hypot(...toward);
   };
-  const mix = (a: Box, b: Box): Box => [lerp(a[0], b[0], flat), lerp(a[1], b[1], flat), lerp(a[2], b[2], flat), lerp(a[3], b[3], flat)];
+  const mix = (a: Box, b: Box): Box => [lerp(a[0], b[0], trim), lerp(a[1], b[1], trim), lerp(a[2], b[2], trim), lerp(a[3], b[3], trim)];
 
   // The base: its thickness and the round of its underside's edge are FRONT's at flat 1.
   const thick = lerp(BASE, fat, flat);
-  const round = fillet * flat;
-  const arc = round > 0.01 ? [0, 1, 2, 3, 4, 5, 6].map((step) => (Math.PI / 12) * step) : [Math.PI / 2];
+  // Realistic, the underside's edge is round in every look, about 4 mm.
+  const round = real ? lerp(0.85, fillet, flat) : fillet * flat;
+  const arc = round > 0.01 ? (real ? [0, 1, 2, 3, 4] : [0, 1, 2, 3, 4, 5, 6]).map((step, _, all) => (Math.PI / 2 / (all.length - 1)) * step) : [Math.PI / 2];
   const rings = [at(inset(0, COARSE), 0), ...arc.map((turn) => at(inset(round * (1 - Math.cos(turn)), COARSE), round - thick - round * Math.sin(turn)))];
-  const base = slab(rings, { position: [0, 0, 0], rotation: IDENTITY }, eye, [0, 0, -thick / 2]);
+  const base = slab(rings, { position: [0, 0, 0], rotation: IDENTITY }, eye, [0, 0, -thick / 2], real);
   const top = shows([0, 0, 0], [0, 0, 1]);
   const under = shows([0, 0, -thick], [0, 0, -1]);
   const back = shows([0, -HALF_DEPTH, -thick / 2], [0, -1, 0]);
@@ -838,33 +780,43 @@ function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: { wid
   const { lidWorld } = joint(lerp(OPEN, -90, flat));
   const closed = 1 - pose.lid;
   const lid = compose(lidWorld(closed), { position: [0, slide * flat, 0], rotation: IDENTITY });
-  const radii: Flat = [lerp(ROUND, share(LID_ROUND), flat), lerp(ROUND, 1.2, flat)];
+  const radii: Flat = [lerp(ROUND, share(LID_ROUND), trim), lerp(ROUND, 1.2, trim)];
   const ring = (step?: number) => rounded([-HALF_WIDTH, -DEPTH, HALF_WIDTH, 0], radii, [], [], step);
   const coarse = ring(COARSE);
   const skirt = LIFT * clamp((closed - 0.9) / 0.1, 0, 1);
-  const shell = slab([at(coarse, skirt), at(coarse, 0), at(coarse, -LID)], lid, eye, [0, -DEPTH / 2, -LID / 2]);
+  const shell = slab([at(coarse, skirt), at(coarse, 0), at(coarse, -LID)], lid, eye, [0, -DEPTH / 2, -LID / 2], real);
   const normal = rotate(lid.rotation, [0, 0, 1]);
   const facing = shows(place(lid, [0, -DEPTH / 2, 0]), normal);
   const outer = shows(place(lid, [0, -DEPTH / 2, -LID]), [-normal[0], -normal[1], -normal[2]]);
   const plate = (box: Box, [high, low]: Flat, z = 0) => (facing || z ? project(at(rounded(box, [high, low]), z).map((point) => place(lid, point))) : "");
   const ringed = (inset: number, bottom: number, low: number) =>
-    plate(mix(BEZEL_BOX, onLid([inset, inset, 100 - inset, bottom])), [lerp(ROUND - RIM, share(LID_ROUND - inset), flat), lerp(ROUND - RIM, share(low), flat)]);
+    plate(mix(BEZEL_BOX, onLid([inset, inset, 100 - inset, bottom])), [lerp(ROUND - RIM, share(LID_ROUND - inset), trim), lerp(ROUND - RIM, share(low), trim)]);
   const face = plate([-HALF_WIDTH, -DEPTH, HALF_WIDTH, 0], radii);
   const lidPoint = (y: number) => eye.project(place(lid, [0, y, 0]));
 
   // The glass, FRONT's display at flat 1: the eye's own glass mapped onto it, so the content lays out the same.
   const [left, high, right, low] = onLid(DISPLAY);
-  const want = { x: lerp(GLASS.x, left, flat), y: lerp(GLASS.y, high, flat), width: lerp(GLASS.width, right - left, flat), height: lerp(GLASS.height, low - high, flat) };
+  const want = { x: lerp(GLASS.x, left, trim), y: lerp(GLASS.y, high, trim), width: lerp(GLASS.width, right - left, trim), height: lerp(GLASS.height, low - high, trim) };
   // Shut over the deck, or seen past the base from under the deck, the
   // display is hidden even where it faces the eye, so the glass goes with it.
   const [sx, sy] = facing && !under && closed < 0.98 ? [want.width / GLASS.width, want.height / GLASS.height] : [0, 0];
 
   // The feet: under the base's corners, the front two where FRONT draws them.
+  // Realistic, they are round, each in a bright ring on the underside.
+  const deep = real ? 2 * foot.half : foot.deep;
+  const soles: string[] = [];
+  const bezels: string[] = [];
   const feet = [-1, 1].flatMap((side) =>
-    [foot.front - foot.deep, -foot.front].map((near) => {
-      const pad: Box = [side * foot.x - foot.half, near, side * foot.x + foot.half, near + foot.deep];
+    [foot.front - deep, -foot.front].map((near) => {
+      const pad: Box = [side * foot.x - foot.half, near, side * foot.x + foot.half, near + deep];
       const sole: Box = [pad[0] + foot.taper, pad[1] + foot.taper, pad[2] - foot.taper, pad[3] - foot.taper];
-      return shape(hull([...at(rounded(pad, [0.6, 0.6], [], [], COARSE), foot.high - thick), ...at(rounded(sole, [0.5, 0.5], [], [], COARSE), -thick - foot.low)].map(eye.project)));
+      const [high, low] = real ? [foot.half, foot.half - foot.taper] : [0.6, 0.5];
+      const ground = at(rounded(sole, [low, low], [], [], COARSE), -thick - foot.low);
+      if (real) {
+        soles.push(under ? project(ground) : "");
+        bezels.push(under ? project(at(rounded([pad[0] - 0.3, pad[1] - 0.3, pad[2] + 0.3, pad[3] + 0.3], [high + 0.3, high + 0.3], [], [], COARSE), -thick)) : "");
+      }
+      return shape(hull([...at(rounded(pad, [high, high], [], [], COARSE), foot.high - thick), ...ground].map(eye.project)));
     }),
   );
 
@@ -882,6 +834,35 @@ function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: { wid
 
   const ahead = rotate(eye.rotation, [0, 1, 0]);
   const parts = under ? ["base", "feet"] : ["feet", "base"];
+  const outerFace = outer ? plate([-HALF_WIDTH, -DEPTH, HALF_WIDTH, 0], radii, -LID) : "";
+  const span = (from: Solid, to: Solid) => {
+    const [[x1, y1], [x2, y2]] = [eye.project(from), eye.project(to)];
+    return { x1: fixed(x1), y1: fixed(y1), x2: fixed(x2), y2: fixed(y2) };
+  };
+  // The realistic look's extra parts: the underside's intake slots along its
+  // sides and its eight screws, the feet's soles and rings, and copies of the
+  // faces that carry a sheen or a highlight.
+  const slit = (side: number) => {
+    const x = side * (HALF_WIDTH - 0.43 * round);
+    return project(at(rounded([x - 0.12, -0.2 * DEPTH, x + 0.12, 0.25 * DEPTH], [0.12, 0.12], [], [], COARSE), 0.18 * round - thick));
+  };
+  const screw = ([x, y]: Flat) => {
+    const [sx, sy] = eye.project([x, y, -thick]);
+    return `M${cut(sx)} ${cut(sy)}h0`;
+  };
+  const extra = real
+    ? {
+        "base.sheen": deck?.top ?? "",
+        "base.edge": deck?.top ?? "",
+        "base.slits": under ? slit(-1) + slit(1) : "",
+        "base.screws": under ? [-29.6, -11.9, 11.9, 29.6].flatMap((x) => [screw([x, 1.4 - HALF_DEPTH]), screw([x, HALF_DEPTH - 1.8])]).join("") : "",
+        "base.underSheen": bottom(inset(round)),
+        "lid.sheen": outerFace,
+        "lid.edge": outerFace,
+        ...Object.fromEntries(soles.map((d, index) => [`sole.${index}`, d])),
+        ...Object.fromEntries(bezels.map((d, index) => [`bezel.${index}`, d])),
+      }
+    : {};
   return {
     camera: eye,
     glass: compose(lid, { position: [want.x - sx * GLASS.x, want.y - sy * GLASS.y, 0], rotation: [sx, 0, 0, 0, sy, 0, 0, 0, 1] }),
@@ -889,10 +870,18 @@ function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: { wid
     order: outer ? [...parts, "lid"] : ["lid", ...parts],
     /** How much FRONT's tones show on the base's front: all at flat 1 while it faces the eye. */
     front: flat * clamp((ahead[2] / Math.hypot(...ahead) - 0.6) / 0.4, 0, 1),
-    /** The tones of the deck and the underside, as indexes into `TONES`. */
-    deckTone: lit(eye, [0, 0, 1]),
-    underTone: lit(eye, [0, 0, -1]),
-    outerTone: lit(eye, [-normal[0], -normal[1], -normal[2]]),
+    /** The tones of the deck and the underside, as indexes into `TONES`, or `SHADES` when realistic. */
+    deckTone: shade(eye, [0, 0, 1]),
+    underTone: shade(eye, [0, 0, -1]),
+    outerTone: shade(eye, [-normal[0], -normal[1], -normal[2]]),
+    /** Where the realistic look's sheens run on the deck, the underside and the lid's back, from back to front and from the lid's top edge to its hinge. */
+    /** How far the keys' bevel highlight stands from them on screen, toward the deck's back. */
+    bevel: span([0, -7.7, 0], [0, -7.8, 0]),
+    sheen: {
+      top: span([0, -HALF_DEPTH, 0], [0, HALF_DEPTH, 0]),
+      under: span([0, -HALF_DEPTH, -thick], [0, HALF_DEPTH, -thick]),
+      outer: span(place(lid, [0, -DEPTH, -LID]), place(lid, [0, 0, -LID])),
+    },
     /** Where FRONT's lid edge gradient runs, from the lid's top edge down. */
     edge: { x1: lidPoint(-DEPTH)[0], y1: lidPoint(-DEPTH)[1], x2: lidPoint(share(LID_ROUND) - DEPTH)[0], y2: lidPoint(share(LID_ROUND) - DEPTH)[1] },
     d: {
@@ -924,7 +913,7 @@ function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: { wid
       "lid.hull": shell.hull,
       ...Object.fromEntries(shell.tones.map((d, step) => [`lid.${step}`, d])),
       "lid.face": face,
-      "lid.outer": outer ? plate([-HALF_WIDTH, -DEPTH, HALF_WIDTH, 0], radii, -LID) : "",
+      "lid.outer": outerFace,
       "lid.rim": plate(onLid([RIM_LINE, RIM_LINE, 100 - RIM_LINE, DEEP]), [share(LID_ROUND - RIM_LINE), radii[1]]),
       "lid.gasket": ringed(GASKET, SHOWN, HINGE_ROUND + BLACK - GASKET),
       "lid.gasketLine": ringed(GASKET_LINE, SHOWN, HINGE_ROUND + BLACK - GASKET_LINE),
@@ -932,6 +921,7 @@ function free(options: CameraOptions, OPEN: number, pose: TrickPose, box?: { wid
       "lid.hingeLine": plate(onLid([BLACK, HINGE_LINE, 100 - BLACK, SHOWN]), [0, share(HINGE_ROUND)]),
       "lid.hinge": plate(onLid([BLACK, HINGE, 100 - BLACK, SHOWN]), [0, share(HINGE_ROUND)]),
       "lid.lines": shell.hull + (facing ? face : ""),
+      ...extra,
     },
   };
 }

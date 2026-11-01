@@ -251,3 +251,47 @@ test.each([true, false])("with free turned %p while the handle holds a pose, the
   );
   expect(freeMarkup(moved.host)).toBe(freeMarkup(drawn.host));
 });
+
+/** `freeMarkup`, with the realistic look's sheens made one too. */
+const realMarkup = (host: HTMLElement) => freeMarkup(host).replace(/laptop-(desk|phone)-[\w-]*?-(?=top"|outer"|under"|keys"|top\)|outer\)|under\))/g, "laptop-$1-X-");
+
+test.each([DESK, PHONE])("a realistic laptop's handle draws every pose as its props would, with no render", async (eye) => {
+  const handle = createRef<LaptopHandle>();
+  let renders = 0;
+  const Counted = () => {
+    renders += 1;
+    return <p>live</p>;
+  };
+  const moved = await mount(
+    <Laptop eye={eye} look="realistic" free ref={handle}>
+      <Counted />
+    </Laptop>,
+  );
+  for (const pose of POSES) {
+    await act(async () => handle.current?.set({ x: 0, y: 0, scale: 1, roll: 0, yaw: 0, pitch: eye.pitch, ...pose }));
+    const drawn = await mount(
+      <Laptop eye={eye} look="realistic" free ref={createRef<LaptopHandle>()} {...pose}>
+        <p>live</p>
+      </Laptop>,
+    );
+    expect(realMarkup(moved.host)).toBe(realMarkup(drawn.host));
+    await drawn.unmount();
+  }
+  expect(renders).toBe(1);
+});
+
+test("a realistic laptop that is not free takes the lid, yaw and pitch from its handle, held to their ranges", async () => {
+  const handle = createRef<LaptopHandle>();
+  const moved = await mount(
+    <Laptop eye={DESK} look="realistic" turning ref={handle}>
+      <Live />
+    </Laptop>,
+  );
+  await act(async () => handle.current?.set({ lid: 0.4, yaw: 90, pitch: 60 }));
+  const drawn = await mount(
+    <Laptop eye={DESK} look="realistic" turning lid={0.4} yaw={35} pitch={30} ref={createRef<LaptopHandle>()}>
+      <Live />
+    </Laptop>,
+  );
+  expect(realMarkup(moved.host)).toBe(realMarkup(drawn.host));
+});

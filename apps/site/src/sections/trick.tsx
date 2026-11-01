@@ -48,7 +48,7 @@ function Pinned() {
       <div className="scrub-pin" data-replay-block="">
         <div className="trick-slot">
           <div className="trick-room">
-            <Laptop eye={DESK} free {...START} ref={laptop} label="A laptop that flips in the air and lands open as the page scrolls">
+            <Laptop eye={DESK} look="realistic" free {...START} ref={laptop} label="A laptop that flips in the air and lands open as the page scrolls">
               <Display percent={percent} />
             </Laptop>
           </div>
@@ -66,7 +66,7 @@ function Stills() {
         <figure key={t} className="trick-still">
           <div className="trick-slot">
             <div className="trick-room">
-              <Laptop eye={DESK} free {...scrub(t, KICKFLIP)} label={`A laptop: ${caption.toLowerCase()}`}>
+              <Laptop eye={DESK} look="realistic" free {...scrub(t, KICKFLIP)} label={`A laptop: ${caption.toLowerCase()}`}>
                 <Display value={Math.round(t * 100)} />
               </Laptop>
             </div>

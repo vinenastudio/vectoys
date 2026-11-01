@@ -284,3 +284,33 @@ export function footprint(
   const points = (spread > 0 ? grow(above, spread) : above).map(([x, y]) => camera.project([x, y, ground]));
   return { part: "footprint", d: shape(points), points, facing: camera.facesEye([0, 0, ground], [0, 0, 1]) };
 }
+
+/**
+ * The side faces between `rings` of a convex solid, each ring an outline at
+ * one height, from one end to the other, placed by `pose` and seen by `eye`:
+ * its outline on screen, and the faces that face the eye as path data, one
+ * string for each of `count` tones. `tone` picks a face's tone, from 0 to
+ * `count - 1`, from its normal in the scene's model space, turned out from
+ * `middle`.
+ */
+export function banded(rings: readonly (readonly Solid[])[], pose: Pose, eye: Camera, middle: Solid, count: number, tone: (normal: Solid) => number) {
+  const placed = rings.map((ring) => ring.map((point) => place(pose, point)));
+  const drawn = placed.map((ring) => ring.map(eye.project));
+  const center = place(pose, middle);
+  const tones = Array.from({ length: count }, () => "");
+  placed.forEach((upper, band) => {
+    const lower = placed[band + 1];
+    const [top, bottom] = [drawn[band], drawn[band + 1]];
+    if (!lower || !top || !bottom) return;
+    upper.forEach((a, index) => {
+      const next = (index + 1) % upper.length;
+      const [b, c, d] = [upper[next], lower[next], lower[index]];
+      if (!b || !c || !d) return;
+      const across = cross(subtract(c, a), subtract(d, b));
+      const normal: Solid = dot(across, subtract(a, center)) < 0 ? [-across[0], -across[1], -across[2]] : across;
+      if (!eye.facesEye(a, normal)) return;
+      tones[tone(normal)] += shape([top[index] ?? [0, 0], top[next] ?? [0, 0], bottom[next] ?? [0, 0], bottom[index] ?? [0, 0]]);
+    });
+  });
+  return { hull: shape(hull(drawn.flat())), tones };
+}

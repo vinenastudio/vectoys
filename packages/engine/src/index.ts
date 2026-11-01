@@ -1,9 +1,10 @@
-export { camera, type Camera, type CameraOptions } from "./camera.ts";
-export { grow, hull, keep, quarter, rounded, slot, toward, winding, type Box } from "./outline.ts";
+export { aimed, camera, moved, type Boxed, type Camera, type CameraOptions } from "./camera.ts";
+export { grow, hull, keep, nearness, quarter, rounded, slot, toward, winding, type Box } from "./outline.ts";
 export { DAMPING, STIFFNESS, settled, spring, type Spring, type SpringOptions } from "./motion.ts";
-export { fixed, line, shape } from "./path.ts";
+export { fixed, line, panel, shape } from "./path.ts";
 export {
   LIGHT,
+  banded,
   draw,
   faces,
   footprint,

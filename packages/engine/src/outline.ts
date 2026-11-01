@@ -126,3 +126,10 @@ export function keep<P extends readonly number[]>(
 /** The point a share of the way from one point to another, in any dimension. */
 export const toward = <P extends readonly number[]>(from: P, to: P, share: number): P =>
   from.map((value, axis) => value + (to[axis]! - value) * share) as unknown as P;
+
+/** How near a point on screen lies to a segment, as its squared distance to the segment's nearest point. */
+export function nearness([px, py]: Flat, [ax, ay]: Flat, [bx, by]: Flat): number {
+  const [dx, dy] = [bx - ax, by - ay];
+  const share = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
+  return (ax + dx * share - px) ** 2 + (ay + dy * share - py) ** 2;
+}

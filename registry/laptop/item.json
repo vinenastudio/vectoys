@@ -1,7 +1,7 @@
 {
   "name": "laptop",
   "title": "Laptop",
-  "description": "A 14 inch laptop seen from the front and a little above, drawn as SVG paths, that opens, closes and turns, with live HTML on its display.",
+  "description": "A 14 inch laptop seen from the front and a little above, drawn as SVG paths in a simple or a realistic look, that opens, closes and turns, with live HTML on its display.",
   "files": ["src/geometry.ts", "src/laptop.tsx"],
   "dependencies": ["@vinena/vectoys", "@vinena/vectoys-react"],
   "license": "MIT"

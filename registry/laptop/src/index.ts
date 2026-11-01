@@ -18,4 +18,4 @@ export {
   type TrickPose,
   type View,
 } from "./geometry";
-export { Laptop, type LaptopHandle } from "./laptop";
+export { Laptop, type LaptopHandle, type LaptopLook } from "./laptop";

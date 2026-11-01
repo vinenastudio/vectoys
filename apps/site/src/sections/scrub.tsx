@@ -124,7 +124,7 @@ function Pinned() {
     <div className="scrub-track" ref={track} style={{ height: `${SCREENS * 100}vh` }}>
       <div className="scrub-pin" data-replay-block="">
         <div className="scrub-glide" ref={glide}>
-          <Laptop eye={DESK} turning lid={START.lid} yaw={START.yaw} pitch={START.pitch} ref={laptop} label="A laptop that opens and turns as the page scrolls">
+          <Laptop eye={DESK} look="realistic" turning lid={START.lid} yaw={START.yaw} pitch={START.pitch} ref={laptop} label="A laptop that opens and turns as the page scrolls">
             <Display percent={percent} steps={steps} />
           </Laptop>
         </div>
@@ -151,7 +151,7 @@ function Frames() {
     <div className="scrub-frames">
       {CHAPTERS.map((chapter) => (
         <div key={chapter.title} className="scrub-frame">
-          <Laptop eye={DESK} turning lid={1} yaw={chapter.side === "right" ? 20 : -20} label="A laptop turned toward the words beside it">
+          <Laptop eye={DESK} look="realistic" turning lid={1} yaw={chapter.side === "right" ? 20 : -20} label="A laptop turned toward the words beside it">
             <Display />
           </Laptop>
           <div className="scrub-chapter">
