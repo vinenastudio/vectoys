@@ -4,19 +4,22 @@ import { renderToString } from "react-dom/server";
 import { useScrub, type Progress } from "../src";
 import { fakeFrames, mount, reducedMotion } from "./dom";
 
-let cleanup: (() => void)[] = [];
-afterEach(() => {
-  cleanup.forEach((undo) => undo());
+// Undone last first after each test: mounted trees, then spies.
+let cleanup: (() => unknown)[] = [];
+afterEach(async () => {
+  for (const undo of cleanup.reverse()) await undo();
   cleanup = [];
   document.body.replaceChildren();
+  tall = 3;
 });
 
-// The track's place on screen, as the page scrolls: 3 screens tall in a viewport 768 tall.
+// The track's place on screen, as the page scrolls: `tall` screens tall, 3 unless a test sets it, in a viewport 768 tall.
 const VIEWPORT = window.innerHeight;
 let top = 0;
+let tall = 3;
 const place = () => {
   const spy = spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
-    () => ({ top, bottom: top + 3 * VIEWPORT, height: 3 * VIEWPORT, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) }) satisfies DOMRect,
+    () => ({ top, bottom: top + tall * VIEWPORT, height: tall * VIEWPORT, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) }) satisfies DOMRect,
   );
   cleanup.push(() => spy.mockRestore());
 };
@@ -49,7 +52,8 @@ test("progress runs from 0 at the track's top to 1 at its bottom, once a frame, 
   const seen: Progress[] = [];
   let rendered = 0;
   top = 100;
-  await mount(<Track seen={(scrub, renders) => ((rendered = renders), seen.push(scrub.progress))} />);
+  const { unmount } = await mount(<Track seen={(scrub, renders) => ((rendered = renders), seen.push(scrub.progress))} />);
+  cleanup.push(unmount);
   const scrub = { progress: seen[0] ?? { get: () => -1, subscribe: () => () => {} } };
   expect(scrub.progress.get()).toBe(0);
   const heard: number[] = [];
@@ -91,14 +95,15 @@ test("the listeners are passive and go away with the component", async () => {
     ["resize", { passive: true }],
   ]);
   await unmount();
-  expect(removed.mock.calls.filter(([type]) => type === "scroll" || type === "resize")).toHaveLength(2);
+  const gone = removed.mock.calls.filter(([type]) => type === "scroll" || type === "resize");
+  expect(gone.map(([type, listener]) => [type, listener])).toEqual(listened.map(([type, listener]) => [type, listener]));
 });
 
 test("on the server the progress is 0 and nothing asks for less motion", () => {
   let reduced: boolean | null = null;
   const html = renderToString(<Track seen={(scrub) => (reduced = scrub.reduced)} />);
   expect(html).toContain("<output>0</output>");
-  expect(reduced === false).toBe(true);
+  expect<boolean | null>(reduced).toBe(false);
 });
 
 test("reduced follows the page's ask for less motion", async () => {
@@ -106,6 +111,26 @@ test("reduced follows the page's ask for less motion", async () => {
   const asked = reducedMotion(true);
   cleanup.push(asked.restore);
   let reduced = false;
-  await mount(<Track seen={(scrub) => (reduced = scrub.reduced)} />);
+  const { unmount } = await mount(<Track seen={(scrub) => (reduced = scrub.reduced)} />);
+  cleanup.push(unmount);
   expect(reduced).toBe(true);
+});
+
+test("the track's measured height wins whenever it has one, even one no taller than the viewport", async () => {
+  place();
+  const frames = fakeFrames();
+  cleanup.push(frames.restore);
+  let progress: Progress | undefined;
+  tall = 1;
+  top = 100;
+  const { unmount } = await mount(<Track seen={(scrub) => (progress = scrub.progress)} />);
+  cleanup.push(unmount);
+  // No room to scroll through: 0 until the track's top passes the viewport's, then 1.
+  expect(progress?.get()).toBe(0);
+  await scrolled(-100, frames);
+  expect(progress?.get()).toBe(1);
+  // With no height yet, the track is taken as `screens` tall.
+  tall = 0;
+  await scrolled(-VIEWPORT, frames);
+  expect(progress?.get()).toBeCloseTo(0.5, 10);
 });

@@ -1,5 +1,5 @@
-import { fixed, screenQuad, type Camera, type Pose, type ScreenRect } from "@vinena/vectoys";
-import type { CSSProperties, ReactNode, Ref } from "react";
+import { fixed, screenQuad, type Camera, type Pose, type ScreenQuad, type ScreenRect } from "@vinena/vectoys";
+import { useLayoutEffect, useRef, type CSSProperties, type ReactNode, type Ref } from "react";
 
 /**
  * CSS pixels per scene unit in the layer screens are laid out in. Any
@@ -36,14 +36,18 @@ function placement(camera: Camera, pose: Pose, rect: ScreenRect, width?: number)
 /**
  * Lays a `Screen`'s element, from its `ref`, onto a new pose at once, as a
  * render with that pose would, for a face that moves every frame without a
- * render. The camera's size and `rect` must be the ones the Screen rendered
- * with; a later render with the same props as before leaves this pose be.
+ * render. The camera's size, `rect` and `width` must be the ones the Screen
+ * rendered with; a later render with the same props as before leaves this
+ * pose be, and one with a new pose lays the element onto that.
  */
 export function placeScreen(element: HTMLElement, camera: Camera, pose: Pose, rect: ScreenRect, width?: number) {
-  const { quad } = placement(camera, pose, rect, width);
-  element.style.transform = quad.matrix ?? "";
-  element.style.visibility = quad.facing ? "visible" : "hidden";
-  element.style.pointerEvents = quad.facing ? "auto" : "none";
+  apply(element, placement(camera, pose, rect, width).quad);
+}
+
+function apply(element: HTMLElement, { matrix, facing }: ScreenQuad) {
+  element.style.transform = matrix ?? "";
+  element.style.visibility = facing ? "visible" : "hidden";
+  element.style.pointerEvents = facing ? "auto" : "none";
 }
 
 /**
@@ -62,8 +66,16 @@ export function placeScreen(element: HTMLElement, camera: Camera, pose: Pose, re
 export function Screen({ camera, pose, rect, width, children, className, style, ref }: ScreenProps) {
   const { element, quad } = placement(camera, pose, rect, width);
   const layer = fixed(camera.width * PIXELS_PER_UNIT);
+  // React writes only the style keys whose value changed since its last
+  // render, so after a placeScreen a new pose lays every key down again.
+  const outer = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const content = outer.current?.firstElementChild;
+    if (content instanceof HTMLElement) apply(content, quad);
+  }, [quad.matrix, quad.facing]);
   return (
     <div
+      ref={outer}
       style={{
         position: "absolute",
         left: 0,

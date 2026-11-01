@@ -1,7 +1,11 @@
-import { expect, test } from "bun:test";
+import { afterEach, expect, test } from "bun:test";
 import { camera, draw, plate, rotateX, slab, type Pose } from "@vinena/vectoys";
+import { createRef } from "react";
 import { renderToString } from "react-dom/server";
-import { Faces, Screen, Stage } from "../src";
+import { Faces, Screen, Stage, placeScreen } from "../src";
+import { mount } from "./dom";
+
+afterEach(() => document.body.replaceChildren());
 
 const EYE = camera({ height: 60, perspective: 300, yaw: -30, pitch: -20 });
 const RECT = { x: -4, y: -3, width: 8, height: 6 };
@@ -58,6 +62,30 @@ test("a screen facing the eye takes a matrix and pointer events; one turned away
   const hidden = renderToString(<Screen camera={EYE} pose={away} rect={RECT} />);
   expect(hidden).not.toContain("matrix3d(");
   expect(hidden).toContain("visibility:hidden");
+});
+
+test("a screen placeScreen turned away shows again when a render gives it a new pose that faces the eye", async () => {
+  const facing: Pose = { position: [0, 0, 0], rotation: rotateX(-90) };
+  const tilted: Pose = { position: [0, 0, 0], rotation: rotateX(-80) };
+  const away: Pose = { position: [0, 0, 0], rotation: rotateX(90) };
+  const ref = createRef<HTMLDivElement>();
+  const screen = (pose: Pose) => (
+    <Screen camera={EYE} pose={pose} rect={RECT} ref={ref}>
+      live
+    </Screen>
+  );
+  const { rerender, unmount } = await mount(screen(facing));
+  const element = ref.current;
+  if (!element) throw new Error("the screen did not mount");
+  placeScreen(element, EYE, away, RECT);
+  expect(element.style.visibility).toBe("hidden");
+  // The same props again leave placeScreen's pose be.
+  await rerender(screen(facing));
+  expect(element.style.visibility).toBe("hidden");
+  await rerender(screen(tilted));
+  expect([element.style.visibility, element.style.pointerEvents]).toEqual(["visible", "auto"]);
+  expect(element.style.transform).toContain("matrix3d(");
+  await unmount();
 });
 
 test("shaded, a part's faces join by role and shade step, darker in less light", () => {

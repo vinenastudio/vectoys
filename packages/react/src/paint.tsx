@@ -13,8 +13,8 @@ export type Stop = readonly [offset: number, color: string, opacity?: number];
 export function Gradient({ id, stops, ...rest }: { id: string; stops: readonly Stop[] } & SVGProps<SVGLinearGradientElement>) {
   return (
     <linearGradient id={id} {...rest}>
-      {stops.map(([offset, stopColor, stopOpacity]) => (
-        <stop key={offset} offset={offset} style={{ stopColor, stopOpacity }} />
+      {stops.map(([offset, stopColor, stopOpacity], index) => (
+        <stop key={index} offset={offset} style={{ stopColor, stopOpacity }} />
       ))}
     </linearGradient>
   );
@@ -29,7 +29,8 @@ export function Gradient({ id, stops, ...rest }: { id: string; stops: readonly S
  * once into the tile, with no filter, so it costs nothing per frame.
  */
 export function Grain({ id, size = 3, count = 140, speck = 0.07, strength = 0.07, stretch = 1, seed = 7 }: { id: string; size?: number; count?: number; speck?: number; strength?: number; stretch?: number; seed?: number }) {
-  let state = seed;
+  // The generator's state is a whole number from 1 to 2147483646: 0 would stay 0, and a negative one would scatter off the tile.
+  let state = (((Math.round(seed) % 2147483647) + 2147483647) % 2147483647) || 1;
   const next = () => (state = (state * 16807) % 2147483647) / 2147483647;
   const specks = Array.from({ length: count }, (_, index) => {
     const [x, y, light, share] = [next() * size, next() * size, next() < 0.5, next()];

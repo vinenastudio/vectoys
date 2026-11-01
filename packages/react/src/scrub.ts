@@ -57,7 +57,7 @@ export function useScrub(ref: RefObject<HTMLElement | null>, { screens }: UseScr
       if (!track) return;
       const { top, height } = track.getBoundingClientRect();
       const viewport = window.innerHeight;
-      const distance = height > viewport ? height - viewport : (screens - 1) * viewport;
+      const distance = height > 0 ? height - viewport : (screens - 1) * viewport;
       store.set(distance > 0 ? clamp(-top / distance, 0, 1) : top <= 0 ? 1 : 0);
     };
     const schedule = () => {

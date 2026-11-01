@@ -1,6 +1,9 @@
-import { expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { renderToString } from "react-dom/server";
 import { Glare, Gradient, Grain, mirrored } from "../src";
+import { mount } from "./dom";
+
+afterEach(() => document.body.replaceChildren());
 
 test("a gradient draws a stop for each, its opacity only where given, and passes its other attributes on", () => {
   const html = renderToString(
@@ -20,6 +23,38 @@ test("a grain is a tile of specks scattered the same on every render, its seed c
   expect(draw().match(/<rect /g)).toHaveLength(140);
   expect(draw(3)).not.toBe(draw());
   expect(draw()).not.toMatch(/NaN|Infinity/);
+});
+
+test("a gradient with a hard edge, two stops at one offset, renders and rerenders them all with no React warnings", async () => {
+  const errors = spyOn(console, "error");
+  try {
+    const edge = (color: string) => (
+      <svg>
+        <Gradient id="edge" stops={[[0, color], [0.5, color], [0.5, "white"], [1, "white"]]} />
+      </svg>
+    );
+    const { host, rerender, unmount } = await mount(edge("black"));
+    await rerender(edge("gray"));
+    expect([...host.querySelectorAll("stop")].map((stop) => stop.getAttribute("offset"))).toEqual(["0", "0.5", "0.5", "1"]);
+    expect(errors.mock.calls.map((call) => String(call[0]))).toEqual([]);
+    await unmount();
+  } finally {
+    errors.mockRestore();
+  }
+});
+
+test("a grain's seed of 0 or below still scatters its specks over the tile", () => {
+  const spots = (seed: number) => [...renderToString(<svg><Grain id="n" seed={seed} /></svg>).matchAll(/<rect x="([^"]+)" y="([^"]+)"/g)].map((match) => `${match[1]} ${match[2]}`);
+  for (const seed of [0, -7]) {
+    const all = spots(seed);
+    expect(all).toHaveLength(140);
+    expect(new Set(all).size).toBeGreaterThan(100);
+    for (const value of all.flatMap((spot) => spot.split(" ").map(Number))) {
+      expect(value).toBeGreaterThanOrEqual(0);
+      expect(value).toBeLessThan(3);
+    }
+  }
+  expect(spots(7)).toEqual(spots(7 + 2147483647));
 });
 
 test("mirrored stops run back from the middle", () => {

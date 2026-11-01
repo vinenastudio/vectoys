@@ -26,3 +26,17 @@ test("useNodes keeps every mounted element under its name, with the same ref cal
   expect([...(nodes?.all("part") ?? [])]).toHaveLength(1);
   expect(new Set(refs).size).toBe(1);
 });
+
+test("useNodes gives one live set per name, so a set taken before its elements mount holds them once they do", async () => {
+  let nodes: Nodes | undefined;
+  const Late = ({ shown }: { shown: boolean }) => {
+    nodes = useNodes();
+    return <svg>{shown && <path ref={nodes.ref("late")} />}</svg>;
+  };
+  const { host, rerender } = await mount(<Late shown={false} />);
+  const early = nodes?.all("late");
+  expect([...(early ?? [])]).toHaveLength(0);
+  await rerender(<Late shown />);
+  expect(nodes?.all("late")).toBe(early);
+  expect([...(early ?? [])]).toEqual([...host.querySelectorAll("path")]);
+});
