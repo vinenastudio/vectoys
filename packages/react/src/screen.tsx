@@ -44,10 +44,18 @@ export function placeScreen(element: HTMLElement, camera: Camera, pose: Pose, re
   apply(element, placement(camera, pose, rect, width).quad);
 }
 
-function apply(element: HTMLElement, { matrix, facing }: ScreenQuad) {
-  element.style.transform = matrix ?? "";
-  element.style.visibility = facing ? "visible" : "hidden";
-  element.style.pointerEvents = facing ? "auto" : "none";
+/** The style keys a quad sets on a Screen's element, in a render and in `placeScreen` alike. */
+const placed = ({ matrix, facing }: ScreenQuad): { transform: string | undefined; visibility: "visible" | "hidden"; pointerEvents: "auto" | "none" } => ({
+  transform: matrix,
+  visibility: facing ? "visible" : "hidden",
+  pointerEvents: facing ? "auto" : "none",
+});
+
+function apply(element: HTMLElement, quad: ScreenQuad) {
+  const { transform, visibility, pointerEvents } = placed(quad);
+  element.style.transform = transform ?? "";
+  element.style.visibility = visibility;
+  element.style.pointerEvents = pointerEvents;
 }
 
 /**
@@ -98,9 +106,7 @@ export function Screen({ camera, pose, rect, width, children, className, style, 
           width: element.width,
           height: element.height,
           transformOrigin: "0 0",
-          transform: quad.matrix,
-          visibility: quad.facing ? "visible" : "hidden",
-          pointerEvents: quad.facing ? "auto" : "none",
+          ...placed(quad),
         }}
       >
         {children}
