@@ -60,3 +60,14 @@ test("a rectangle edge on, turned away or behind the eye has no matrix", () => {
     expect(quad.matrix).toBeUndefined();
   }
 });
+
+test("a face seen straight on gets a plain scale and move, with the rounding dust of its turns written as 0", async () => {
+  const { camera, combine, rotateX, rotateY, screenQuad } = await import("../src");
+  // Turned a full round about two axes, the pose is straight on again, but its rotation carries terms of about 1e-17.
+  const eye = camera({ height: 60, perspective: 1000 });
+  const pose = { position: [0, 0, 0] as const, rotation: combine(rotateX(-90), rotateY(360), rotateX(360)) };
+  const quad = screenQuad(eye, { position: [...pose.position], rotation: pose.rotation }, { x: -10, y: -5, width: 20, height: 10 }, { width: 200, height: 100 });
+  const terms = (quad.matrix ?? "").slice("matrix3d(".length, -1).split(",");
+  expect(terms).toHaveLength(16);
+  for (const at of [1, 2, 3, 4, 6, 7, 8, 9, 11, 14]) expect(terms[at]).toBe("0");
+});

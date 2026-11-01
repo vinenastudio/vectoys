@@ -418,10 +418,10 @@ function seen<const Id extends string>({ id, ...options }: CameraOptions & { id:
     ...own,
     /** The eye's own height, the pitch of `LaptopPose`. */
     pitch: -rest.pitch,
-    /** The fixed box that holds every pose, in scene units. */
+    /** The fixed box that holds every pose, in scene units, and where the eye's own scene sits in it. */
     get box() {
-      const { width, height } = fixedBox();
-      return { width, height };
+      const { width, height, x, y } = fixedBox();
+      return { width, height, x: fixed(x), y: fixed(y) };
     },
     /** The laptop turned to `yaw` and seen from `pitch`, boxed in the fixed box that holds every pose, or in the eye's own scene. */
     at({ yaw, pitch }: Omit<LaptopPose, "lid">, boxed = false) {
@@ -462,7 +462,10 @@ export const PHONE = seen({ id: "phone", height: 59, perspective: 600, pitch: -1
  * eye can take: yaw from -35 to 35, pitch from 5 to 30, the lid shut to open,
  * with its shadow, and the laptop in the middle. A `Laptop` passed `turning`
  * draws in it, so its stage keeps one size while a scroll turns it; its
- * aspect ratio is `width / height`.
+ * aspect ratio is `width / height`. `x` and `y` are where the eye's own
+ * scene sits in the box, in scene units: a point of the eye's own drawing
+ * lands `x` to the right and `y` down in the box, so an overlay placed on
+ * the untouched laptop can follow it into a turning one.
  */
 export const LAPTOP_BOX = {
   get desk() {

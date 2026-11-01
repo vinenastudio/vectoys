@@ -253,6 +253,9 @@ test("the kickflip shuts the lid straight on, flips and turns once round, lands 
 
 // A hash of the default markup across eyes and poses, taken before the
 // realistic look was added: without `look`, every laptop draws as it did.
+// Since then the glass's matrix writes terms under a billionth as 0; the
+// five matrices that changed had only such terms (1e-16 to 1e-20), and
+// nothing else in the markup did.
 test("without a look, the markup is what it was before the realistic look", async () => {
   const { createHash } = await import("node:crypto");
   const html = [
@@ -276,7 +279,7 @@ test("without a look, the markup is what it was before the realistic look", asyn
     renderToString(<Laptop eye={DESK} free flat={1} />),
     renderToString(<Laptop eye={PHONE} roll={20} y={0.2} />),
   ].join("\n");
-  expect(createHash("sha256").update(html).digest("hex")).toBe("6ee0f8c8e2aba27c850fea9722a0d3444d996fdc643c1f460c3ac0e72747c0b1");
+  expect(createHash("sha256").update(html).digest("hex")).toBe("efec156ec07b6b780134062da9d9857058b143c48f1b24fac197eaaf95573d3f");
   expect(renderToString(<Laptop eye={DESK} look="simple" />)).toBe(renderToString(<Laptop eye={DESK} />));
 });
 
@@ -344,4 +347,16 @@ test("realistic, the underside shows four round feet in rings, its slots and scr
   const keys = html.match(/<g id="([^"]+-keys)">/)?.[1];
   expect(html).toContain(`style="fill:#5b5c5e;stroke:none" href="#${keys}"`);
   expect(html).toMatch(/<use transform="translate\([-\d.]+ -[\d.]+\)"/);
+});
+
+test.each([DESK, PHONE])("LAPTOP_BOX gives where the eye's own scene sits in the box: its own drawing lands x right and y down", (eye) => {
+  const box = LAPTOP_BOX[eye.id];
+  expect(Object.keys(box)).toEqual(["width", "height", "x", "y"]);
+  const boxed = eye.at({ yaw: 0, pitch: eye.pitch }, true);
+  const [own, moved] = [points(eye.DECK.hull), points(boxed.DECK.hull)];
+  expect(moved).toHaveLength(own.length);
+  own.forEach(([x, y], index) => {
+    expect(moved[index]?.[0] ?? 0).toBeCloseTo(x + box.x, 1);
+    expect(moved[index]?.[1] ?? 0).toBeCloseTo(y + box.y, 1);
+  });
 });
