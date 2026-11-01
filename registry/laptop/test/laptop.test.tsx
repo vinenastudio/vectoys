@@ -113,8 +113,8 @@ test.each([DESK, PHONE])("the fixed box holds the whole laptop in every pose, wi
     for (let pitch = PITCH[0]; pitch <= PITCH[1]; pitch += 2.5) {
       const view = eye.at({ yaw, pitch }, true);
       expect([view.camera.width, view.camera.height]).toEqual([box.width, box.height]);
-      for (let lid = 0; lid <= 1; lid += 0.05) {
-        const art = view.lidArt(1 - lid);
+      for (let step = 0; step <= 20; step++) {
+        const art = view.lidArt(1 - step / 20);
         for (const [x, y] of [...points(view.DECK.hull), ...points(art.hull), ...points(view.DECK.ground)]) {
           [left, right, top, bottom] = [Math.min(left, x), Math.max(right, x), Math.min(top, y), Math.max(bottom, y)];
         }

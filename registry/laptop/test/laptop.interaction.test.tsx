@@ -160,7 +160,7 @@ const POSES = [
   { lid: 1, flat: 0 },
 ];
 
-test.each([DESK, PHONE])("a free laptop's handle draws every pose as its props would, from the underside and the back too, with no render", async (eye) => {
+test.each([DESK, PHONE])("a free laptop's handle draws every pose as its props would, from the underside and the back too, with no render, seen by $id", async (eye) => {
   const handle = createRef<LaptopHandle>();
   let renders = 0;
   const Counted = () => {
@@ -255,7 +255,7 @@ test.each([true, false])("with free turned %p while the handle holds a pose, the
 /** `freeMarkup`, with the realistic look's sheens made one too. */
 const realMarkup = (host: HTMLElement) => freeMarkup(host).replace(/laptop-(desk|phone)-[\w-]*?-(?=top"|outer"|under"|dish"|pane"|notch"|grain"|keys"|top\)|outer\)|under\)|dish\)|pane\)|notch\)|grain\))/g, "laptop-$1-X-");
 
-test.each([DESK, PHONE])("a realistic laptop's handle draws every pose as its props would, with no render", async (eye) => {
+test.each([DESK, PHONE])("a realistic laptop's handle draws every pose as its props would, with no render, seen by $id", async (eye) => {
   const handle = createRef<LaptopHandle>();
   let renders = 0;
   const Counted = () => {
