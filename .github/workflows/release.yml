@@ -52,6 +52,15 @@ jobs:
           for dir in engine react cli; do
             (cd "packages/$dir" && bun pm pack --destination "$RUNNER_TEMP/pack" --quiet)
           done
+      - name: Check react depends on this engine version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          range="$(tar -xOzf "$RUNNER_TEMP/pack/vinena-vectoys-react-$VERSION.tgz" package/package.json | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync(0, 'utf8')).dependencies['@vinena/vectoys'])")"
+          if [ "$range" != "^$VERSION" ]; then
+            echo "::error::vectoys-react depends on @vinena/vectoys $range, not ^$VERSION. bun.lock still records an old engine version; run \`rm bun.lock && bun install\` after the version bump and commit bun.lock."
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: tarballs
