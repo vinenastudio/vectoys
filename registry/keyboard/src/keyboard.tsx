@@ -39,7 +39,7 @@ const SHEET = [
   `.${BUTTON},.${BOX}{outline:none}.${BUTTON}:focus-visible{outline:${FOCUS_WIDTH} solid ${FOCUS};outline-offset:2px}`,
   `.${BOX}:not([data-full]):focus{background:color-mix(in srgb, ${HAIRLINE} 18%, transparent)}`,
   `.${BOX}::placeholder{color:color-mix(in srgb, ${INK} 45%, transparent);opacity:1}.${BOX}[data-full]::placeholder{color:color-mix(in srgb, ${INK} 32%, transparent)}`,
-  `.${CORNER}{opacity:.55;transition:opacity .2s}.${CORNER}:hover,.${CORNER}:focus-within{opacity:1}`,
+  `.${CORNER}>.${BUTTON}{opacity:.55;transition:opacity .2s}.${CORNER}>.${BUTTON}:hover,.${CORNER}>.${BUTTON}:focus-visible{opacity:1}`,
   `.${CAP}-top{fill:${FINISH}}.${CAP}-side{fill:${CAP_SIDE}}`,
   `.${CAP}-key[data-down] .${CAP}-top{fill:${CAP_DOWN}}.${CAP}-key[data-down] .${CAP}-side{fill:${CAP_DOWN_SIDE}}`,
   `.${CAP}-legend{fill:${INK};font-family:ui-sans-serif,system-ui,sans-serif;pointer-events:none}`,
