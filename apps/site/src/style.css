@@ -1358,22 +1358,25 @@ code.inline {
 }
 
 /*
- * The laptop's stage is where it lands, with some room above it for where
- * the kickflip starts, 0.6 of its width up; the drawing may leave both as
- * it flips and glides. On a narrow page it stands in the top half, the words
- * under it.
+ * The laptop's stage is where it lands, 0.7 of its width tall, under room
+ * for the kickflip, which rises up to 0.41 of its width over it; so the
+ * whole trick stays inside the pin, below the section's words, from its
+ * first frame. The slot stands at the pin's top. On a narrow page it is as
+ * wide as keeps the landed laptop, the stage's top 0.63, in the top half,
+ * the words under it; on a wide one, as puts its middle `--landed` down the
+ * page, level with the words beside it.
  */
+.scrub-pin:has(.trick-slot) {
+  place-items: start center;
+  padding-top: 24px;
+}
+
 .trick-slot {
-  width: min(100%, calc((50svh - 32px) / 0.88));
+  width: min(100%, calc((50svh - 24px) / 1.046));
 }
 
 .trick-room {
-  padding-top: 18%;
-}
-
-.scrub-pin:has(.trick-slot) {
-  place-items: start center;
-  padding-top: max(48px, 6svh);
+  padding-top: 42%;
 }
 
 .scrub-chapter {
@@ -1406,15 +1409,17 @@ code.inline {
 }
 
 @media (min-width: 900px) {
-  .trick-slot {
-    width: min(64%, calc((100svh - 120px) / 0.88));
-    /* Landed, the laptop stands under the room kept for the kickflip's start; this centers it on the page. */
-    margin-top: -8svh;
+  .scrub-pin:has(.trick-slot) {
+    --landed: 54svh;
   }
 
-  .scrub-pin:has(.trick-slot) {
-    place-items: center;
-    padding-top: 0;
+  .trick-slot {
+    width: min(64%, calc((var(--landed) - 24px) / 0.733));
+  }
+
+  /* Beside the landed laptop, level with it. */
+  .scrub-pin:has(.trick-slot) .scrub-chapter {
+    top: var(--landed);
   }
 
   .scrub-pin .scrub-chapter {
