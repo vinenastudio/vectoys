@@ -58,7 +58,7 @@ jobs:
         run: |
           range="$(tar -xOzf "$RUNNER_TEMP/pack/vinena-vectoys-react-$VERSION.tgz" package/package.json | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync(0, 'utf8')).dependencies['@vinena/vectoys'])")"
           if [ "$range" != "^$VERSION" ]; then
-            echo "::error::vectoys-react depends on @vinena/vectoys $range, not ^$VERSION. bun.lock still records an old engine version; run \`rm bun.lock && bun install\` after the version bump and commit bun.lock."
+            echo "::error::vectoys-react depends on @vinena/vectoys $range, not ^$VERSION. bun.lock still records an old engine version; set the same version on the packages/engine, packages/react and packages/cli entries in bun.lock (plain \`bun install\` does not update them) and commit bun.lock with the bump."
             exit 1
           fi
       - uses: actions/upload-artifact@v4

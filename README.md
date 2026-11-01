@@ -146,7 +146,7 @@ Pushing to main deploys vectoys.com through GitHub Actions. The deploy then noti
 
 ## Release
 
-1. Bump the version in `packages/engine`, `packages/react` and `packages/cli`. The three `package.json` files share one version. Then run `rm bun.lock && bun install` so `bun.lock` records the new versions, and commit `bun.lock` with the bump. `bun pm pack` and `bun publish` take the engine version for the React package from `bun.lock`, so this applies to `bun run release` too. If you skip it, the Release workflow fails.
+1. Bump the version in `packages/engine`, `packages/react` and `packages/cli`. The three `package.json` files share one version. Then set the same version on the `packages/engine`, `packages/react` and `packages/cli` entries in `bun.lock` (plain `bun install` does not update them), and commit `bun.lock` with the bump. `bun pm pack` and `bun publish` take the engine version for the React package from `bun.lock`, so this applies to `bun run release` too. If you skip it, the Release workflow fails.
 2. Merge the change to main.
 3. Push a tag `vectoys@<version>`, for example `git tag vectoys@0.3.0 && git push origin vectoys@0.3.0`.
 
