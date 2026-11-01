@@ -22,7 +22,7 @@ Besides the camera, poses and paths, the engine has:
 - `slab({ outline })` and `plate({ outline })`: a part takes any flat outline in place of its rounded box, such as a triangle for an envelope's flap.
 - `rotateAxis(axis, degrees)`: a turn about any axis.
 - `aimed(options, { yaw, pitch }, box)`: an eye's camera turned, and moved into a fixed `box` so a pose draws the same there, only shifted. `moved(eye, turn, scale, shift, middle)`: a camera that sees the model turned round `middle`, then grown about it on screen and shifted.
-- `banded(rings, pose, eye, middle, count, tone)`: the side faces between outlines at several heights of a convex solid, as path data for each of `count` tones that `tone` picks from a face's normal, and its outline on screen.
+- `banded(rings, pose, eye, middle, count, tone)`: the side faces between outlines at several heights of a convex solid, as path data for each of `count` tones that `tone` picks from a face's unit normal, and its outline on screen.
 - `panel(box, high, low)`: a rectangle as path data with its own top and bottom corner radii. `nearness(point, a, b)`: a point's squared distance to a segment.
 - `slerp(from, to, share)`: the rotation a share of the way between two, turning the short way round.
 - `spring(state, target, seconds, { stiffness, damping })` and `settled(state, target)`: a value on a spring, stepped in small fixed steps so any frame rate gives the same path. `useSpring(target)` in `@vinena/vectoys-react` follows a target on it.
@@ -32,12 +32,12 @@ Besides the camera, poses and paths, the engine has:
 
 ### Scroll scenes
 
-`useScrub(ref, { screens })` in `@vinena/vectoys-react` follows a tall track element as the page scrolls, for a scene pinned inside it with `position: sticky`. The track is `screens` times the viewport's height, set by your CSS. It returns `{ progress, reduced }`. `progress.get()` is 0 while the track's top is at the viewport's top, and 1 once its bottom reaches the viewport's bottom. `progress.subscribe(fn)` calls `fn` with each new value, at most once a frame, and causes no React render. It does not call `fn` with the current value, so draw that first, for a page opened partway down. On the server `progress` is 0. `reduced` is true when the page asks for less motion, so you can show still frames with no pinning instead.
+`useScrub(ref, { screens })` in `@vinena/vectoys-react` follows a tall track element as the page scrolls, for a scene pinned inside it with `position: sticky`. The track is `screens` times the viewport's height, set by your CSS; once it has a height, the measured one wins. It returns `{ progress, reduced }`. `progress.get()` is 0 while the track's top is at the viewport's top, and 1 once its bottom reaches the viewport's bottom. `progress.subscribe(fn)` calls `fn` with each new value, at most once a frame, and causes no React render. It does not call `fn` with the current value, so draw that first, for a page opened partway down. On the server `progress` is 0. `reduced` is true when the page asks for less motion, so you can show still frames with no pinning instead.
 
 ```tsx
 const { progress } = useScrub(track, { screens: 4 });
 useEffect(() => {
-  const draw = (t: number) => laptop.current?.set(scrub(t, KEYS));
+  const draw = (t: number) => laptop.current?.set(scrub(t, KICKFLIP));
   draw(progress.get());
   return progress.subscribe(draw);
 }, [progress]);
@@ -83,7 +83,7 @@ npx @vinena/vectoys-cli add laptop
 
 This writes `vectoys.json`, copies the item to `src/components/vectoys/laptop/` (or `components/vectoys/` without a `src` folder), and installs `@vinena/vectoys` and `@vinena/vectoys-react` with your package manager. `npx @vinena/vectoys-cli list` shows every item.
 
-The CLI finds your package manager in your project or in the workspace above it: the `packageManager` field first, then the lockfile. In a monorepo it installs in the app folder you run it from. If your tsconfig.json uses `node16` or `nodenext` module resolution, the CLI adds `.js` to the relative imports in the copied files (or `.ts` and `.tsx` with `allowImportingTsExtensions`). Bundler projects get the files unchanged.
+The CLI finds your package manager in the first folder up from where you run it that has a `packageManager` field, a lockfile or a workspace: your project's own, or the workspace's above it. In that folder the `packageManager` field wins over the lockfile. In a monorepo it installs in the app folder you run it from. If your tsconfig.json uses `node16` or `nodenext` module resolution, the CLI adds `.js` to the relative imports in the copied files (or `.ts` and `.tsx` with `allowImportingTsExtensions`). Bundler projects get the files unchanged.
 
 The shadcn CLI works too:
 
