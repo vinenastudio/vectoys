@@ -68,6 +68,8 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (t:
   const curve = (a: number, b: number, s: number) => 3 * a * s * (1 - s) ** 2 + 3 * b * s * s * (1 - s) + s ** 3;
   return (t) => {
     const share = clamp(t, 0, 1);
+    // Exact at the ends, where halving would stop just short of them.
+    if (share === 0 || share === 1) return share;
     // The curve's x only grows, so halving finds the point at any time.
     let [lo, hi] = [0, 1];
     for (let step = 0; step < 30; step++) {

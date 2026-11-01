@@ -108,6 +108,9 @@ test("cubicBezier follows CSS's curves", () => {
   const over = cubicBezier(0.3, 0, 0.2, 1.6);
   expect(Math.max(...steps.map(over))).toBeGreaterThan(1);
   expect(over(1)).toBeCloseTo(1, 6);
+  // Large handles still start at exactly 0 and end at exactly 1.
+  const steep = cubicBezier(0.3, 8, 0.7, -8);
+  expect([steep(0), steep(1), steep(-1), steep(2)]).toEqual([0, 1, 0, 1]);
 });
 
 test("a keyframe's ease shapes the segment that ends at it, by name, function or curve", () => {

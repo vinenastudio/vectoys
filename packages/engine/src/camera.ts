@@ -129,7 +129,7 @@ export function moved(eye: Camera, turn: Rotation, scale: number, [dx, dy]: Flat
  */
 export function gradientSpace(eye: Camera, from: Solid, to: Solid) {
   const [[ox, oy], [tx, ty]] = [eye.project(from), eye.project(to)];
-  const side = (x: number) => eye.project(add(from, [x, (to[1] - from[1]) / 2, (to[2] - from[2]) / 2]));
+  const side = (x: number) => eye.project(add(from, [x + (to[0] - from[0]) / 2, (to[1] - from[1]) / 2, (to[2] - from[2]) / 2]));
   const [[lx, ly], [rx, ry]] = [side(-1), side(1)];
   return { gradientTransform: `matrix(${[rx - lx, ry - ly, tx - ox, ty - oy, ox, oy].map(fixed).join(" ")})` };
 }

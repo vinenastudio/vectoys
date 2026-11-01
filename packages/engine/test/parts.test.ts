@@ -225,12 +225,31 @@ test("banded draws the side faces between rings that face the eye, each in the t
   const ring = rounded([-5, -5, 5, 5], [1, 1]);
   const rings = [0, -2].map((z) => ring.map(([x, y]): Solid => [x, y, z]));
   const pose: Pose = { position: [0, 0, 0], rotation: rotateZ(0) };
-  const { hull: outline, tones } = banded(rings, pose, CORNER, [0, 0, -1], 3, (normal) => (normal[0] > 0.5 ? 2 : normal[1] > 0.5 ? 1 : 0));
-  expect(tones).toHaveLength(3);
+  // Tone 3 is for the faces turned away, the -x and -y sides.
+  const { hull: outline, tones } = banded(rings, pose, CORNER, [0, 0, -1], 4, (normal) => (normal[0] > 0.5 ? 2 : normal[1] > 0.5 ? 1 : normal[0] < -0.5 || normal[1] < -0.5 ? 3 : 0));
+  expect(tones).toHaveLength(4);
   expect(outline).toMatch(/^M.*Z$/);
   // From above and to the side, the eye sees the +x side and the front, never the faces turned away.
   expect(tones[2]).not.toBe("");
+  expect(tones[1]).not.toBe("");
+  expect(tones[3]).toBe("");
   const all = tones.join("").match(/Z/g)?.length ?? 0;
-  expect(all).toBeLessThan(ring.length);
+  expect(all).toBeLessThanOrEqual(ring.length / 2);
   expect(all).toBeGreaterThan(0);
+});
+
+test("banded gives tone a unit normal, so a small solid picks its tones by direction alone", async () => {
+  const { banded, rounded } = await import("../src");
+  const solid = (size: number) => {
+    const ring = rounded([-size, -size, size, size], [size / 5, size / 5]);
+    return [0, -size / 2.5].map((z) => ring.map(([x, y]): Solid => [x, y, z]));
+  };
+  const pose: Pose = { position: [0, 0, 0], rotation: rotateZ(0) };
+  const lengths: number[] = [];
+  const tone = (normal: Solid) => (lengths.push(Math.hypot(...normal)), normal[0] > 0.5 ? 2 : normal[1] > 0.5 ? 1 : 0);
+  const small = banded(solid(0.05), pose, CORNER, [0, 0, -0.01], 3, tone).tones;
+  expect(lengths.length).toBeGreaterThan(0);
+  for (const length of lengths) expect(length).toBeCloseTo(1, 9);
+  // The +x side faces the eye, so its faces take the tone kept for it however small they are.
+  expect(small[2]).not.toBe("");
 });

@@ -128,4 +128,10 @@ test("a gradient space runs from one point to the other, its lines along the mod
   const [[lx, ly], [rx, ry]] = [eye.project([-1, 0, 0]), eye.project([1, 0, 0])];
   expect(a).toBeCloseTo(rx - lx, 3);
   expect(b).toBeCloseTo(ry - ly, 3);
+  // Ends apart in x too: the lines run along x through the span's middle, not through `from`.
+  const [start, end] = [[-8, -10, 0], [8, 10, 0]] as const;
+  const [p, q] = gradientSpace(eye, start, end).gradientTransform.match(/[-\d.]+/g)?.map(Number) ?? [];
+  const [[sx, sy], [ex, ey]] = [eye.project([-1, 0, 0]), eye.project([1, 0, 0])];
+  expect(p).toBeCloseTo(ex - sx, 3);
+  expect(q).toBeCloseTo(ey - sy, 3);
 });

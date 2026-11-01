@@ -70,4 +70,6 @@ test("a face seen straight on gets a plain scale and move, with the rounding dus
   const terms = (quad.matrix ?? "").slice("matrix3d(".length, -1).split(",");
   expect(terms).toHaveLength(16);
   for (const at of [1, 2, 3, 4, 6, 7, 8, 9, 11, 14]) expect(terms[at]).toBe("0");
+  // 20 units over 200 pixels each way, the depth and the diagonal's end left at 1, and the rectangle's corner moved to (40, 25).
+  expect([terms[0], terms[5], terms[10], terms[15], terms[12], terms[13]]).toEqual(["0.1", "0.1", "1", "1", "40", "25"]);
 });

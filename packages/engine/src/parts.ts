@@ -290,8 +290,8 @@ export function footprint(
  * one height, from one end to the other, placed by `pose` and seen by `eye`:
  * its outline on screen, and the faces that face the eye as path data, one
  * string for each of `count` tones. `tone` picks a face's tone, from 0 to
- * `count - 1`, from its normal in the scene's model space, turned out from
- * `middle`.
+ * `count - 1`, from its unit normal in the scene's model space, turned out
+ * from `middle`.
  */
 export function banded(rings: readonly (readonly Solid[])[], pose: Pose, eye: Camera, middle: Solid, count: number, tone: (normal: Solid) => number) {
   const placed = rings.map((ring) => ring.map((point) => place(pose, point)));
@@ -309,7 +309,8 @@ export function banded(rings: readonly (readonly Solid[])[], pose: Pose, eye: Ca
       const across = cross(subtract(c, a), subtract(d, b));
       const normal: Solid = dot(across, subtract(a, center)) < 0 ? [-across[0], -across[1], -across[2]] : across;
       if (!eye.facesEye(a, normal)) return;
-      tones[tone(normal)] += shape([top[index] ?? [0, 0], top[next] ?? [0, 0], bottom[next] ?? [0, 0], bottom[index] ?? [0, 0]]);
+      const length = Math.hypot(...normal);
+      tones[tone([normal[0] / length, normal[1] / length, normal[2] / length])] += shape([top[index] ?? [0, 0], top[next] ?? [0, 0], bottom[next] ?? [0, 0], bottom[index] ?? [0, 0]]);
     });
   });
   return { hull: shape(hull(drawn.flat())), tones };
