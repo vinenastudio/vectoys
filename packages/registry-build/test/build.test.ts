@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { SCHEMA, buildRegistry, header, type RegistryIndex, type RegistryItem } from "../src";
+import { FIRST, SCHEMA, buildRegistry, header, type RegistryIndex, type RegistryItem } from "../src";
 
 const root = resolve(import.meta.dir, "../../..");
 const out = await mkdtemp(join(tmpdir(), "vectoys-registry-"));
@@ -11,9 +11,10 @@ afterAll(() => rm(out, { recursive: true, force: true }));
 test("writes an index and one shadcn registry item per device", async () => {
   await buildRegistry({ root, out, baseUrl: "https://example.test/r" });
   const index: RegistryIndex = JSON.parse(await readFile(join(out, "index.json"), "utf8"));
-  // Every folder under registry/ is an item, in name order.
-  const folders = (await readdir(join(root, "registry"), { withFileTypes: true })).filter((entry) => entry.isDirectory());
-  expect(index.items.map((item) => item.name)).toEqual(folders.map((entry) => entry.name).sort());
+  // Every folder under registry/ is an item: the keyboard and the keycap first, then the rest in name order.
+  const folders = (await readdir(join(root, "registry"), { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  expect(FIRST).toEqual(["keyboard", "keycap"]);
+  expect(index.items.map((item) => item.name)).toEqual([...FIRST, ...folders.filter((name) => !FIRST.includes(name)).sort()]);
   expect(index.items.find((item) => item.name === "phone")).toMatchObject({ name: "phone", title: "Phone", type: "registry:component", license: "MIT" });
 
   const phone: RegistryItem = JSON.parse(await readFile(join(out, "phone.json"), "utf8"));

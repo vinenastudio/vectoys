@@ -1500,6 +1500,15 @@ code.inline {
   }
 }
 
+/* Type on it: the full keyboard as wide as the page, with room kept for it and its buttons before it draws. */
+.typing {
+  container-type: inline-size;
+}
+
+.typing-stage {
+  min-height: calc(38cqi + 44px);
+}
+
 /* All toys: the band under the header, then every item. */
 
 .toys-intro {

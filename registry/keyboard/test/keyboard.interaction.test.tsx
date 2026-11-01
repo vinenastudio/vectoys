@@ -71,6 +71,57 @@ test("a real key holds its cap down by its code until it comes up, and never sto
   await unmount();
 });
 
+const SCROLL_KEYS = ["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+/** Sends a cancelable key down for each of Space and the arrows from `target`, and returns whether each was default-prevented. */
+const scrollKeys = async (target: Element = document.body, init: KeyboardEventInit = {}) => {
+  const prevented: boolean[] = [];
+  for (const code of SCROLL_KEYS) {
+    const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, code, key: code === "Space" ? " " : code, ...init });
+    await fire(target, event);
+    prevented.push(event.defaultPrevented);
+    await fire(target, new KeyboardEvent("keyup", { bubbles: true, code }));
+  }
+  return prevented;
+};
+
+test("Space and the arrows do not scroll the page while focus is on no control, and still press their keys", async () => {
+  const { host, unmount } = await mount(<Keyboard />);
+  expect(await scrollKeys()).toEqual([true, true, true, true, true]);
+  expect(await scrollKeys(document.body, { shiftKey: true })).toEqual([true, true, true, true, true]);
+  const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, code: "Space", key: " " });
+  await fire(document.body, event);
+  expect(isDown(host, "Space")).toBe(true);
+  // Other keys, Tab and the browser's shortcuts on the arrows keep their defaults.
+  for (const init of [{ code: "KeyA", key: "a" }, { code: "Tab", key: "Tab" }, { code: "Enter", key: "Enter" }, { code: "PageDown", key: "PageDown" }]) {
+    const other = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init });
+    await fire(document.body, other);
+    expect(other.defaultPrevented).toBe(false);
+  }
+  expect(await scrollKeys(document.body, { metaKey: true })).toEqual([false, false, false, false, false]);
+  expect(await scrollKeys(document.body, { altKey: true })).toEqual([false, false, false, false, false]);
+  await unmount();
+});
+
+test("Space and the arrows keep their defaults in another control, on the toy's own button, with listen={false}, and in the text box", async () => {
+  const { host, unmount } = await mount(<Keyboard typing />);
+  const other = document.createElement("input");
+  document.body.append(other);
+  other.focus();
+  expect(await scrollKeys(other)).toEqual([false, false, false, false, false]);
+  other.remove();
+  const sound = host.querySelector<HTMLButtonElement>('[role="switch"]')!;
+  sound.focus();
+  expect(await scrollKeys(sound)).toEqual([false, false, false, false, false]);
+  sound.blur();
+  // A space typed while nothing has focus goes to the text box, so it must still type there.
+  expect(await scrollKeys()).toEqual([false, false, false, false, false]);
+  expect(document.activeElement).toBe(host.querySelector("textarea"));
+  await unmount();
+  const quiet = await mount(<Keyboard listen={false} />);
+  expect(await scrollKeys()).toEqual([false, false, false, false, false]);
+  await quiet.unmount();
+});
+
 test("leaving the window lets every held key go", async () => {
   const { host, unmount } = await mount(<Keyboard />);
   await press("keydown", "KeyA");
@@ -325,6 +376,20 @@ test("the real keyboard moves the keys only while the board is on screen", async
     expect(made).toBe(1);
     await view(false);
     expect(isDown(host, "KeyQ")).toBe(false);
+    await unmount();
+  } finally {
+    restore();
+  }
+});
+
+test("off screen, Space and the arrows scroll the page as usual", async () => {
+  const { view, restore } = fakeObserver();
+  try {
+    const { unmount } = await mount(<Keyboard />);
+    await view(false);
+    expect(await scrollKeys()).toEqual([false, false, false, false, false]);
+    await view(true);
+    expect(await scrollKeys()).toEqual([true, true, true, true, true]);
     await unmount();
   } finally {
     restore();
