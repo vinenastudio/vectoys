@@ -11,31 +11,23 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: release-vectoys
   cancel-in-progress: false
 
 jobs:
-  publish:
-    # npm trusted publishing does not support self-hosted runners.
+  # Builds, tests and packs with no id-token, so install scripts and build tools
+  # can never mint an npm publish token.
+  build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      # Trusted publishing needs npm 11.5.1 or later.
-      - name: Check npm version
-        run: |
-          if ! node -e 'const [a, b, c] = process.argv[1].split(".").map(Number); process.exit(a > 11 || (a === 11 && (b > 5 || (b === 5 && c >= 1))) ? 0 : 1)' "$(npm --version)"; then
-            npm install -g npm@^11.5.1
-          fi
-          npm --version
       - name: Check tag matches package versions
         id: version
         run: |
@@ -53,26 +45,63 @@ jobs:
       - run: bun run build
       - run: bun test
       # `npm publish` ships `workspace:^` as is, and `bun publish` has no trusted publishing.
-      # So bun packs each package (that rewrites workspace ranges to real versions) and npm
-      # publishes the tarball. Publishing a tarball runs no lifecycle scripts, so dist comes
-      # from the build step above. Order matters: react depends on the engine.
+      # So bun packs each package (that rewrites workspace ranges to real versions) and the
+      # publish job hands the tarballs to npm.
+      - name: Pack
+        run: |
+          for dir in engine react cli; do
+            (cd "packages/$dir" && bun pm pack --destination "$RUNNER_TEMP/pack" --quiet)
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tarballs
+          path: ${{ runner.temp }}/pack
+          retention-days: 1
+          if-no-files-found: error
+
+  # Its own job with only first-party actions, so only this job can mint an npm token.
+  publish:
+    needs: build
+    # npm trusted publishing does not support self-hosted runners.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # Trusted publishing needs npm 11.5.1 or later.
+      - name: Check npm version
+        run: |
+          if ! node -e 'const [a, b, c] = process.argv[1].split(".").map(Number); process.exit(a > 11 || (a === 11 && (b > 5 || (b === 5 && c >= 1))) ? 0 : 1)' "$(npm --version)"; then
+            npm install -g npm@^11.5.1
+          fi
+          npm --version
+      - uses: actions/download-artifact@v4
+        with:
+          name: tarballs
+          path: ${{ runner.temp }}/pack
+      # Publishing a tarball runs no lifecycle scripts. Order matters: react depends on the engine.
       - name: Publish to npm
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
           tag_args=()
           case "$VERSION" in
             *-*) tag_args=(--tag next) ;;
           esac
-          out="$RUNNER_TEMP/pack"
-          mkdir -p "$out"
-          for dir in engine react cli; do
-            name="$(node -p "require('./packages/$dir/package.json').name")"
+          for pkg in vinena/vectoys:vinena-vectoys vinena/vectoys-react:vinena-vectoys-react vinena/vectoys-cli:vinena-vectoys-cli; do
+            name="@${pkg%%:*}"
+            tarball="$RUNNER_TEMP/pack/${pkg#*:}-$VERSION.tgz"
+            if [ ! -f "$tarball" ]; then
+              echo "::error::Missing tarball $tarball for $name."
+              exit 1
+            fi
             published="$(npm view "$name@$VERSION" version 2>/dev/null || true)"
             if [ "$published" = "$VERSION" ]; then
               echo "::notice::$name@$VERSION is already on npm. Skipping publish."
               continue
             fi
-            tarball="$(cd "packages/$dir" && bun pm pack --destination "$out" --quiet | tail -n 1)"
             npm publish "$tarball" --access public "${tag_args[@]}"
           done
