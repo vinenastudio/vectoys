@@ -1,5 +1,6 @@
 import { LaptopFront } from "@vectoys/laptop-front";
 import { useState } from "react";
+import { Segmented } from "../components/segmented";
 import { Wallpaper } from "./wallpaper";
 
 const FINISHES = [
@@ -14,13 +15,7 @@ export const LaptopFrontPreview = () => {
       <LaptopFront finish={finish}>
         <Wallpaper />
       </LaptopFront>
-      <div className="segmented" role="radiogroup" aria-label="Finish">
-        {FINISHES.map(([value, name]) => (
-          <button key={value} type="button" role="radio" aria-checked={finish === value} onClick={() => setFinish(value)}>
-            {name}
-          </button>
-        ))}
-      </div>
+      <Segmented label="Finish" options={FINISHES} value={finish} onChange={setFinish} />
     </div>
   );
 };

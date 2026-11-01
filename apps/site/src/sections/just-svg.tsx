@@ -1,12 +1,14 @@
 import { Phone, TURN } from "@vectoys/phone";
 import type { StyleWithVariables } from "@vinena/vectoys-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { Segmented } from "../components/segmented";
 import { clamp, useInFocus, useReducedMotion } from "../motion";
 
 const YAW_PER_PIXEL = 0.5;
 const PITCH_PER_PIXEL = 0.3;
 const PITCH = [-45, 25] as const;
 const ZOOMS = [1, 4, 16] as const;
+const ZOOM_OPTIONS = ZOOMS.map((value): readonly [(typeof ZOOMS)[number], string] => [value, `${value}×`]);
 // How long the paths take to trace, and how far apart they start.
 const TRACE_MS = 1400;
 const TRACE_STAGGER = 30;
@@ -156,13 +158,7 @@ export function JustSvg() {
           <button type="button" className="toggle" aria-pressed={showPaths} onClick={() => setShowPaths((shown) => !shown)}>
             Show paths
           </button>
-          <div className="segmented" role="radiogroup" aria-label="Zoom">
-            {ZOOMS.map((value) => (
-              <button key={value} type="button" role="radio" aria-checked={zoom === value} onClick={() => setZoom(value)}>
-                {value}×
-              </button>
-            ))}
-          </div>
+          <Segmented label="Zoom" options={ZOOM_OPTIONS} value={zoom} onChange={setZoom} />
         </div>
       </div>
     </section>

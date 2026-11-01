@@ -1,5 +1,6 @@
 import { DESK, Laptop, type LaptopLook } from "@vectoys/laptop";
 import { useState } from "react";
+import { Segmented } from "../components/segmented";
 import { Wallpaper } from "./wallpaper";
 
 const LOOKS: readonly (readonly [LaptopLook, string])[] = [
@@ -14,13 +15,7 @@ export const LaptopPreview = () => {
       <Laptop closed={0.04} eye={DESK} look={look}>
         <Wallpaper />
       </Laptop>
-      <div className="segmented" role="radiogroup" aria-label="Look">
-        {LOOKS.map(([value, name]) => (
-          <button key={value} type="button" role="radio" aria-checked={look === value} onClick={() => setLook(value)}>
-            {name}
-          </button>
-        ))}
-      </div>
+      <Segmented label="Look" options={LOOKS} value={look} onChange={setLook} />
     </div>
   );
 };
