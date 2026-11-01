@@ -148,7 +148,17 @@ Pushing to main deploys vectoys.com through GitHub Actions. The deploy then noti
 
 1. Bump the version in `packages/engine`, `packages/react` and `packages/cli`. The three `package.json` files share one version. Then set the same version on the `packages/engine`, `packages/react` and `packages/cli` entries in `bun.lock` (plain `bun install` does not update them), and commit `bun.lock` with the bump. `bun pm pack` and `bun publish` take the engine version for the React package from `bun.lock`, so this applies to `bun run release` too. If you skip it, the Release workflow fails.
 2. Merge the change to main.
-3. Push a tag `vectoys@<version>`, for example `git tag vectoys@0.3.0 && git push origin vectoys@0.3.0`.
+3. Push a tag `vectoys@<version>`, for example `git tag vectoys@0.3.0 && git push origin vectoys@0.3.0`. The tag must point to a commit on main.
+
+One-time setup: link each package to the workflow as a trusted publisher. This needs npm 11.15 or later and 2FA on your npm account.
+
+```sh
+npm trust github @vinena/vectoys --file release.yml --repo vinenastudio/vectoys --allow-publish
+npm trust github @vinena/vectoys-react --file release.yml --repo vinenastudio/vectoys --allow-publish
+npm trust github @vinena/vectoys-cli --file release.yml --repo vinenastudio/vectoys --allow-publish
+```
+
+npm removes a new trusted publisher if no publish happens through it within 2 days. So run these commands right before the first release from CI.
 
 The Release workflow (`.github/workflows/release.yml`) checks that the tag matches all three versions, then typechecks, builds and tests. It publishes the engine, then the React package, then the CLI through npm trusted publishing, so it needs no npm token and npm adds provenance. A version with a `-` goes out under the `next` tag. A version that is already on npm is skipped, so you can run a failed release again.
 
