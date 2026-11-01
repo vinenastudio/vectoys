@@ -5,7 +5,6 @@ import { Faq } from "./sections/faq";
 import { Hero } from "./sections/hero";
 import { JustSvg } from "./sections/just-svg";
 import { MakeYourOwn } from "./sections/make-your-own";
-import { Scrub } from "./sections/scrub";
 import { Showcase } from "./sections/showcase";
 import { Toys } from "./sections/toys";
 import { Trick } from "./sections/trick";
@@ -30,7 +29,6 @@ export function App({ index, page }: { index: RegistryIndex | null; page: Page }
             <div className="sections">
               <JustSvg />
               <Trick />
-              <Scrub />
               <Typing />
               <Uses index={index} />
               <Showcase />
