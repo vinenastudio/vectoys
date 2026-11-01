@@ -674,13 +674,15 @@ const REAL = {
 };
 
 // The bezel's glass catching the light from above, down the lid from its top edge, gone at flat 1 as FRONT has none.
+const [BRIGHT, DIM, AT] = [0.13, 0.04, 0.25];
 const PANE: Stop[] = [
-  [0, "white", 0.13],
-  [0.25, "white", 0.04],
+  [0, "white", BRIGHT],
+  [AT, "white", DIM],
   [0.6, "white", 0],
 ];
-// The lid's top edge and its hinge in the notch's units, hundredths of the lid's width down from the display's top edge.
-const LID_SPAN = [-FRONT.glass.y, DEPTH - FRONT.glass.y].map((y) => fixed((y * 100) / WIDTH));
+// The pane's light at the notch's middle height, in its first stretch. Over the notch it changes by under 3 levels,
+// and a gradient there is drawn on the wrong scale by some browsers under the glass's 3D transform, so the notch takes it whole.
+const NOTCH_LIGHT = fixed(lerp(BRIGHT, DIM, (FRONT.glass.y + (FRONT.notch.height * WIDTH) / 200) / DEPTH / AT));
 
 /** The glass's top corners and the notch, from the eye's own at `flat` 0 to FRONT's at 1. */
 function glassLook(flat: number) {
@@ -1019,8 +1021,7 @@ function Free({
         {/* Realistic, the notch is the bezel's glass, under the same light down the lid. */}
         {real && (
           <g {...bind("lines")}>
-            <Gradient id={`${id}-notch`} gradientUnits="userSpaceOnUse" x1="0" y1={LID_SPAN[0]} x2="0" y2={LID_SPAN[1]} stops={PANE} />
-            <path d={notch.path} fill={url("notch")} />
+            <path d={notch.path} fill="white" fillOpacity={NOTCH_LIGHT} />
           </g>
         )}
         <circle cx={notch.lens.x} cy={notch.lens.y} r={0.35} fill="#111112" />

@@ -376,9 +376,9 @@ test("realistic, the aluminum has its grain, the glass its glare, and at flat 1 
   expect(html).toMatch(/<linearGradient id="[^"]+-top" gradientTransform="matrix\([-\d. ]+\)" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="1">/);
 });
 
-test("realistic, the notch is the bezel's glass under the same light down the lid, fading with it toward flat 1; elsewhere it stays black", () => {
-  const notchOf = (html: string) => html.match(/<g opacity="([\d.]+)"><linearGradient id="[^"]+-notch" gradientUnits="userSpaceOnUse" x1="0" y1="([-\d.]+)" x2="0" y2="([-\d.]+)">(.*?)<\/linearGradient>/);
-  const pane = (html: string) => html.match(/-pane"[^>]*>(.*?)<\/linearGradient>/)?.[1];
+test("realistic, the notch is the bezel's glass, in the pane's light at its height, fading with it toward flat 1; elsewhere it stays black", () => {
+  const notchOf = (html: string) => html.match(/<g opacity="([\d.]+)"><path d="[^"]+" fill="white" fill-opacity="([\d.]+)"><\/path><\/g><circle/);
+  const pane = (html: string) => [...(html.match(/-pane"[^>]*>(.*?)<\/linearGradient>/)?.[1] ?? "").matchAll(/offset="([\d.]+)" style="stop-color:white;stop-opacity:([\d.]+)"/g)].map(([, offset, opacity]) => [Number(offset), Number(opacity)]);
   const html = renderToString(
     <Laptop eye={DESK} look="realistic">
       <p>live</p>
@@ -386,13 +386,15 @@ test("realistic, the notch is the bezel's glass under the same light down the li
   );
   const notch = notchOf(html);
   expect(notch?.[1]).toBe("1");
-  // From the lid's top edge to its hinge in the notch's units, hundredths of the lid's width from the display's top edge.
-  expect(Number(notch?.[2])).toBeCloseTo(-1.75, 6);
-  expect(Number(notch?.[3])).toBeCloseTo((46.7 * 100) / WIDTH - 1.75, 3);
-  expect(notch?.[4]).toBe(pane(html));
+  // The pane's light down the lid at the notch's middle height, from the lid's top edge: the display's top border and half the notch.
+  const stops = pane(html);
+  const [[from = 0, bright = 0], [to = 1, dim = 0]] = [stops[0] ?? [], stops[1] ?? []];
+  const share = (FRONT.glass.y + (FRONT.notch.height * WIDTH) / 200) / 46.7;
+  expect(Number(notch?.[2])).toBeCloseTo(bright + ((dim - bright) * (share - from)) / (to - from), 4);
+  expect(Number(notch?.[2])).toBeCloseTo(0.1159, 4);
   expect(notchOf(renderToString(<Laptop eye={DESK} look="realistic" free flat={0.5} />))?.[1]).toBe("0.5");
-  expect(renderToString(<Laptop eye={DESK} free flat={0.5} />)).not.toContain("-notch");
-  expect(renderToString(<Laptop eye={FRONT} />)).not.toContain("-notch");
+  expect(renderToString(<Laptop eye={DESK} free flat={0.5} />)).not.toContain('fill="white" fill-opacity');
+  expect(renderToString(<Laptop eye={FRONT} />)).not.toContain('fill="white" fill-opacity');
 });
 
 test.each([DESK, PHONE])("LAPTOP_BOX gives where the eye's own scene sits in the box: its own drawing lands x right and y down", (eye) => {
