@@ -4,6 +4,12 @@ import { ArrowUpRightIcon } from "../components/icons";
 /** Our own products that draw their hero scenes with vectoys. Product names stay in this section only. */
 const PRODUCTS = [
   {
+    name: "Snug",
+    host: "snug.so",
+    clip: "snug",
+    line: "vectoys draws the MacBook that kickflips into the scroll scene",
+  },
+  {
     name: "Agent Caffeine",
     host: "caffeinagent.com",
     clip: "caffeinagent",
