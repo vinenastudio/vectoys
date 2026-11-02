@@ -147,7 +147,7 @@ function Pinned() {
       <div className="scrub-pin" data-replay-block="">
         <div className="trick-slot">
           <div className="trick-room">
-            <Laptop eye={DESK} look="realistic" free {...pose(0, 0)} ref={laptop} label="A laptop that flips, lands open and turns toward the words as the page scrolls">
+            <Laptop eye={DESK} look="realistic" free draggable={false} fullscreen={false} {...pose(0, 0)} ref={laptop} label="A laptop that flips, lands open and turns toward the words as the page scrolls">
               <Display percent={percent} steps={steps} />
             </Laptop>
           </div>
@@ -175,7 +175,7 @@ function Stills() {
       {STILLS.map((still) => (
         <figure key={still.t} className="trick-still">
           <div className="trick-room">
-            <Laptop eye={DESK} look="realistic" free {...pose(still.t, 0)} label={`A laptop: ${still.caption.toLowerCase()}`}>
+            <Laptop eye={DESK} look="realistic" free draggable={false} fullscreen={false} {...pose(still.t, 0)} label={`A laptop: ${still.caption.toLowerCase()}`}>
               <Display value={still.t} />
             </Laptop>
           </div>

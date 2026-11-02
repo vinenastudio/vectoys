@@ -117,17 +117,17 @@ function Perf() {
       <h2>Perf</h2>
       <div className="cmp-perf cmp-light">
         <div className="cmp-stage">
-          <Laptop eye={DESK} look="realistic" free {...scrub(0, KICKFLIP)} ref={kick}>
+          <Laptop eye={DESK} look="realistic" free draggable={false} fullscreen={false} {...scrub(0, KICKFLIP)} ref={kick}>
             <Wallpaper />
           </Laptop>
         </div>
         <div className="cmp-stage">
-          <Laptop eye={DESK} look="realistic" turning lid={0} ref={turn}>
+          <Laptop eye={DESK} look="realistic" turning lid={0} draggable={false} fullscreen={false} ref={turn}>
             <Wallpaper />
           </Laptop>
         </div>
         <div className="cmp-stage">
-          <Laptop eye={DESK} free {...scrub(0, KICKFLIP)} ref={plain}>
+          <Laptop eye={DESK} free draggable={false} fullscreen={false} {...scrub(0, KICKFLIP)} ref={plain}>
             <Wallpaper />
           </Laptop>
         </div>

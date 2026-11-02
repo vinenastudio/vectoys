@@ -10,6 +10,7 @@
   --accent: #1f6fff;
 
   --vectoys-bg: var(--page);
+  --vectoys-backdrop: var(--page);
   --vectoys-surface: #f5f6f8;
   --vectoys-hairline: #8a8e96;
   --vectoys-border: #d2d5db;

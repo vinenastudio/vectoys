@@ -360,7 +360,7 @@ function HeroPhone() {
         onPointerUp={up}
         onPointerCancel={up}
       >
-        <Phone yaw={now.yaw} pitch={now.pitch} label="A phone with a working to-do app on its screen">
+        <Phone yaw={now.yaw} pitch={now.pitch} draggable={false} fullscreen={false} label="A phone with a working to-do app on its screen">
           {/* Focusable itself, so a click on the glass between controls keeps focus in the app. */}
           <div ref={glass} className="todo-glass" tabIndex={-1} onPointerDown={() => setDemo(false)} onFocus={focusIn} onBlur={focusOut}>
             <TodoApp todos={todos} dispatch={dispatch} reduced={reduced} live={!demo} />

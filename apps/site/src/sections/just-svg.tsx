@@ -142,7 +142,7 @@ export function JustSvg() {
           style={zoomVariable}
         >
           <div className="xray-zoom" style={zoomed} ref={drawing}>
-            <Phone yaw={turn.yaw} pitch={turn.pitch}>
+            <Phone yaw={turn.yaw} pitch={turn.pitch} draggable={false} fullscreen={false}>
               <LockScreen />
             </Phone>
             {showPaths && measure && (
