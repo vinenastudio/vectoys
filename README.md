@@ -113,6 +113,8 @@ npx @vinena/vectoys-cli preview registry/spinning-top --open
 npx @vinena/vectoys-cli submit registry/spinning-top
 ```
 
+To send a toy to this registry, read [CONTRIBUTING.md](CONTRIBUTING.md).
+
 `npx @vinena/vectoys-cli skill` prints how a coding agent makes an item, so you can point your agent at it.
 
 `create` writes `spinning-top/` (under `--dir`, else the current folder) with an `item.json`, a working component that draws a tilted, shaded slab, a `package.json`, a `tsconfig.json` and a test, as the items in `registry/` have. It does not write over a folder that is already there unless you pass `--overwrite`. Made in `registry/` of this repository, `bun install` links its packages. Made anywhere else, it asks for `@vinena/vectoys` and `@vinena/vectoys-react` from npm by version, and writes a `tsconfig.json` of its own; `submit` turns both back into the form the items in `registry/` have.

@@ -1,0 +1,29 @@
+name: New toy idea
+description: Suggest a toy for the registry.
+labels: ["toy idea"]
+body:
+  - type: input
+    id: idea
+    attributes:
+      label: Toy idea
+      description: A short name for the toy.
+      placeholder: Spinning top
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What it does
+      description: What it shows and how it moves.
+    validations:
+      required: true
+  - type: textarea
+    id: interaction
+    attributes:
+      label: Interaction
+      description: What happens when you click, drag, scroll or use the keyboard.
+  - type: textarea
+    id: sketch
+    attributes:
+      label: Reference sketch (optional)
+      description: Drop an image or a link to a sketch. No brand products or logos, please.
