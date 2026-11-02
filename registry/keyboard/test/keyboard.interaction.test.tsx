@@ -426,7 +426,7 @@ test("with listen={false} a key held by a pointer still comes up when the window
 });
 
 const box = (host: Element) => host.querySelector("textarea")!;
-const buttonNamed = (host: Element, name: string) => [...host.querySelectorAll("button")].find((button) => button.textContent === name);
+const buttonNamed = (host: Element, name: string) => [...host.querySelectorAll("button")].find((button) => (button.getAttribute("aria-label") ?? button.textContent) === name);
 /**
  * Puts `text` in a text box as typing would. Depending on what React found when it loaded,
  * it reads the change on input or on key up, so both are sent; it acts on the first only.
@@ -575,10 +575,10 @@ test("the text box brings no audio before a gesture, and listen={false} with typ
   await unmount();
 });
 
-test("the full screen button shows only where the Fullscreen API is, and follows full screen changes", async () => {
-  const plain = await mount(<Keyboard fullscreen />);
-  expect(buttonNamed(plain.host, "Full screen")).toBeUndefined();
-  await plain.unmount();
+test("the full screen button fills the screen with the turntable, follows full screen changes, and shows the text box there", async () => {
+  const off = await mount(<Keyboard fullscreen={false} />);
+  expect(off.host.querySelectorAll("button")).toHaveLength(1);
+  await off.unmount();
 
   const screen: { filled: Element | null } = { filled: null };
   const change = () => document.dispatchEvent(new Event("fullscreenchange"));
@@ -594,61 +594,101 @@ test("the full screen button shows only where the Fullscreen API is, and follows
   Object.defineProperty(document, "exitFullscreen", { value: exitFullscreen, configurable: true });
   Object.defineProperty(document, "fullscreenElement", { get: () => screen.filled, configurable: true });
   try {
-    const off = await mount(<Keyboard />);
-    expect(off.host.querySelectorAll("button")).toHaveLength(1);
-    await off.unmount();
-
-    const { host, unmount } = await mount(<Keyboard fullscreen typing />);
-    const toy = host.firstElementChild!;
-    expect([...host.querySelectorAll("button, textarea")].map((element) => element.textContent || element.tagName)).toEqual([
-      "TEXTAREA",
+    const { host, unmount } = await mount(<Keyboard typing />);
+    const turntable = host.querySelector(".vectoys-turntable")!;
+    expect([...host.querySelectorAll("button, textarea")].map((element) => element.getAttribute("aria-label") ?? (element.textContent || element.tagName))).toEqual([
+      "Typed text",
       "Clear",
       "Sound on",
-      "Full screen",
+      "Full screen Keyboard",
     ]);
-    await act(async () => buttonNamed(host, "Full screen")!.click());
+    await act(async () => buttonNamed(host, "Full screen Keyboard")!.click());
     expect(requestFullscreen).toHaveBeenCalledTimes(1);
-    expect(screen.filled).toBe(toy);
+    expect(screen.filled).toBe(turntable);
     expect(buttonNamed(host, "Exit full screen")).toBeDefined();
     await act(async () => buttonNamed(host, "Exit full screen")!.click());
     expect(exitFullscreen).toHaveBeenCalledTimes(1);
-    expect(buttonNamed(host, "Full screen")).toBeDefined();
+    expect(buttonNamed(host, "Full screen Keyboard")).toBeDefined();
     // Esc is the browser's: it leaves full screen and sends only the change.
-    await act(async () => toy instanceof HTMLElement && toy.requestFullscreen());
+    await act(async () => turntable instanceof HTMLElement && turntable.requestFullscreen());
     expect(buttonNamed(host, "Exit full screen")).toBeDefined();
     screen.filled = null;
     await act(async () => change());
-    expect(buttonNamed(host, "Full screen")).toBeDefined();
+    expect(buttonNamed(host, "Full screen Keyboard")).toBeDefined();
     await unmount();
 
-    const only = await mount(<Keyboard fullscreen typing="fullscreen" />);
+    // As the site's typing section has it.
+    const only = await mount(<Keyboard demo typing="fullscreen" fullscreen />);
     expect(only.host.querySelector("textarea")).toBeNull();
     await press("keydown", "KeyH", { key: "h" });
     expect(document.activeElement).toBe(document.body);
-    await act(async () => buttonNamed(only.host, "Full screen")!.click());
+    await act(async () => buttonNamed(only.host, "Full screen Keyboard")!.click());
     expect(box(only.host)).not.toBeNull();
     expect(box(only.host).placeholder).toBe("Start typing\u2026");
     await press("keydown", "KeyH", { key: "h" });
     expect(document.activeElement).toBe(box(only.host));
-    expect([...only.host.querySelectorAll("button")].map((element) => element.textContent)).toEqual(["Clear", "Sound on", "Exit full screen"]);
+    expect([...only.host.querySelectorAll("button")].map((element) => element.getAttribute("aria-label") ?? element.textContent)).toEqual(["Clear", "Sound on", "Exit full screen"]);
     await act(async () => buttonNamed(only.host, "Exit full screen")!.click());
     expect(only.host.querySelector("textarea")).toBeNull();
     await only.unmount();
 
     // The page takes the button away while the toy fills the screen: it leaves full screen and lays out as before.
-    const dropped = await mount(<Keyboard fullscreen typing="fullscreen" />);
-    await act(async () => buttonNamed(dropped.host, "Full screen")?.click());
+    const dropped = await mount(<Keyboard typing="fullscreen" />);
+    await act(async () => buttonNamed(dropped.host, "Full screen Keyboard")?.click());
     expect(box(dropped.host)).not.toBeNull();
     const exits = exitFullscreen.mock.calls.length;
-    await dropped.rerender(<Keyboard typing="fullscreen" />);
+    await dropped.rerender(<Keyboard typing="fullscreen" fullscreen={false} />);
     expect(exitFullscreen).toHaveBeenCalledTimes(exits + 1);
     expect(screen.filled).toBeNull();
     expect(dropped.host.querySelector("textarea")).toBeNull();
-    expect(dropped.host.firstElementChild?.getAttribute("style")).not.toContain("position: relative");
+    expect(dropped.host.querySelector('[role="group"]')?.getAttribute("style")).not.toContain("position: relative");
     await dropped.unmount();
   } finally {
     Reflect.deleteProperty(HTMLElement.prototype, "requestFullscreen");
     Reflect.deleteProperty(document, "exitFullscreen");
     Reflect.deleteProperty(document, "fullscreenElement");
   }
+});
+
+const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 7, pointerType: "mouse", button: 0, bubbles: true });
+
+test("a drag from a key tilts the keyboard and lets the key up, and a press with no drag holds it", async () => {
+  const { host, unmount } = await mount(<Keyboard />);
+  const body = host.querySelector<HTMLElement>(".vectoys-turntable-body")!;
+  await fire(key(host, "KeyJ"), pointer("pointerdown", 0));
+  expect(isDown(host, "KeyJ")).toBe(true);
+  await fire(key(host, "KeyJ"), pointer("pointermove", 2));
+  expect(isDown(host, "KeyJ")).toBe(true);
+  await fire(key(host, "KeyJ"), pointer("pointermove", 60));
+  expect(isDown(host, "KeyJ")).toBe(false);
+  expect(body.style.transform).not.toContain("rotateY(0deg)");
+  await fire(key(host, "KeyJ"), pointer("pointerup", 60));
+  await fire(key(host, "KeyK"), pointer("pointerdown", 0));
+  expect(isDown(host, "KeyK")).toBe(true);
+  await fire(key(host, "KeyK"), pointer("pointerup", 0));
+  expect(isDown(host, "KeyK")).toBe(false);
+  await frames.advance(400);
+  await unmount();
+});
+
+test("keys typed while the turntable round the keyboard has focus still press, and type into the box", async () => {
+  const { host, unmount } = await mount(<Keyboard typing />);
+  const turntable = host.querySelector<HTMLElement>(".vectoys-turntable")!;
+  turntable.focus();
+  await press("keydown", "KeyA", { key: "a" });
+  expect(isDown(host, "KeyA")).toBe(true);
+  expect(document.activeElement).toBe(box(host));
+  await press("keyup", "KeyA", { key: "a" });
+  await unmount();
+});
+
+test("with dragging off a pointer that moves keeps its key down", async () => {
+  const { host, unmount } = await mount(<Keyboard draggable={false} fullscreen={false} />);
+  expect(host.querySelector(".vectoys-turntable")?.hasAttribute("tabindex")).toBe(false);
+  expect(host.querySelectorAll("button")).toHaveLength(1);
+  await fire(key(host, "KeyJ"), pointer("pointerdown", 0));
+  await fire(key(host, "KeyJ"), pointer("pointermove", 60));
+  expect(isDown(host, "KeyJ")).toBe(true);
+  await fire(key(host, "KeyJ"), pointer("pointerup", 60));
+  await unmount();
 });

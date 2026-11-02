@@ -120,11 +120,19 @@ export const PRESS = mm(5);
 
 /**
  * The disk as the eye sees it, `hover` from 0 to 1 sliding the shutter open
- * and turning it toward the eye, and `press` from 0 to 1 pushing it back:
- * the parts drawn, the body's pose and the shadow under it.
+ * and turning it toward the eye, `press` from 0 to 1 pushing it back, and
+ * the eye moved `turn` degrees round it: the parts drawn, the body's pose
+ * and the shadow under it.
  */
-export function seen(hover = 0, press = 0) {
-  const eye = camera({ width: 100, height: 100, perspective: 280, anchorY: 47, yaw: TURN.yaw + HOVER_TURN.yaw * hover, pitch: TURN.pitch + HOVER_TURN.pitch * hover });
+export function seen(hover = 0, press = 0, turn = { yaw: 0, pitch: 0 }) {
+  const eye = camera({
+    width: 100,
+    height: 100,
+    perspective: 280,
+    anchorY: 47,
+    yaw: TURN.yaw + HOVER_TURN.yaw * hover + turn.yaw,
+    pitch: TURN.pitch + HOVER_TURN.pitch * hover + turn.pitch,
+  });
   const pose = bodyPose(PRESS * press);
   const scene = parts(pose, SLIDE * hover);
   const ground = (spread: number, ahead: number) => footprint(scene, eye, { gap: mm(10), spread, ahead });

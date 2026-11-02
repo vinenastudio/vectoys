@@ -67,14 +67,15 @@ test("each row is as wide as the others, and wide keys have their real widths", 
   expect(KEYS.find((key) => key.id === "ArrowUp")?.height).toBe(0.5);
 });
 
-test("renders on the server the same twice, with no props, as a named group", () => {
+test("renders on the server the same twice, with no props, as a named group in a turntable", () => {
   const html = renderToString(<Keyboard />);
   expect(renderToString(<Keyboard />)).toBe(html);
-  expect(html).toStartWith('<div role="group" aria-label="Keyboard"');
+  expect(html).toMatch(/<div class="vectoys-turntable vectoys-keyboard-turn" tabindex="0"[^>]*><div class="vectoys-turntable-body"[^>]*><div role="group" aria-label="Keyboard"/);
   expect(html).not.toContain("NaN");
   expect(html.match(/data-key=/g)).toHaveLength(KEYS.length);
   expect(html).toMatch(/<button type="button" role="switch" aria-checked="true" class="[^"]*"[^>]*>.*Sound on<\/button>/);
-  expect(html.match(/<button/g)).toHaveLength(1);
+  expect(html.match(/<button/g)).toHaveLength(2);
+  expect(html).toContain('aria-label="Full screen Keyboard"');
   for (const legend of [">Q<", ">command<", ">caps lock<", ">return<", ">F12<", ">⌥<"]) expect(html).toContain(legend);
 });
 
@@ -85,13 +86,16 @@ test("takes a finish and starts with the sound off when asked", () => {
   expect(html).toContain("Sound off");
 });
 
-test("the text box and the full screen button are opt in, and the server never shows the full screen button", () => {
+test("the text box is opt in, and the full screen button and the turning are on unless turned off", () => {
   expect(renderToString(<Keyboard />)).not.toContain("<textarea");
-  const html = renderToString(<Keyboard typing fullscreen defaultValue="hi" />);
-  expect(renderToString(<Keyboard typing fullscreen defaultValue="hi" />)).toBe(html);
+  const html = renderToString(<Keyboard typing defaultValue="hi" />);
+  expect(renderToString(<Keyboard typing defaultValue="hi" />)).toBe(html);
   expect(html).toMatch(/<textarea[^>]*aria-label="Typed text"[^>]*placeholder="Click here or just start typing"[^>]*>hi<\/textarea>/);
   expect(html).toContain(">Clear</button>");
-  expect(html).not.toContain("Full screen");
+  expect(html).toContain('aria-label="Full screen Keyboard"');
+  const off = renderToString(<Keyboard draggable={false} fullscreen={false} />);
+  expect(off).not.toContain('tabindex="0"');
+  expect(off).not.toContain("Full screen");
 });
 
 test("a pressed key sinks and its legends ride down with it", () => {

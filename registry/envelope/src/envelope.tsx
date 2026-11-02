@@ -1,4 +1,4 @@
-import { Faces, Screen, Stage, useSpring, type Look } from "@vinena/vectoys-react";
+import { Faces, Screen, Stage, Turntable, useSpring, type Look, type TurnOptions } from "@vinena/vectoys-react";
 import { memo, useId, useMemo, useState, type CSSProperties, type FocusEvent, type ReactNode } from "react";
 import { CARD, FRONT, seen, type View } from "./geometry";
 
@@ -87,7 +87,7 @@ export type EnvelopeProps = {
   finish?: string;
   /** Live content on the letter, such as a sign up form, laid out `LETTER_WIDTH` pixels across. */
   children?: ReactNode;
-};
+} & TurnOptions;
 
 /** Whether it is open and how far, either as the page says or as its own spring has it. */
 function useOpening(open: number | undefined, defaultOpen: boolean, onOpenChange?: (open: boolean) => void) {
@@ -108,9 +108,10 @@ function useOpening(open: number | undefined, defaultOpen: boolean, onOpenChange
  * card inside. A real button over the envelope opens it on a click, or as
  * soon as the keyboard reaches it; the flap swings up behind the card and
  * the card rises out, its content clipped to what shows over the pocket.
- * Under reduced motion it opens without the motion.
+ * Under reduced motion it opens without the motion. A drag tilts it, and a
+ * button shows it full screen.
  */
-export const Envelope = memo(function Envelope({ open, defaultOpen = false, onOpenChange, label = "Open the letter", finish, children }: EnvelopeProps) {
+export const Envelope = memo(function Envelope({ open, defaultOpen = false, onOpenChange, label = "Open the letter", finish, children, ...turning }: EnvelopeProps) {
   const id = `envelope-${useId().replace(/[^\w-]/g, "")}`;
   const { amount, isOpen, ask, setHover } = useOpening(open, defaultOpen, onOpenChange);
   const view = useMemo(() => seen(amount), [amount]);
@@ -133,6 +134,7 @@ export const Envelope = memo(function Envelope({ open, defaultOpen = false, onOp
           onFocus={focus}
           onPointerEnter={() => setHover(true)}
           onPointerLeave={() => setHover(false)}
+          data-vectoys-grab=""
           style={OPENER}
         />
       </Screen>
@@ -144,10 +146,13 @@ export const Envelope = memo(function Envelope({ open, defaultOpen = false, onOp
     </>
   );
 
+  // Tilted, not turned: the card's clip is worked out for this one eye.
   return (
-    <Stage camera={view.camera} overlay={overlay} style={finish ? { "--vectoys-finish": finish } : {}}>
-      {view.shadow && <Shadow id={id} shadow={view.shadow} />}
-      <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
-    </Stage>
+    <Turntable mode="tilt" label="envelope" {...turning}>
+      <Stage camera={view.camera} overlay={overlay} style={finish ? { "--vectoys-finish": finish } : {}}>
+        {view.shadow && <Shadow id={id} shadow={view.shadow} />}
+        <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
+      </Stage>
+    </Turntable>
   );
 });

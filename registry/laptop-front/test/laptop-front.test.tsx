@@ -17,9 +17,31 @@ test("renders on the server the same twice, with the scene's viewBox", () => {
   expect(render()).not.toContain("NaN");
 });
 
+/** The toy inside its turntable, as the server draws it with no tab stop and no button, less what marks the display as its own. */
+const drawing = (html: string) => {
+  const body = html.indexOf(">", html.indexOf('class="vectoys-turntable-body"')) + 1;
+  return html.slice(body, html.lastIndexOf("</div></div>")).replace(' data-vectoys-nodrag=""', "");
+};
+
 // The laptop item draws the same laptop with `eye={FRONT}`; the two never drift apart.
 test.each([undefined, <p key="live">live</p>])("draws what the laptop item draws straight on, with %p", (children) => {
-  expect(renderToString(<LaptopFront>{children}</LaptopFront>)).toBe(renderToString(<Laptop eye={LAPTOP_FRONT}>{children}</Laptop>));
+  const front = drawing(
+    renderToString(
+      <LaptopFront draggable={false} fullscreen={false}>
+        {children}
+      </LaptopFront>,
+    ),
+  );
+  expect(front).toStartWith("<div");
+  expect(front).toBe(
+    drawing(
+      renderToString(
+        <Laptop eye={LAPTOP_FRONT} draggable={false} fullscreen={false}>
+          {children}
+        </Laptop>,
+      ),
+    ),
+  );
   expect(JSON.stringify(FRONT)).toBe(JSON.stringify(LAPTOP_FRONT));
 });
 

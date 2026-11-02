@@ -85,6 +85,34 @@ test("a press on a button inside the toy never starts a drag", async () => {
   expect(read(host).yaw).toBe(0);
 });
 
+test("a toy that is one big button marked to grab turns on a drag, and still presses on a click", async () => {
+  const frames = fakeFrames();
+  cleanup.push(frames.restore);
+  let clicks = 0;
+  const { host } = await place(
+    <Turntable mode="camera">
+      {(turn) => (
+        <>
+          <output>{`${turn.yaw.toFixed(1)} ${turn.pitch.toFixed(1)} ${turn.full}`}</output>
+          <button type="button" data-vectoys-grab="" onClick={() => clicks++}>
+            <span>Roll</span>
+          </button>
+        </>
+      )}
+    </Turntable>,
+  );
+  const span = host.querySelector("span")!;
+  await dragOn(span, 50);
+  expect(read(host).yaw).toBeGreaterThan(0);
+  await fire(span, pointer("pointerup", 50));
+  await fire(span, new MouseEvent("click", { bubbles: true }));
+  expect(clicks).toBe(0);
+  await fire(span, pointer("pointerdown", 0));
+  await fire(span, pointer("pointerup", 0));
+  await fire(span, new MouseEvent("click", { bubbles: true }));
+  expect(clicks).toBe(1);
+});
+
 test("the click that ends a drag does not reach the toy, and the next one does", async () => {
   const frames = fakeFrames();
   cleanup.push(frames.restore);

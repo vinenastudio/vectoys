@@ -42,6 +42,6 @@ test("the cap covers the switch it rides over, and its dish draws over its top",
 test("a row is a named group with one button for each key", () => {
   const html = renderToString(<KeycapRow keys={["v", "e", "c"]} label="vec" />);
   expect(html).toContain('role="group" aria-label="vec"');
-  expect(html.match(/<button/g)).toHaveLength(3);
+  expect(html.match(/<button type="button" data-vectoys-grab/g)).toHaveLength(3);
   expect(html).toMatch(/>v<\/button>.*>e<\/button>.*>c<\/button>/s);
 });

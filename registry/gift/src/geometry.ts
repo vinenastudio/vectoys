@@ -194,9 +194,9 @@ function shown(eye: Eye, pose: Pose): number {
 
 const EYE = { width: 100, height: 110, perspective: 280, yaw: -30, pitch: -24, anchorY: 72 };
 
-/** The gift as the eye sees it, `open` of the way open and lifted `peek` by a hover: the faces drawn, the surprise's pose and how much of it shows, and the shadow. */
-export function seen(open = 0, peek = 0) {
-  const eye = camera(EYE);
+/** The gift as the eye sees it, `open` of the way open, lifted `peek` by a hover and the eye moved `turn` degrees round it: the faces drawn, the surprise's pose and how much of it shows, and the shadow. */
+export function seen(open = 0, peek = 0, turn = { yaw: 0, pitch: 0 }) {
+  const eye = camera({ ...EYE, yaw: EYE.yaw + turn.yaw, pitch: EYE.pitch + turn.pitch });
   const scene = [body, lid(lidPose(open, peek))];
   const ground = (spread: number, ahead: number) => footprint([body], eye, { spread, ahead });
   const { pose, out } = surprisePose(open);

@@ -1,5 +1,5 @@
 import { fixed } from "@vinena/vectoys";
-import { Faces, Screen, Stage, useSpring, type Look } from "@vinena/vectoys-react";
+import { Faces, Screen, Stage, Turntable, useSpring, type Look, type TurnOptions } from "@vinena/vectoys-react";
 import {
   createContext,
   memo,
@@ -174,22 +174,31 @@ function useClicks() {
   return useCallback(() => (audio.current ??= clicks()), []);
 }
 
-/** A row's sound, shared by its keys so they play through one audio context. */
-const Shared = createContext<{ audible: boolean; start: () => Clicks | null } | null>(null);
+/** A row's sound, shared by its keys so they play through one audio context, and whether a drag on a key turns the row. */
+const Shared = createContext<{ audible: boolean; start: () => Clicks | null; grab: boolean } | null>(null);
 
 const PRESS_KEYS = new Set([" ", "Enter"]);
+// A pointer that moves this far while held is turning the key, not pressing it.
+const DRAG_FROM = 4;
+// Seen from above, never from under the deck.
+const LIMITS = { yaw: [-40, 40], pitch: [-25, 25] } as const;
 
 /** The button's own events the cap follows; a caller's handlers for them still run, first. */
 type PressHandlers = Pick<
   ComponentProps<"button">,
-  "onPointerEnter" | "onPointerLeave" | "onPointerDown" | "onPointerUp" | "onPointerCancel" | "onKeyDown" | "onKeyUp" | "onBlur"
+  "onPointerEnter" | "onPointerLeave" | "onPointerDown" | "onPointerMove" | "onPointerUp" | "onPointerCancel" | "onKeyDown" | "onKeyUp" | "onBlur"
 >;
 
-/** Whether the cap is under the pointer and whether it is held down, from the button's own events; `changed` hears each press and release. */
-function usePress(disabled: boolean, caller: PressHandlers, changed: (down: boolean) => void) {
+/**
+ * Whether the cap is under the pointer and whether it is held down, from the
+ * button's own events; `changed` hears each press and release. With `drag`,
+ * a pointer that moves while held is turning the key, so the key comes up.
+ */
+function usePress(disabled: boolean, caller: PressHandlers, changed: (down: boolean) => void, drag: boolean) {
   const [hover, setHover] = useState(false);
   const [held, setHeldState] = useState(false);
   const down = useRef(false);
+  const from = useRef<{ x: number; y: number } | null>(null);
   // A key disabled while held is up from then on, so it sends no release later and its next press clicks.
   useEffect(() => {
     if (disabled) down.current = false;
@@ -212,7 +221,16 @@ function usePress(disabled: boolean, caller: PressHandlers, changed: (down: bool
     },
     onPointerDown: (event) => {
       caller.onPointerDown?.(event);
-      if (event.button === 0) setHeld(true);
+      if (event.button !== 0) return;
+      from.current = { x: event.clientX, y: event.clientY };
+      setHeld(true);
+    },
+    onPointerMove: (event) => {
+      caller.onPointerMove?.(event);
+      if (drag && from.current && Math.hypot(event.clientX - from.current.x, event.clientY - from.current.y) >= DRAG_FROM) {
+        from.current = null;
+        setHeld(false);
+      }
     },
     onPointerUp: (event) => {
       caller.onPointerUp?.(event);
@@ -238,14 +256,15 @@ function usePress(disabled: boolean, caller: PressHandlers, changed: (down: bool
   return { hover: hover && !disabled, held: held && !disabled, handlers };
 }
 
-export type KeycapProps = Omit<ComponentProps<"button">, "children"> & {
+export type KeycapProps = Omit<ComponentProps<"button">, "children" | "draggable"> & {
   /** The label on the cap's top, live HTML laid out about `LABEL_WIDTH` pixels across; it names the button too, "Key" without one. */
   children?: ReactNode;
   /** Called when the key is pressed, by pointer, touch or keyboard. */
   onPress?: () => void;
   /** The cap's color; by default the page's `--vectoys-finish`, else its surface. */
   finish?: string;
-} & SoundProps;
+} & SoundProps &
+  TurnOptions;
 
 /**
  * A big mechanical key that is a real button, for a call to action. The
@@ -254,7 +273,8 @@ export type KeycapProps = Omit<ComponentProps<"button">, "children"> & {
  * pointer and travels down while held, then springs back; under reduced
  * motion it moves straight between those places. It can click as it goes
  * down and up, made with WebAudio after the first press; that is off by
- * default.
+ * default. A drag on it, the cap included, turns the eye round it, and a
+ * button shows it full screen; in a row, the row turns instead.
  */
 export const Keycap = memo(function Keycap({
   children,
@@ -267,6 +287,10 @@ export const Keycap = memo(function Keycap({
   defaultSound,
   onSoundChange,
   soundToggle = false,
+  draggable = true,
+  fullscreen,
+  limits = LIMITS,
+  release,
   ...button
 }: KeycapProps) {
   const id = `keycap-${useId().replace(/[^\w-]/g, "")}`;
@@ -278,47 +302,62 @@ export const Keycap = memo(function Keycap({
   const click = (down: boolean) => {
     if (audible) (shared ? shared.start() : start())?.play(name, 1, down);
   };
-  const { hover, held, handlers } = usePress(disabled, button, click);
+  const grab = shared ? shared.grab : draggable;
+  const { hover, held, handlers } = usePress(disabled, button, click, grab);
   // The cap bottoms out on the switch, so the spring's overshoot never shows past it.
   const travel = Math.min(useSpring(held ? TRAVEL : hover ? -HOVER : 0), TRAVEL);
-  const view = useMemo(() => seen(travel), [travel]);
-  const cap = view.drawn.hulls.find((hull) => hull.part === "cap");
 
   const press = (event: MouseEvent<HTMLButtonElement>) => {
     onClick?.(event);
     onPress?.();
   };
 
-  const label = (
-    <Screen camera={view.camera} pose={view.top} rect={LABEL} width={LABEL_WIDTH}>
-      <button
-        type="button"
-        aria-label={children == null ? "Key" : undefined}
-        {...button}
-        {...handlers}
-        disabled={disabled}
-        data-pressed={held || undefined}
-        onClick={press}
-        style={{ ...BUTTON, ...(disabled && { cursor: "default", opacity: 0.6 }), ...style }}
-      >
-        {children}
-      </button>
-    </Screen>
-  );
+  /** The key with the eye moved `turn` degrees round it. */
+  const drawn = (turn: { yaw: number; pitch: number }) => {
+    const view = seen(travel, turn);
+    const cap = view.drawn.hulls.find((hull) => hull.part === "cap");
+    const label = (
+      <Screen camera={view.camera} pose={view.top} rect={LABEL} width={LABEL_WIDTH}>
+        <button
+          type="button"
+          aria-label={children == null ? "Key" : undefined}
+          {...button}
+          {...handlers}
+          disabled={disabled}
+          data-pressed={held || undefined}
+          data-vectoys-grab={grab ? "" : undefined}
+          onClick={press}
+          style={{ ...BUTTON, ...(disabled && { cursor: "default", opacity: 0.6 }), ...style }}
+        >
+          {children}
+        </button>
+      </Screen>
+    );
+    return (
+      <Stage camera={view.camera} overlay={label} style={finish ? { "--vectoys-finish": finish } : {}}>
+        <Shadow id={id} shadow={view.shadow} />
+        <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
+        {cap && <path d={cap.d} {...OUTLINE} />}
+      </Stage>
+    );
+  };
 
-  const stage = (
-    <Stage camera={view.camera} overlay={label} style={finish ? { "--vectoys-finish": finish } : {}}>
-      <Shadow id={id} shadow={view.shadow} />
-      <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
-      {cap && <path d={cap.d} {...OUTLINE} />}
-    </Stage>
-  );
-  if (!soundToggle) return stage;
+  // In a row the row turns, so the key draws from where it rests.
+  if (shared) return drawn({ yaw: 0, pitch: 0 });
+  const title = typeof children === "string" || typeof children === "number" ? `${children} key` : "key";
   return (
-    <div style={COLUMN}>
-      {stage}
-      <SoundSwitch on={audible} toggle={own.toggle} />
-    </div>
+    <Turntable mode="camera" label={title} draggable={draggable} limits={limits} {...(fullscreen !== undefined && { fullscreen })} {...(release && { release })}>
+      {(turn) =>
+        soundToggle ? (
+          <div style={COLUMN}>
+            {drawn(turn)}
+            <SoundSwitch on={audible} toggle={own.toggle} />
+          </div>
+        ) : (
+          drawn(turn)
+        )
+      }
+    </Turntable>
   );
 });
 
@@ -332,13 +371,20 @@ export type KeycapRowProps = {
   finish?: string;
   className?: string;
   style?: CSSProperties;
-} & SoundProps;
+} & SoundProps &
+  TurnOptions;
 
-/** A row of keys side by side, such as a word spelled out, each its own button. Its keys share one audio context and one sound switch. */
-export function KeycapRow({ keys, onPress, label, finish, className, style, sound, defaultSound, onSoundChange, soundToggle = false }: KeycapRowProps) {
+/**
+ * A row of keys side by side, such as a word spelled out, each its own
+ * button. Its keys share one audio context and one sound switch. A drag on
+ * the row, its keys included, tilts it as one, and a button shows it full
+ * screen.
+ */
+export function KeycapRow({ keys, onPress, label, finish, className, style, sound, defaultSound, onSoundChange, soundToggle = false, ...turning }: KeycapRowProps) {
   const { audible, toggle } = useSound(sound, defaultSound, onSoundChange);
   const start = useClicks();
-  const shared = useMemo(() => ({ audible, start }), [audible, start]);
+  const grab = turning.draggable !== false;
+  const shared = useMemo(() => ({ audible, start, grab }), [audible, start, grab]);
   const row = (
     <div role="group" aria-label={label} className={className} style={{ display: "flex", ...style }}>
       {keys.map((key, index) => (
@@ -350,16 +396,19 @@ export function KeycapRow({ keys, onPress, label, finish, className, style, soun
       ))}
     </div>
   );
+  // Tilted as one, since each key draws with an eye of its own.
   return (
     <Shared.Provider value={shared}>
-      {soundToggle ? (
-        <div style={COLUMN}>
-          {row}
-          <SoundSwitch on={audible} toggle={toggle} />
-        </div>
-      ) : (
-        row
-      )}
+      <Turntable mode="tilt" label={label ?? "keys"} {...turning}>
+        {soundToggle ? (
+          <div style={COLUMN}>
+            {row}
+            <SoundSwitch on={audible} toggle={toggle} />
+          </div>
+        ) : (
+          row
+        )}
+      </Turntable>
     </Shared.Provider>
   );
 }

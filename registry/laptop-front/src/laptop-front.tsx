@@ -1,5 +1,5 @@
 import { fixed } from "@vinena/vectoys";
-import { Screen, Stage, type StyleWithVariables } from "@vinena/vectoys-react";
+import { Screen, Stage, Turntable, type StyleWithVariables, type TurnOptions } from "@vinena/vectoys-react";
 import { memo, useId, type CSSProperties, type ReactNode } from "react";
 import { FRONT } from "./geometry";
 
@@ -112,10 +112,15 @@ type LaptopFrontProps = {
   label?: string;
   /** Live content on the display, laid out as on a screen about 1280 pixels wide. */
   children?: ReactNode;
-};
+} & TurnOptions;
 
-/** A 14 inch laptop straight on, drawn flat, with live content on its display under the notch. */
-export const LaptopFront = memo(function LaptopFront({ finish, children, label = "Laptop" }: LaptopFrontProps) {
+/**
+ * A 14 inch laptop straight on, drawn flat, with live content on its display
+ * under the notch. A drag on its frame tilts it, and a button shows it full
+ * screen; the display keeps its own pointer, so its content is used as on a
+ * real screen.
+ */
+export const LaptopFront = memo(function LaptopFront({ finish, children, label = "Laptop", ...turning }: LaptopFrontProps) {
   const id = `laptop-${FRONT.id}-${useId().replace(/[^\w-]/g, "")}`;
   const { art, notch, camera } = FRONT;
   const url = (name: string) => `url(#${id}-${name})`;
@@ -123,7 +128,9 @@ export const LaptopFront = memo(function LaptopFront({ finish, children, label =
 
   const glass = (
     <Screen camera={camera} pose={FRONT.pose} rect={FRONT.glass} style={GLASS_STYLE}>
-      <div style={FILL}>{children}</div>
+      <div style={FILL} data-vectoys-nodrag={children == null ? undefined : ""}>
+        {children}
+      </div>
       <svg
         viewBox={`0 0 ${fixed(notch.width)} ${notch.height}`}
         preserveAspectRatio="none"
@@ -146,87 +153,90 @@ export const LaptopFront = memo(function LaptopFront({ finish, children, label =
     </Screen>
   );
 
+  // Tilted, not turned: the drawing is flat art for one eye straight on.
   return (
-    <Stage role={children == null ? "img" : "group"} label={label} camera={camera} overlay={glass} style={look}>
-      <defs>
-        <linearGradient id={`${id}-face`} x1="0" y1="0" x2="0" y2="1">
-          {stops(FACE)}
-        </linearGradient>
-        <linearGradient id={`${id}-ends`} x1="0" y1="0" x2="1" y2="0">
-          {mirrored(ENDS).map(([offset, opacity]) => (
-            <stop key={offset} offset={offset} style={{ stopColor: tone(62), stopOpacity: opacity }} />
-          ))}
-        </linearGradient>
-        <linearGradient id={`${id}-streak`} x1="0" y1="0" x2="1" y2="0">
-          {mirrored(STREAK).map(([offset, opacity]) => (
-            <stop key={offset} offset={offset} style={{ stopColor: FINISH, stopOpacity: opacity }} />
-          ))}
-        </linearGradient>
-        <linearGradient id={`${id}-hinge`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#161616" />
-          <stop offset="1" stopColor="#030303" />
-        </linearGradient>
-        <linearGradient id={`${id}-edge`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={art.rimFade}>
-          {stops([
-            [0, 66],
-            [1, 73],
-          ])}
-        </linearGradient>
-        <linearGradient id={`${id}-rim`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={art.rimFade}>
-          {stops([
-            [0, 60],
-            [1, 67],
-          ])}
-        </linearGradient>
-        <linearGradient id={`${id}-wall`} x1="0" y1="0" x2="0" y2="1">
-          {stops([
-            [0, 15],
-            [0.5, 30],
-            [0.85, 75],
-            [1, 90],
-          ])}
-        </linearGradient>
-        <linearGradient id={`${id}-floor`} x1="0" y1="0" x2="0" y2="1">
-          {stops([
-            [0, 96],
-            [0.9, 100],
-          ])}
-        </linearGradient>
-        <linearGradient id={`${id}-feet`} gradientUnits="userSpaceOnUse" x1="0" y1={art.feetTop} x2="0" y2={art.feetBottom}>
-          {stops(FOOT)}
-        </linearGradient>
-        <linearGradient id={`${id}-foot`} x1="0" y1="0" x2="1" y2="0">
-          {mirrored(FOOT_ROUND).map(([offset, opacity]) => (
-            <stop key={offset} offset={offset} style={{ stopColor: "black", stopOpacity: opacity }} />
-          ))}
-        </linearGradient>
-        <filter id={`${id}-soft`}>
-          <feGaussianBlur stdDeviation="0.12" />
-        </filter>
-        <clipPath id={`${id}-scoop`}>
-          <path d={art.scoop} />
-        </clipPath>
-      </defs>
-      {art.feet.map((foot) => (
-        <g key={foot}>
-          <path d={foot} fill={url("feet")} />
-          <path d={foot} fill={url("foot")} />
+    <Turntable mode="tilt" label={label} {...turning}>
+      <Stage role={children == null ? "img" : "group"} label={label} camera={camera} overlay={glass} style={look}>
+        <defs>
+          <linearGradient id={`${id}-face`} x1="0" y1="0" x2="0" y2="1">
+            {stops(FACE)}
+          </linearGradient>
+          <linearGradient id={`${id}-ends`} x1="0" y1="0" x2="1" y2="0">
+            {mirrored(ENDS).map(([offset, opacity]) => (
+              <stop key={offset} offset={offset} style={{ stopColor: tone(62), stopOpacity: opacity }} />
+            ))}
+          </linearGradient>
+          <linearGradient id={`${id}-streak`} x1="0" y1="0" x2="1" y2="0">
+            {mirrored(STREAK).map(([offset, opacity]) => (
+              <stop key={offset} offset={offset} style={{ stopColor: FINISH, stopOpacity: opacity }} />
+            ))}
+          </linearGradient>
+          <linearGradient id={`${id}-hinge`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#161616" />
+            <stop offset="1" stopColor="#030303" />
+          </linearGradient>
+          <linearGradient id={`${id}-edge`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={art.rimFade}>
+            {stops([
+              [0, 66],
+              [1, 73],
+            ])}
+          </linearGradient>
+          <linearGradient id={`${id}-rim`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={art.rimFade}>
+            {stops([
+              [0, 60],
+              [1, 67],
+            ])}
+          </linearGradient>
+          <linearGradient id={`${id}-wall`} x1="0" y1="0" x2="0" y2="1">
+            {stops([
+              [0, 15],
+              [0.5, 30],
+              [0.85, 75],
+              [1, 90],
+            ])}
+          </linearGradient>
+          <linearGradient id={`${id}-floor`} x1="0" y1="0" x2="0" y2="1">
+            {stops([
+              [0, 96],
+              [0.9, 100],
+            ])}
+          </linearGradient>
+          <linearGradient id={`${id}-feet`} gradientUnits="userSpaceOnUse" x1="0" y1={art.feetTop} x2="0" y2={art.feetBottom}>
+            {stops(FOOT)}
+          </linearGradient>
+          <linearGradient id={`${id}-foot`} x1="0" y1="0" x2="1" y2="0">
+            {mirrored(FOOT_ROUND).map(([offset, opacity]) => (
+              <stop key={offset} offset={offset} style={{ stopColor: "black", stopOpacity: opacity }} />
+            ))}
+          </linearGradient>
+          <filter id={`${id}-soft`}>
+            <feGaussianBlur stdDeviation="0.12" />
+          </filter>
+          <clipPath id={`${id}-scoop`}>
+            <path d={art.scoop} />
+          </clipPath>
+        </defs>
+        {art.feet.map((foot) => (
+          <g key={foot}>
+            <path d={foot} fill={url("feet")} />
+            <path d={foot} fill={url("foot")} />
+          </g>
+        ))}
+        <path d={art.edge} fill={url("edge")} />
+        <path d={art.rim} fill={url("rim")} />
+        <path d={art.gasket} fill={GASKET} />
+        <path d={art.gasketLine} fill={GASKET_LINE} />
+        <path d={art.glass} fill="black" />
+        <path d={art.hingeLine} fill={HINGE_LINE} />
+        <path d={art.hinge} fill={url("hinge")} />
+        <path d={art.base} fill={url("face")} />
+        <path d={art.base} fill={url("ends")} />
+        <path d={art.base} fill={url("streak")} />
+        <path d={art.scoop} fill={url("floor")} />
+        <g clipPath={url("scoop")}>
+          <path d={art.walls} fillRule="evenodd" fill={url("wall")} filter={url("soft")} />
         </g>
-      ))}
-      <path d={art.edge} fill={url("edge")} />
-      <path d={art.rim} fill={url("rim")} />
-      <path d={art.gasket} fill={GASKET} />
-      <path d={art.gasketLine} fill={GASKET_LINE} />
-      <path d={art.glass} fill="black" />
-      <path d={art.hingeLine} fill={HINGE_LINE} />
-      <path d={art.hinge} fill={url("hinge")} />
-      <path d={art.base} fill={url("face")} />
-      <path d={art.base} fill={url("ends")} />
-      <path d={art.base} fill={url("streak")} />
-      <path d={art.scoop} fill={url("floor")} />
-      <g clipPath={url("scoop")}>
-        <path d={art.walls} fillRule="evenodd" fill={url("wall")} filter={url("soft")} />
-      </g>
-    </Stage>
+      </Stage>
+    </Turntable>
   );
 });

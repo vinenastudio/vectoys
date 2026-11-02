@@ -95,9 +95,9 @@ function parts(travel: number): Part[] {
 /** Seen from in front and well above, turned a little so two sides of the cap show. */
 export const EYE = { yaw: -18, pitch: -42 } as const;
 
-/** The key as the eye sees it with the cap `travel` millimetres down: the parts drawn, the cap's pose and the shadow. */
-export function seen(travel = 0) {
-  const eye = camera({ width: 100, height: 90, perspective: 320, anchorY: 58, ...EYE });
+/** The key as the eye sees it with the cap `travel` millimetres down and the eye moved `turn` degrees round it: the parts drawn, the cap's pose and the shadow. */
+export function seen(travel = 0, turn = { yaw: 0, pitch: 0 }) {
+  const eye = camera({ width: 100, height: 90, perspective: 320, anchorY: 58, yaw: EYE.yaw + turn.yaw, pitch: EYE.pitch + turn.pitch });
   const scene = parts(travel);
   const ground = (spread: number, ahead: number) => footprint(scene, eye, { spread, ahead }).d;
   return {

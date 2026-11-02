@@ -1,6 +1,6 @@
 import { fixed } from "@vinena/vectoys";
-import { Faces, Screen, Stage, useSpring, type Look } from "@vinena/vectoys-react";
-import { memo, useId, useMemo, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { Faces, Screen, Stage, Turntable, useSpring, type Look, type TurnOptions } from "@vinena/vectoys-react";
+import { memo, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { FACE, LABEL, seen, type View } from "./geometry";
 
 // The page's colors, as CSS variables, each with a tone so the disk shows as
@@ -100,15 +100,29 @@ const Shadow = ({ id, shadow }: { id: string; shadow: NonNullable<View["shadow"]
 const BUTTON_KEYS = new Set([" ", "Enter"]);
 const LINK_KEYS = new Set(["Enter"]);
 
-/** Whether the disk is under the pointer or the keyboard's focus, and whether it is held down by `keys`. */
-function usePointing(keys: ReadonlySet<string>) {
+// A pointer that moves this far while held is turning the disk, not pressing it.
+const DRAG_FROM = 4;
+
+/** Whether the disk is under the pointer or the keyboard's focus, and whether it is held down by `keys`; with `drag`, a pointer that moves lets it go. */
+function usePointing(keys: ReadonlySet<string>, drag: boolean) {
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
   const [held, setHeld] = useState(false);
+  const from = useRef<{ x: number; y: number } | null>(null);
   const handlers = {
     onPointerEnter: () => setHover(true),
     onPointerLeave: () => (setHover(false), setHeld(false)),
-    onPointerDown: (event: PointerEvent<HTMLElement>) => event.button === 0 && setHeld(true),
+    onPointerDown: (event: PointerEvent<HTMLElement>) => {
+      if (event.button !== 0) return;
+      from.current = { x: event.clientX, y: event.clientY };
+      setHeld(true);
+    },
+    onPointerMove: (event: PointerEvent<HTMLElement>) => {
+      if (drag && from.current && Math.hypot(event.clientX - from.current.x, event.clientY - from.current.y) >= DRAG_FROM) {
+        from.current = null;
+        setHeld(false);
+      }
+    },
     onPointerUp: () => setHeld(false),
     onPointerCancel: () => setHeld(false),
     onKeyDown: (event: KeyboardEvent<HTMLElement>) => keys.has(event.key) && setHeld(true),
@@ -132,25 +146,26 @@ export type FloppyProps = {
   label?: string;
   /** The plastic's color; by default the page's `--vectoys-finish`, else near black. */
   finish?: string;
-};
+} & TurnOptions;
+
+// Turned no further than the label stays in view.
+const LIMITS = { yaw: [-40, 40], pitch: [-20, 20] } as const;
 
 /**
  * A 3.5 inch floppy disk as a download button: with `href` a real link that
  * downloads the file, without one a real button. Under the pointer or the
  * keyboard's focus its shutter slides open and it turns a little toward
  * the eye; pressed, it dips back. Under reduced motion it changes without
- * the motion.
+ * the motion. A drag turns the eye round it, and a button shows it full
+ * screen.
  */
-export const Floppy = memo(function Floppy({ children, href, download = true, onPress, label, finish }: FloppyProps) {
+export const Floppy = memo(function Floppy({ children, href, download = true, onPress, label, finish, limits = LIMITS, ...turning }: FloppyProps) {
   const id = `floppy-${useId().replace(/[^\w-]/g, "")}`;
-  const { raised, held, handlers } = usePointing(href ? LINK_KEYS : BUTTON_KEYS);
+  const { raised, held, handlers } = usePointing(href ? LINK_KEYS : BUTTON_KEYS, turning.draggable !== false);
   const hover = Math.max(0, Math.min(1, useSpring(raised ? 1 : 0, { stiffness: 260, damping: 26 })));
   const press = Math.max(0, useSpring(held ? 1 : 0));
-  const view = useMemo(() => seen(hover, press), [hover, press]);
-  const body = view.drawn.hulls.find((hull) => hull.part === "body");
-
   const text = <span style={LABEL_TEXT}>{children}</span>;
-  const common = { ...handlers, "aria-label": label ?? (children == null ? "Floppy disk" : undefined), onClick: onPress, "data-pressed": held || undefined, style: FACE_STYLE };
+  const common = { ...handlers, "aria-label": label ?? (children == null ? "Floppy disk" : undefined), onClick: onPress, "data-pressed": held || undefined, "data-vectoys-grab": "", style: FACE_STYLE };
   const face = href ? (
     <a href={href} download={download === true ? "" : download || undefined} {...common}>
       {text}
@@ -162,18 +177,26 @@ export const Floppy = memo(function Floppy({ children, href, download = true, on
   );
 
   return (
-    <Stage
-      camera={view.camera}
-      overlay={
-        <Screen camera={view.camera} pose={view.body} rect={FACE} width={FACE_WIDTH}>
-          {face}
-        </Screen>
-      }
-      style={finish ? { "--vectoys-finish": finish } : {}}
-    >
-      {view.shadow && <Shadow id={id} shadow={view.shadow} />}
-      <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
-      {body && <path d={body.d} {...OUTLINE} />}
-    </Stage>
+    <Turntable mode="camera" label="floppy disk" limits={limits} {...turning}>
+      {(turn) => {
+        const view = seen(hover, press, turn);
+        const body = view.drawn.hulls.find((hull) => hull.part === "body");
+        return (
+          <Stage
+            camera={view.camera}
+            overlay={
+              <Screen camera={view.camera} pose={view.body} rect={FACE} width={FACE_WIDTH}>
+                {face}
+              </Screen>
+            }
+            style={finish ? { "--vectoys-finish": finish } : {}}
+          >
+            {view.shadow && <Shadow id={id} shadow={view.shadow} />}
+            <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
+            {body && <path d={body.d} {...OUTLINE} />}
+          </Stage>
+        );
+      }}
+    </Turntable>
   );
 });

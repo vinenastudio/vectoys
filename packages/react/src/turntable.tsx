@@ -52,6 +52,8 @@ const DEFAULT_LIMITS: Record<TurntableProps["mode"], Required<TurnLimits>> = {
 };
 // A pointer down on these presses, types or picks in the toy, and never turns it.
 const NODRAG = "a, button, input, textarea, select, label, [contenteditable], [role=button], [data-vectoys-nodrag]";
+// Unless the control is the toy itself, such as a die that is one big button: it turns on a drag and is pressed on a click.
+const GRAB = "[data-vectoys-grab]";
 
 const ROOT = "vectoys-turntable";
 const BODY = `${ROOT}-body`;
@@ -116,6 +118,12 @@ const perPixel = (degrees: number, pixels: number) => (pixels > 0 && Number.isFi
  * button is there from the start, hidden by CSS until the toy is hovered or
  * focused. With reduced motion the toy stops where it is let go, with no
  * spin and no spring.
+ *
+ * A press on a control inside the toy (a link, a button, a text box, or
+ * anything marked `data-vectoys-nodrag`) never turns it. A toy that is one
+ * big control marks it `data-vectoys-grab`: a drag on it then turns the toy
+ * and the click that ends the drag is swallowed, while a plain click still
+ * presses it.
  */
 export function Turntable({ mode, label, children, className, style, draggable = true, fullscreen = true, limits, release = "stay" }: TurntableProps) {
   const reduced = useReducedMotion();
@@ -222,7 +230,8 @@ export function Turntable({ mode, label, children, className, style, draggable =
 
   const down = (event: PointerEvent<HTMLDivElement>) => {
     swallow.current = false;
-    if (event.button !== 0 || (event.target as Element).closest(NODRAG)) return;
+    const control = (event.target as Element).closest(NODRAG);
+    if (event.button !== 0 || (control && !control.matches(GRAB))) return;
     const { yaw, pitch } = pose.current;
     drag.current = {
       id: event.pointerId,

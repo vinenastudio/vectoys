@@ -134,9 +134,9 @@ const CORNERS: Solid[] = [-1, 1].flatMap((x) => [-1, 1].flatMap((y) => [-1, 1].m
 /** How high the die's middle stands when it rests turned by `rotation`: on its lowest corner, edge or face. */
 export const standing = (rotation: Rotation) => Math.max(...CORNERS.map((corner) => -rotate(rotation, corner)[2])) + ROUND;
 
-/** The die as one eye sees it, turned by `rotation` and lifted `hop` off the ground. */
-export function seen(rotation: Rotation = resting(5), hop = 0) {
-  const eye = camera({ width: 100, height: 100, perspective: 260, yaw: -32, pitch: -28, anchorY: 60 });
+/** The die as one eye sees it, turned by `rotation` and lifted `hop` off the ground, the eye moved `turn` degrees round it. */
+export function seen(rotation: Rotation = resting(5), hop = 0, turn = { yaw: 0, pitch: 0 }) {
+  const eye = camera({ width: 100, height: 100, perspective: 260, yaw: -32 + turn.yaw, pitch: -28 + turn.pitch, anchorY: 60 });
   const height = standing(rotation);
   const scene = [die(rotation, [0, 0, height + hop])];
   // The shadow stays on the ground, so it is cast by the die as if resting

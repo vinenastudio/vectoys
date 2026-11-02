@@ -1,6 +1,6 @@
 import { fixed, settled, spring, type Spring } from "@vinena/vectoys";
-import { Faces, Screen, Stage, useFrames, useReducedMotion, type Look, type StyleWithVariables } from "@vinena/vectoys-react";
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Faces, Screen, Stage, Turntable, useFrames, useReducedMotion, type Look, type StyleWithVariables, type TurnOptions } from "@vinena/vectoys-react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { SURPRISE, seen, type View } from "./geometry";
 
 // The page's colors, as CSS variables, each with a tone so the gift shows as
@@ -121,14 +121,18 @@ type GiftProps = {
   label?: string;
   className?: string;
   style?: CSSProperties;
-};
+} & TurnOptions;
+
+// The eye stays above the box, so the lid always draws over it, and in front of the surprise.
+const LIMITS = { yaw: [-40, 40], pitch: [-20, 14] } as const;
 
 /**
  * A gift box tied with a ribbon and a bow. A click, a tap or a key pops the
  * lid up and off, and the surprise rises out of the box; again, and it all
- * goes back. Under a pointer the lid peeks up a little.
+ * goes back. Under a pointer the lid peeks up a little. A drag turns the
+ * eye round it, and a button shows it full screen.
  */
-export function Gift({ children, open, defaultOpen = false, onOpenChange, finish, ribbon, label = "Open the gift", className, style }: GiftProps) {
+export function Gift({ children, open, defaultOpen = false, onOpenChange, finish, ribbon, label = "Open the gift", className, style, limits = LIMITS, ...turning }: GiftProps) {
   const id = `gift-${useId().replace(/[^\w-]/g, "")}`;
   const reduced = useReducedMotion();
   const frames = useFrames();
@@ -171,58 +175,69 @@ export function Gift({ children, open, defaultOpen = false, onOpenChange, finish
     run();
   };
 
-  const view = useMemo(() => seen(state.open, state.peek), [state]);
   const surpriseId = `${id}-surprise`;
-  const hidden = view.surprise.shown === 0;
-
-  const overlay = (
-    <>
-      <style>{FOCUS_RING}</style>
-      <button
-        type="button"
-        className={BUTTON}
-        aria-label={label}
-        aria-expanded={isOpen}
-        aria-controls={surpriseId}
-        style={BUTTON_STYLE}
-        onClick={toggle}
-        onPointerEnter={(event) => event.pointerType === "mouse" && hover(true)}
-        onPointerLeave={() => hover(false)}
-      />
-      <Screen
-        camera={view.camera}
-        pose={view.surprise.pose}
-        rect={SURPRISE}
-        width={VIEWPORT}
-        style={{ ...SURPRISE_STYLE, clipPath: `inset(0 0 ${fixed((1 - view.surprise.shown) * 100)}% 0)` }}
-      >
-        <div id={surpriseId} aria-hidden={!isOpen} inert={!isOpen} style={{ position: "absolute", inset: 0, opacity: hidden ? 0 : 1 }}>
-          {children}
-        </div>
-      </Screen>
-    </>
-  );
-
   const vars: StyleWithVariables = { ...(finish && { "--vectoys-finish": finish }), ...(ribbon && { "--vectoys-accent": ribbon }) };
-  const layer = (has: (part: string) => boolean) => ({
-    faces: view.drawn.faces.filter((face) => has(face.part)),
-    hulls: view.drawn.hulls.filter((hull) => has(hull.part)),
-  });
-  const outline = (part: string) => {
-    const hull = view.drawn.hulls.find((hull) => hull.part === part);
-    return hull && <path d={hull.d} {...OUTLINE} />;
+
+  /** The gift with the eye moved `turn` degrees round it. */
+  const drawn = (turn: { yaw: number; pitch: number }) => {
+    const view = seen(state.open, state.peek, turn);
+    const hidden = view.surprise.shown === 0;
+
+    const overlay = (
+      <>
+        <style>{FOCUS_RING}</style>
+        <button
+          type="button"
+          className={BUTTON}
+          aria-label={label}
+          aria-expanded={isOpen}
+          aria-controls={surpriseId}
+          style={BUTTON_STYLE}
+          onClick={toggle}
+          onPointerEnter={(event) => event.pointerType === "mouse" && hover(true)}
+          onPointerLeave={() => hover(false)}
+          data-vectoys-grab=""
+        />
+        <Screen
+          camera={view.camera}
+          pose={view.surprise.pose}
+          rect={SURPRISE}
+          width={VIEWPORT}
+          style={{ ...SURPRISE_STYLE, clipPath: `inset(0 0 ${fixed((1 - view.surprise.shown) * 100)}% 0)` }}
+        >
+          <div id={surpriseId} aria-hidden={!isOpen} inert={!isOpen} style={{ position: "absolute", inset: 0, opacity: hidden ? 0 : 1 }}>
+            {children}
+          </div>
+        </Screen>
+      </>
+    );
+
+    const layer = (has: (part: string) => boolean) => ({
+      faces: view.drawn.faces.filter((face) => has(face.part)),
+      hulls: view.drawn.hulls.filter((hull) => has(hull.part)),
+    });
+    const outline = (part: string) => {
+      const hull = view.drawn.hulls.find((hull) => hull.part === part);
+      return hull && <path d={hull.d} {...OUTLINE} />;
+    };
+
+    return (
+      <div className={className} style={{ position: "relative", touchAction: "manipulation", ...style }}>
+        <Stage camera={view.camera} overlay={overlay} style={vars}>
+          <Shadow id={id} shadow={view.shadow} />
+          <Faces {...layer(onBox)} styles={STYLES} shading />
+          {outline("box")}
+          <Faces {...layer(isLid)} styles={STYLES} shading />
+          {outline("lid")}
+          <Faces {...layer(overLid)} styles={STYLES} shading />
+        </Stage>
+      </div>
+    );
   };
 
   return (
-    <div className={className} style={{ position: "relative", touchAction: "manipulation", ...style }}>
-      <Stage camera={view.camera} overlay={overlay} style={vars}>
-        <Shadow id={id} shadow={view.shadow} />
-        <Faces {...layer(onBox)} styles={STYLES} shading />
-        {outline("box")}
-        <Faces {...layer(isLid)} styles={STYLES} shading />
-        {outline("lid")}
-        <Faces {...layer(overLid)} styles={STYLES} shading />
-      </Stage>
-    </div>
+    <Turntable mode="camera" label="gift" limits={limits} {...turning}>
+      {drawn}
+    </Turntable>
   );
 }

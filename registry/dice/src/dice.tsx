@@ -1,6 +1,6 @@
 import { fixed, type Rotation } from "@vinena/vectoys";
-import { Faces, Stage, useFrames, useReducedMotion, type Look } from "@vinena/vectoys-react";
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Faces, Stage, Turntable, useFrames, useReducedMotion, type Look, type TurnOptions } from "@vinena/vectoys-react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { VALUES, resting, roll, rollAt, seen, type Value, type View } from "./geometry";
 
 // The page's colors, as CSS variables. Each falls back to a tone for light
@@ -97,16 +97,20 @@ type DiceProps = {
   label?: string;
   className?: string;
   style?: CSSProperties;
-};
+} & TurnOptions;
+
+// The eye can go all the way round the die, but never under the ground it stands on.
+const LIMITS = { yaw: [-Infinity, Infinity], pitch: [-30, 18] } as const;
 
 const random = (): Value => VALUES[Math.floor(Math.random() * VALUES.length)] ?? 1;
 
 /**
  * A die that rolls when clicked, tapped or pressed: it hops, tumbles a few
  * turns, lands on a random or given face, rocks and settles, its shadow
- * following on the ground. The face on top is read out as it lands.
+ * following on the ground. The face on top is read out as it lands. A drag
+ * turns the eye round it, and a button shows it full screen.
  */
-export function Dice({ value, onRoll, finish, label = "Roll the die", className, style }: DiceProps) {
+export function Dice({ value, onRoll, finish, label = "Roll the die", className, style, limits = LIMITS, ...turning }: DiceProps) {
   const id = `dice-${useId().replace(/[^\w-]/g, "")}`;
   const reduced = useReducedMotion();
   const frames = useFrames();
@@ -160,24 +164,29 @@ export function Dice({ value, onRoll, finish, label = "Roll the die", className,
     if (!rolling.current) start(value ?? random());
   };
 
-  const view = useMemo(() => seen(state.rotation, state.hop), [state]);
-  const die = view.drawn.hulls.find((hull) => hull.part === "die");
-
   const overlay = (
     <>
       <style>{FOCUS_RING}</style>
-      <button type="button" className={BUTTON} aria-label={label} style={BUTTON_STYLE} onClick={click} />
+      <button type="button" className={BUTTON} aria-label={label} style={BUTTON_STYLE} onClick={click} data-vectoys-grab="" />
       <span aria-live="polite" style={HIDDEN}>{said}</span>
     </>
   );
 
   return (
-    <div className={className} style={{ position: "relative", touchAction: "manipulation", ...style }}>
-      <Stage camera={view.camera} overlay={overlay} style={finish ? { "--vectoys-finish": finish } : {}}>
-        <Shadow id={id} shadow={view.shadow} />
-        <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
-        {die && <path d={die.d} {...OUTLINE} />}
-      </Stage>
-    </div>
+    <Turntable mode="camera" label="die" limits={limits} {...turning}>
+      {(turn) => {
+        const view = seen(state.rotation, state.hop, turn);
+        const die = view.drawn.hulls.find((hull) => hull.part === "die");
+        return (
+          <div className={className} style={{ position: "relative", touchAction: "manipulation", ...style }}>
+            <Stage camera={view.camera} overlay={overlay} style={finish ? { "--vectoys-finish": finish } : {}}>
+              <Shadow id={id} shadow={view.shadow} />
+              <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
+              {die && <path d={die.d} {...OUTLINE} />}
+            </Stage>
+          </div>
+        );
+      }}
+    </Turntable>
   );
 }
