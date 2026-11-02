@@ -1,5 +1,5 @@
-import { fixed, screenQuad, type Camera, type Pose, type ScreenRect } from "@vinena/vectoys";
-import type { CSSProperties, ReactNode } from "react";
+import { fixed, screenQuad, type Camera, type Pose, type ScreenQuad, type ScreenRect } from "@vinena/vectoys";
+import { useLayoutEffect, useRef, type CSSProperties, type ReactNode, type Ref } from "react";
 
 /**
  * CSS pixels per scene unit in the layer screens are laid out in. Any
@@ -22,7 +22,41 @@ type ScreenProps = {
   children?: ReactNode;
   className?: string;
   style?: CSSProperties;
+  /** The element the content is laid out in, for `placeScreen`. */
+  ref?: Ref<HTMLDivElement>;
 };
+
+/** The size the content lays out at, and where the camera puts it. */
+function placement(camera: Camera, pose: Pose, rect: ScreenRect, width?: number) {
+  const across = fixed(width ?? rect.width * PIXELS_PER_UNIT);
+  const element = { width: across, height: fixed((across * rect.height) / rect.width) };
+  return { element, quad: screenQuad(camera, pose, rect, element, PIXELS_PER_UNIT) };
+}
+
+/**
+ * Lays a `Screen`'s element, from its `ref`, onto a new pose at once, as a
+ * render with that pose would, for a face that moves every frame without a
+ * render. The camera's size, `rect` and `width` must be the ones the Screen
+ * rendered with; a later render with the same props as before leaves this
+ * pose be, and one with a new pose lays the element onto that.
+ */
+export function placeScreen(element: HTMLElement, camera: Camera, pose: Pose, rect: ScreenRect, width?: number) {
+  apply(element, placement(camera, pose, rect, width).quad);
+}
+
+/** The style keys a quad sets on a Screen's element, in a render and in `placeScreen` alike. */
+const placed = ({ matrix, facing }: ScreenQuad): { transform: string | undefined; visibility: "visible" | "hidden"; pointerEvents: "auto" | "none" } => ({
+  transform: matrix,
+  visibility: facing ? "visible" : "hidden",
+  pointerEvents: facing ? "auto" : "none",
+});
+
+function apply(element: HTMLElement, quad: ScreenQuad) {
+  const { transform, visibility, pointerEvents } = placed(quad);
+  element.style.transform = transform ?? "";
+  element.style.visibility = visibility;
+  element.style.pointerEvents = pointerEvents;
+}
 
 /**
  * Live HTML laid onto a part's face, for use as a `Stage`'s overlay.
@@ -37,13 +71,19 @@ type ScreenProps = {
  * While the face turns away the content stays mounted but is hidden, and
  * takes no pointer events; the layer never takes any.
  */
-export function Screen({ camera, pose, rect, width, children, className, style }: ScreenProps) {
-  const across = fixed(width ?? rect.width * PIXELS_PER_UNIT);
-  const element = { width: across, height: fixed((across * rect.height) / rect.width) };
-  const quad = screenQuad(camera, pose, rect, element, PIXELS_PER_UNIT);
+export function Screen({ camera, pose, rect, width, children, className, style, ref }: ScreenProps) {
+  const { element, quad } = placement(camera, pose, rect, width);
   const layer = fixed(camera.width * PIXELS_PER_UNIT);
+  // React writes only the style keys whose value changed since its last
+  // render, so after a placeScreen a new pose lays every key down again.
+  const outer = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const content = outer.current?.firstElementChild;
+    if (content instanceof HTMLElement) apply(content, quad);
+  }, [quad.matrix, quad.facing]);
   return (
     <div
+      ref={outer}
       style={{
         position: "absolute",
         left: 0,
@@ -56,6 +96,7 @@ export function Screen({ camera, pose, rect, width, children, className, style }
       }}
     >
       <div
+        ref={ref}
         className={className}
         style={{
           ...style,
@@ -65,9 +106,7 @@ export function Screen({ camera, pose, rect, width, children, className, style }
           width: element.width,
           height: element.height,
           transformOrigin: "0 0",
-          transform: quad.matrix,
-          visibility: quad.facing ? "visible" : "hidden",
-          pointerEvents: quad.facing ? "auto" : "none",
+          ...placed(quad),
         }}
       >
         {children}

@@ -7,6 +7,8 @@ import { JustSvg } from "./sections/just-svg";
 import { MakeYourOwn } from "./sections/make-your-own";
 import { Showcase } from "./sections/showcase";
 import { Toys } from "./sections/toys";
+import { Trick } from "./sections/trick";
+import { Typing } from "./sections/typing";
 import { Uses } from "./sections/uses";
 
 /** The site's pages, by path. */
@@ -26,6 +28,8 @@ export function App({ index, page }: { index: RegistryIndex | null; page: Page }
             <Hero />
             <div className="sections">
               <JustSvg />
+              <Trick />
+              <Typing />
               <Uses index={index} />
               <Showcase />
               <MakeYourOwn />

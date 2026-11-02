@@ -18,3 +18,9 @@ test("paths are compact and cut to 2 decimals", () => {
     [1, 1],
   ])).toBe("M0 0L1 0L1 1Z");
 });
+
+test("panel draws a rectangle with round top corners and its own bottom ones", async () => {
+  const { panel } = await import("../src");
+  expect(panel([0, 0, 10, 4], 1)).toBe("M1 0H9A1 1 0 0 1 10 1V4H0V1A1 1 0 0 1 1 0Z");
+  expect(panel([0, 0, 10, 4], 0, 2)).toBe("M0 0H10V2A2 2 0 0 1 8 4H2A2 2 0 0 1 0 2V0Z");
+});

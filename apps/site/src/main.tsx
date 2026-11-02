@@ -16,7 +16,12 @@ const app = (
   </StrictMode>
 );
 
-if (root.hasChildNodes()) hydrateRoot(root, app);
+if (import.meta.env.DEV && (location.pathname === "/realistic" || location.pathname === "/realistic/polish")) {
+  // Dev-only: the realistic laptop next to its references, and a polish round's before and after, never built.
+  void import("./dev/realistic").then(({ Polish, Realistic }) =>
+    createRoot(root).render(<StrictMode>{location.pathname === "/realistic" ? <Realistic /> : <Polish />}</StrictMode>),
+  );
+} else if (root.hasChildNodes()) hydrateRoot(root, app);
 else createRoot(root).render(app);
 
 startAnalytics();

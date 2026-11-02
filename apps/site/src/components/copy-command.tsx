@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { track } from "../analytics";
 import { CheckIcon, CopyIcon } from "./icons";
 
-/** Copies `text` to the clipboard, and whether it just did. */
-function useCopy(text: string) {
+/** Copies `text` to the clipboard, and whether it just did. `onCopy` runs once the copy works. */
+function useCopy(text: string, onCopy?: () => void) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return;
@@ -14,6 +15,7 @@ function useCopy(text: string) {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      onCopy?.();
     } catch {
       // Without clipboard access the text stays on screen to select by hand.
     }
@@ -56,14 +58,14 @@ export function CopyCommand({ command, className = "" }: { command: string; clas
   );
 }
 
-/** A prompt to paste into a coding agent, with a button that copies it. */
-export function CopyPrompt({ prompt, caption }: { prompt: string; caption: string }) {
-  const { copied, copy } = useCopy(prompt);
+/** A prompt to paste into a coding agent, with a button that copies it. A copy sends `prompt_copy` with `placement`. */
+export function CopyPrompt({ prompt, caption, placement }: { prompt: string; caption: string; placement: string }) {
+  const { copied, copy } = useCopy(prompt, () => track("prompt_copy", { placement }));
   return (
     <figure className="prompt">
       <figcaption>{caption}</figcaption>
       <p>{prompt}</p>
-      <CopyButton label="Copy the prompt" copied={copied} copy={copy} />
+      <CopyButton label={`Copy ${caption.toLowerCase()}`} copied={copied} copy={copy} />
     </figure>
   );
 }

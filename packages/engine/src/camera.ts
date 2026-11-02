@@ -1,4 +1,5 @@
-import { combine, dot, rotate, rotateX, rotateY, rotateZ, subtract, type Flat, type Rotation, type Solid } from "./vector.ts";
+import { fixed } from "./path.ts";
+import { add, combine, dot, multiply, rotate, rotateX, rotateY, rotateZ, subtract, type Flat, type Rotation, type Solid } from "./vector.ts";
 
 /**
  * A scene `width` by `height`, in the units the SVG viewBox and the CSS use.
@@ -77,4 +78,58 @@ export function camera(options: CameraOptions): Camera {
   }
 
   return { ...settings, rotation, toView, project, facesEye };
+}
+
+/** A box a camera's scene moves into: its size, and how far the drawing moves in it. */
+export type Boxed = { width: number; height: number; x: number; y: number };
+
+/**
+ * An eye's camera turned by `yaw` and `pitch`. Given a `box`, the scene is
+ * the box's size and the drawing moves by its (x, y) in it, so a pose draws
+ * the same in the box, only shifted.
+ */
+export function aimed(options: CameraOptions, { yaw, pitch }: { yaw: number; pitch: number }, box?: Boxed): Camera {
+  const { width = 100, height } = options;
+  const [originX, originY] = [options.originX ?? width / 2, options.originY ?? height / 2];
+  const [anchorX, anchorY] = [options.anchorX ?? width / 2, options.anchorY ?? height / 2];
+  const [x, y] = box ? [box.x, box.y] : [0, 0];
+  return camera({
+    ...options,
+    ...(box && { width: box.width, height: box.height }),
+    originX: originX + x,
+    originY: originY + y,
+    anchorX: anchorX + x,
+    anchorY: anchorY + y,
+    yaw,
+    pitch,
+  });
+}
+
+/** A camera that sees the model turned by `turn` round `middle`, then scaled by `scale` about the middle on screen and moved by `shift`. */
+export function moved(eye: Camera, turn: Rotation, scale: number, [dx, dy]: Flat, middle: Solid): Camera {
+  const [cx, cy] = eye.project(middle);
+  const model = (point: Solid) => add(rotate(turn, subtract(point, middle)), middle);
+  return {
+    ...eye,
+    rotation: multiply(eye.rotation, turn),
+    toView: (point) => eye.toView(model(point)),
+    project(point) {
+      const [x, y] = eye.project(model(point));
+      return [cx + (x - cx) * scale + dx, cy + (y - cy) * scale + dy];
+    },
+    facesEye: (point, normal) => eye.facesEye(model(point), rotate(turn, normal)),
+  };
+}
+
+/**
+ * A linear gradient laid across a face, as the `gradientTransform` of one in
+ * `userSpaceOnUse` with ends (0, 0) and (0, 1): 0 at `from` and 1 at `to`,
+ * and its lines along the model's x where the span's middle is, so they lie
+ * square across a turned face, as ends given on screen do not.
+ */
+export function gradientSpace(eye: Camera, from: Solid, to: Solid) {
+  const [[ox, oy], [tx, ty]] = [eye.project(from), eye.project(to)];
+  const side = (x: number) => eye.project(add(from, [x + (to[0] - from[0]) / 2, (to[1] - from[1]) / 2, (to[2] - from[2]) / 2]));
+  const [[lx, ly], [rx, ry]] = [side(-1), side(1)];
+  return { gradientTransform: `matrix(${[rx - lx, ry - ly, tx - ox, ty - oy, ox, oy].map(fixed).join(" ")})` };
 }

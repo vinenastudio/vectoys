@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { camera, type Flat, type Solid } from "../src";
+import { camera, gradientSpace, type Flat, type Solid } from "../src";
 
 type Eye = { height: number; perspective: number; camera: number; back: number; origin: number; anchor: number };
 
@@ -79,4 +79,59 @@ test("an unturned model at the anchor stands where the scene's middle is", () =>
   expect(eye.project([0, 0, 0])).toEqual([50, 30]);
   const [, up] = eye.toView([0, 0, 10]);
   expect(up).toBeCloseTo(20, 12);
+});
+
+test("aimed turns an eye's camera and moves it into a box, so a pose draws the same there, only shifted", async () => {
+  const { aimed } = await import("../src");
+  const options = { height: 70, perspective: 200, back: 14, originY: 15.4, anchorY: 54.6 };
+  const plain = aimed(options, { yaw: 20, pitch: -15 });
+  const boxed = aimed(options, { yaw: 20, pitch: -15 }, { width: 140, height: 90, x: 20, y: 7 });
+  expect([plain.yaw, plain.pitch, boxed.width, boxed.height]).toEqual([20, -15, 140, 90]);
+  for (const point of POINTS) {
+    const [[x, y], [bx, by]] = [plain.project(point), boxed.project(point)];
+    expect(bx - x).toBeCloseTo(20, 9);
+    expect(by - y).toBeCloseTo(7, 9);
+  }
+});
+
+test("moved turns the model round a middle, then grows it about the middle on screen and shifts it", async () => {
+  const { moved, rotateZ } = await import("../src");
+  const eye = camera({ height: 70, perspective: 200, pitch: -15 });
+  const middle: Solid = [0, 0, -1];
+  const still = moved(eye, rotateZ(0), 1, [0, 0], middle);
+  for (const point of POINTS) expect(still.project(point)).toEqual(eye.project(point));
+  const big = moved(eye, rotateZ(0), 2, [3, -1], middle);
+  const [cx, cy] = eye.project(middle);
+  const [x, y] = eye.project([10, 5, 0]);
+  const [mx, my] = big.project([10, 5, 0]);
+  expect(mx).toBeCloseTo(cx + (x - cx) * 2 + 3, 9);
+  expect(my).toBeCloseTo(cy + (y - cy) * 2 - 1, 9);
+  // A half turn about the up axis through the middle swaps a point's sides.
+  const turned = moved(eye, rotateZ(180), 1, [0, 0], middle);
+  const [a, b] = [turned.toView([10, 0, -1]), eye.toView([-10, 0, -1])];
+  a.forEach((value, axis) => expect(value).toBeCloseTo(b[axis] ?? 0, 9));
+});
+
+test("a gradient space runs from one point to the other, its lines along the model's x where the span's middle is", () => {
+  const eye = camera({ height: 60, perspective: 300, yaw: -30, pitch: -20 });
+  const [from, to] = [[0, -10, 0], [0, 10, 0]] as const;
+  const values = gradientSpace(eye, from, to).gradientTransform.match(/[-\d.]+/g)?.map(Number) ?? [];
+  const [a, b, c, d, e, f] = values;
+  expect(values).toHaveLength(6);
+  const [[ox, oy], [tx, ty]] = [eye.project(from), eye.project(to)];
+  // (0, 0) lands on `from` and (0, 1) on `to`.
+  expect(e).toBeCloseTo(ox, 3);
+  expect(f).toBeCloseTo(oy, 3);
+  expect((c ?? 0) + (e ?? 0)).toBeCloseTo(tx, 3);
+  expect((d ?? 0) + (f ?? 0)).toBeCloseTo(ty, 3);
+  // Its x runs along the model's x at the middle.
+  const [[lx, ly], [rx, ry]] = [eye.project([-1, 0, 0]), eye.project([1, 0, 0])];
+  expect(a).toBeCloseTo(rx - lx, 3);
+  expect(b).toBeCloseTo(ry - ly, 3);
+  // Ends apart in x too: the lines run along x through the span's middle, not through `from`.
+  const [start, end] = [[-8, -10, 0], [8, 10, 0]] as const;
+  const [p, q] = gradientSpace(eye, start, end).gradientTransform.match(/[-\d.]+/g)?.map(Number) ?? [];
+  const [[sx, sy], [ex, ey]] = [eye.project([-1, 0, 0]), eye.project([1, 0, 0])];
+  expect(p).toBeCloseTo(ex - sx, 3);
+  expect(q).toBeCloseTo(ey - sy, 3);
 });

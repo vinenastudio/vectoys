@@ -1,0 +1,8 @@
+{
+  "name": "laptop-front",
+  "title": "Laptop front",
+  "description": "A 14 inch laptop seen straight on, as a product shot, drawn as SVG paths, with live HTML on its display under the notch, in silver or space black.",
+  "files": ["src/geometry.ts", "src/laptop-front.tsx"],
+  "dependencies": ["@vinena/vectoys", "@vinena/vectoys-react"],
+  "license": "MIT"
+}

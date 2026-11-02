@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { Showcase } from "../src/sections/showcase";
@@ -64,6 +66,7 @@ describe("Showcase", () => {
     act(() => root.render(<Showcase />));
     const links = [...host.querySelectorAll<HTMLAnchorElement>("a.showcase-card")];
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      "https://snug.so/?utm_source=vectoys.com&utm_medium=referral&utm_campaign=showcase",
       "https://caffeinagent.com/?utm_source=vectoys.com&utm_medium=referral&utm_campaign=showcase",
       "https://waxmac.com/?utm_source=vectoys.com&utm_medium=referral&utm_campaign=showcase",
     ]);
@@ -72,13 +75,24 @@ describe("Showcase", () => {
       expect(link.dataset.placement).toBe("showcase");
       expect(link.target).toBe("_blank");
     }
-    expect(links.map((link) => link.dataset.to)).toEqual(["caffeinagent.com", "waxmac.com"]);
+    expect(links.map((link) => link.dataset.to)).toEqual(["snug.so", "caffeinagent.com", "waxmac.com"]);
+  });
+
+  test("ships a clip and a poster in both schemes for every product", () => {
+    act(() => root.render(<Showcase />));
+    const sources = [...host.querySelectorAll("source")].map((source) => source.getAttribute("src") ?? "");
+    const clips = new Set(sources.map((src) => src.replace(/-(light|dark)\.(webm|mp4)$/, "")));
+    expect([...clips]).toEqual(["/showcase/snug", "/showcase/caffeinagent", "/showcase/wax"]);
+    const files = [...clips].flatMap((clip) =>
+      ["light", "dark"].flatMap((scheme) => ["webm", "mp4", "webp"].map((type) => `${clip}-${scheme}.${type}`)),
+    );
+    for (const file of files) expect(existsSync(resolve(import.meta.dir, "../public", `.${file}`))).toBe(true);
   });
 
   test("holds every clip unloaded, sized, silent and without a poster until it comes near", () => {
     act(() => root.render(<Showcase />));
     const videos = [...host.querySelectorAll<HTMLVideoElement>("video")];
-    expect(videos).toHaveLength(4);
+    expect(videos).toHaveLength(6);
     for (const video of videos) {
       expect(video.getAttribute("preload")).toBe("none");
       expect(video.getAttribute("width")).toBe("1280");
@@ -90,7 +104,7 @@ describe("Showcase", () => {
     }
     scroll(true);
     for (const video of host.querySelectorAll("video[data-scheme=light]")) {
-      expect((video as HTMLVideoElement).poster).toMatch(/^\/showcase\/(caffeinagent|wax)-light\.webp$/);
+      expect((video as HTMLVideoElement).poster).toMatch(/^\/showcase\/(snug|caffeinagent|wax)-light\.webp$/);
     }
     for (const video of host.querySelectorAll<HTMLVideoElement>("video[data-scheme=dark]")) expect(video.poster).toBeFalsy();
   });

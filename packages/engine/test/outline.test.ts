@@ -65,3 +65,10 @@ test("toward works on points in space", () => {
   ];
   expect(toward(from!, to!, 0.25)).toEqual([0.5, 1, 2]);
 });
+
+test("nearness is the squared distance to a segment's nearest point, its ends included", async () => {
+  const { nearness } = await import("../src");
+  expect(nearness([5, 3], [0, 0], [10, 0])).toBe(9);
+  expect(nearness([-3, 4], [0, 0], [10, 0])).toBe(25);
+  expect(nearness([2, 2], [1, 1], [1, 1])).toBe(2);
+});

@@ -1,0 +1,28 @@
+{
+  "name": "@vectoys/laptop-front",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A 14 inch laptop seen straight on, drawn with the vectoys engine, with live content on its display.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@vinena/vectoys": "workspace:*",
+    "@vinena/vectoys-react": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=19"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  }
+}

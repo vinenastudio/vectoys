@@ -218,7 +218,7 @@ function seen({ id, height, perspective: PERSPECTIVE, camera: CAMERA, back: BACK
     const top = ARROW_TOP + half * (ARROW_HALF + 0.2);
     return [left, top, left + UNIT - 2 * GAP, top + ARROW_HALF];
   });
-  const TOUCH_ID = KEYS[ROWS[0].length - 1];
+  const LOCK_KEY = KEYS[ROWS[0].length - 1];
 
   // The trackpad, 129.6 by 80.9 mm, 3 mm under the well.
   const TRACKPAD: Box = [-13.68, 5.07, 13.68, 22.17];
@@ -258,11 +258,11 @@ function seen({ id, height, perspective: PERSPECTIVE, camera: CAMERA, back: BACK
     lines: `${line(BASE_LINE)}${shape(DECK_RING)}${line(DIP_EDGE)}`,
     scoop: shape([...SCOOP_EDGE.map((point) => onDeck(point)), ...[...DIP_EDGE].reverse()]),
     well: patch(WELL, 0.8),
-    keys: [...KEYS.filter((key) => key !== TOUCH_ID), ...ARROWS]
+    keys: [...KEYS.filter((key) => key !== LOCK_KEY), ...ARROWS]
       .map((key) => patch(key, key[3] - key[1] < 2 ? 0.25 : 0.38))
       .join(""),
-    touchId: patch(TOUCH_ID, 0.38),
-    touchIdRing: patch([TOUCH_ID[0] + 0.45, TOUCH_ID[1] + 0.45, TOUCH_ID[2] - 0.45, TOUCH_ID[3] - 0.45], 0.3),
+    lockKey: patch(LOCK_KEY, 0.38),
+    lockKeyRing: patch([LOCK_KEY[0] + 0.45, LOCK_KEY[1] + 0.45, LOCK_KEY[2] - 0.45, LOCK_KEY[3] - 0.45], 0.3),
     // The same field of holes at full, half and quarter density, for scenes
     // too small to keep the finer ones apart.
     holes: [holes(15, 47), holes(8, 24), holes(4, 12)],

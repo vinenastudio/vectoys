@@ -39,7 +39,7 @@ const SHEET = [
   `.${BUTTON},.${BOX}{outline:none}.${BUTTON}:focus-visible{outline:${FOCUS_WIDTH} solid ${FOCUS};outline-offset:2px}`,
   `.${BOX}:not([data-full]):focus{background:color-mix(in srgb, ${HAIRLINE} 18%, transparent)}`,
   `.${BOX}::placeholder{color:color-mix(in srgb, ${INK} 45%, transparent);opacity:1}.${BOX}[data-full]::placeholder{color:color-mix(in srgb, ${INK} 32%, transparent)}`,
-  `.${CORNER}{opacity:.55;transition:opacity .2s}.${CORNER}:hover,.${CORNER}:focus-within{opacity:1}`,
+  `.${CORNER}>.${BUTTON}{opacity:.55;transition:opacity .2s}.${CORNER}>.${BUTTON}:hover,.${CORNER}>.${BUTTON}:focus-visible{opacity:1}`,
   `.${CAP}-top{fill:${FINISH}}.${CAP}-side{fill:${CAP_SIDE}}`,
   `.${CAP}-key[data-down] .${CAP}-top{fill:${CAP_DOWN}}.${CAP}-key[data-down] .${CAP}-side{fill:${CAP_DOWN_SIDE}}`,
   `.${CAP}-legend{fill:${INK};font-family:ui-sans-serif,system-ui,sans-serif;pointer-events:none}`,
@@ -105,6 +105,8 @@ const CORNER_STYLE: CSSProperties = { ...ROW, position: "absolute", top: "clamp(
 // Where a hold comes from: the real keyboard, a pointer by its id, or the demo.
 const BY_KEY = "key";
 const BY_DEMO = "demo";
+// Keys that scroll the page when focus is on no control, which would carry the board off screen as someone types on it.
+const SCROLLERS = new Set(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
 const MODIFIERS = new Set(["ShiftLeft", "ShiftRight", "ControlLeft", "AltLeft", "AltRight", "MetaLeft", "MetaRight", "Fn", "CapsLock"]);
 const WIDTHS = new Map(KEYS.map((key) => [key.id, key.width]));
 // A key that sends no key up, such as caps lock on some systems, springs back after this long.
@@ -389,6 +391,9 @@ export function Keyboard({
       setCaps(event.getModifierState("CapsLock"));
       const key = keyFor(event.code);
       if (!key) return;
+      // Only while focus is on no control, so a focused button or text box keeps its own Space and arrows; shortcuts stay the browser's.
+      const free = !document.activeElement || document.activeElement === document.body || document.activeElement === document.documentElement;
+      if (free && SCROLLERS.has(event.code) && !event.metaKey && !event.ctrlKey && !event.altKey) event.preventDefault();
       person();
       if (key === "CapsLock") capsAt = event.timeStamp;
       // Some systems send no key up for caps lock, nor for keys pressed while command is down.

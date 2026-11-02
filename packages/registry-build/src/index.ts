@@ -5,6 +5,9 @@ export const SCHEMA = "https://ui.shadcn.com/schema/registry-item.json";
 export const BASE_URL = "https://vectoys.com/r";
 const AUTHOR = "vectoys (https://vectoys.com)";
 
+/** The items the index lists first, in this order; the rest follow in name order. */
+export const FIRST = ["keyboard", "keycap"];
+
 /** What `registry/<name>/item.json` holds. */
 export type ItemSource = {
   name: string;
@@ -48,7 +51,7 @@ export async function buildRegistry({ root, out, baseUrl = BASE_URL }: Options):
   const names = (await readdir(join(root, "registry"), { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
-    .sort();
+    .sort(byPlace);
   const items = await Promise.all(names.map((dir) => readItem(root, dir, baseUrl)));
 
   await rm(out, { recursive: true, force: true });
@@ -61,6 +64,12 @@ export async function buildRegistry({ root, out, baseUrl = BASE_URL }: Options):
   };
   await writeJson(join(out, "index.json"), index);
   return index;
+}
+
+/** Orders folder names: those in FIRST by their place there, then the rest by name. */
+function byPlace(a: string, b: string) {
+  const place = (name: string) => (FIRST.includes(name) ? FIRST.indexOf(name) : FIRST.length);
+  return place(a) - place(b) || a.localeCompare(b);
 }
 
 async function readItem(root: string, dir: string, baseUrl: string): Promise<RegistryItem> {

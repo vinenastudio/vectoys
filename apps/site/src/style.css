@@ -145,7 +145,7 @@ pre {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 68px;
+  min-height: 4rem;
 }
 
 .wordmark {
@@ -156,16 +156,27 @@ pre {
   text-decoration: none;
 }
 
+/*
+  At large text sizes the nav's links wrap onto a second row inside the
+  header instead of running past the page's edge. The header's height is in
+  rem so it grows with the text, and the hero below starts under it by the
+  same amount. Its height is a minimum, so rows past what 4rem holds grow
+  the header and push the hero down rather than run over it or off the top.
+*/
 .site-nav {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 4px;
+  min-width: 0;
   margin-left: auto;
+  font-size: 15px;
 }
 
 .site-nav a {
   padding: 8px 10px;
   border-radius: 10px;
-  font-size: 15px;
+  white-space: nowrap;
   color: var(--muted);
   text-decoration: none;
   transition: color 150ms var(--ease);
@@ -299,9 +310,11 @@ code.inline {
   align-items: center;
   gap: 8px;
   height: 36px;
+  flex-shrink: 0;
   padding: 0 14px 0 12px;
   border-radius: 10px;
   font-size: 15px;
+  white-space: nowrap;
   color: var(--ink);
   /* The page color, so it stays a filled button on the hero band, like the install command. */
   background: var(--page);
@@ -347,15 +360,15 @@ code.inline {
 
 /* Hero: a full-width band, the phone very large and cut off at its bottom */
 
-/* The band starts under the 68 pixel header, so header and hero are one surface with no seam. */
+/* The band starts under the header (68 pixels at the default text size), so header and hero are one surface with no seam. */
 .site-header {
   position: relative;
   z-index: 3;
 }
 
 .hero {
-  margin-top: -68px;
-  padding-top: 68px;
+  margin-top: -4rem;
+  padding-top: 4rem;
   background:
     radial-gradient(50% 60% at 72% 45%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
     var(--card);
@@ -364,7 +377,7 @@ code.inline {
 
 /* The hero fills the first screen under the 68 pixel header, and never gets so short that its copy clips. */
 .hero-inner {
-  --hero-height: max(600px, calc(100dvh - 68px));
+  --hero-height: max(600px, calc(100dvh - 4rem));
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
@@ -394,17 +407,38 @@ code.inline {
   color: var(--muted);
 }
 
-.hero .command {
-  background: var(--page);
-}
-
-.hero .command code {
-  font-size: 14.5px;
-}
-
 .hero-note {
   font-size: 14px;
   color: var(--muted);
+}
+
+/* The prompt sits on the page color like the command did, and its full text link right under it. */
+.hero-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.hero .prompt {
+  max-width: 100%;
+  background: var(--page);
+}
+
+.hero .prompt p {
+  overflow-wrap: anywhere;
+}
+
+.hero-link {
+  font-size: 14px;
+  color: var(--muted);
+  transition: color 150ms var(--ease);
+}
+
+.hero-link:hover,
+.hero-link:focus-visible {
+  color: var(--ink);
 }
 
 .hero-stage {
@@ -444,12 +478,6 @@ code.inline {
 .hero-phone:focus-visible > div > svg > path:last-child {
   stroke: var(--accent) !important;
   stroke-width: 3px !important;
-}
-
-@media (max-width: 719px) {
-  .hero .command code {
-    font-size: 12.5px;
-  }
 }
 
 /* Narrow and upright screens stack the copy over the phone; a short landscape window keeps the two columns. */
@@ -1327,6 +1355,205 @@ code.inline {
   translate: 2px -2px;
 }
 
+/* Kickflip it, then scrub it: the scene stays pinned for a few screens while the scroll draws it. */
+
+.scrub-track {
+  position: relative;
+}
+
+.scrub-pin {
+  position: sticky;
+  top: 0;
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  height: 100svh;
+}
+
+/*
+ * The laptop's stage is where it lands, 0.7 of its width tall, under room
+ * for the kickflip, which rises up to 0.41 of its width over it; so the
+ * whole trick stays inside the pin, below the section's words, from its
+ * first frame. The slot stands at the pin's top. On a narrow page it is as
+ * wide as keeps the landed laptop, the stage's top 0.63, in the top half,
+ * the words under it; on a wide one, as puts its middle `--landed` down the
+ * page, level with the words beside it.
+ */
+.scrub-pin:has(.trick-slot) {
+  place-items: start center;
+  padding-top: 24px;
+}
+
+.trick-slot {
+  width: min(100%, calc((50svh - 24px) / 1.046));
+}
+
+.trick-room {
+  padding-top: 42%;
+}
+
+.scrub-chapter {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 360px;
+}
+
+.scrub-chapter h3 {
+  font-size: clamp(24px, 2.6vw, 32px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.scrub-chapter p {
+  color: var(--muted);
+}
+
+/* On a narrow page the words stand under the laptop, one chapter at a time. */
+.scrub-pin .scrub-chapter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(24px, 5svh);
+  margin-inline: auto;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (min-width: 900px) {
+  .scrub-pin:has(.trick-slot) {
+    --landed: 54svh;
+  }
+
+  .trick-slot {
+    width: min(64%, calc((var(--landed) - 24px) / 0.733));
+  }
+
+  /* Beside the landed laptop, level with it. */
+  .scrub-pin:has(.trick-slot) .scrub-chapter {
+    top: var(--landed);
+  }
+
+  .scrub-pin .scrub-chapter {
+    top: 50%;
+    bottom: auto;
+    width: 30%;
+    margin: 0;
+    text-align: left;
+    translate: 0 -50%;
+  }
+
+  .scrub-pin .scrub-chapter-left {
+    right: auto;
+  }
+
+  .scrub-pin .scrub-chapter-right {
+    left: auto;
+  }
+}
+
+/* The display, laid out about 1280 pixels across. */
+.scrub-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 80px 96px;
+  background:
+    radial-gradient(80% 60% at 25% 15%, rgba(140, 180, 255, 0.9), transparent 70%),
+    linear-gradient(160deg, #3d5cc4 0%, #1b2557 60%, #0d1126 100%);
+  color: #ffffff;
+}
+
+.scrub-screen-label {
+  font-size: 40px;
+  opacity: 0.7;
+}
+
+.scrub-screen-count {
+  font-family: var(--display);
+  font-size: 240px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.scrub-screen-steps {
+  display: grid;
+  gap: 14px;
+  margin: auto 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 40px;
+}
+
+.scrub-screen-steps li {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  opacity: 0.4;
+}
+
+.scrub-screen-steps li::before {
+  content: "";
+  width: 28px;
+  height: 28px;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+}
+
+.scrub-screen-steps li[data-done] {
+  opacity: 1;
+}
+
+.scrub-screen-steps li[data-done]::before {
+  background: currentColor;
+}
+
+/* With reduced motion: moments of the one timeline as still frames in the page's flow. */
+.trick-stills {
+  display: grid;
+  gap: 40px;
+}
+
+.trick-still {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+/* Still, the kickflip's start stands its whole 0.6 of the laptop's width up, so the room above it is too. */
+.trick-still > :first-child {
+  width: min(100%, 520px);
+  padding-top: 42%;
+}
+
+.trick-still figcaption {
+  color: var(--muted);
+  text-align: center;
+}
+
+.trick-still .scrub-chapter {
+  margin-inline: auto;
+}
+
+@media (min-width: 900px) {
+  .trick-stills {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Type on it: the full keyboard as wide as the page, with room kept for it and its buttons before it draws. */
+.typing {
+  container-type: inline-size;
+}
+
+.typing-stage {
+  min-height: calc(38cqi + 44px);
+}
+
 /* All toys: the band under the header, then every item. */
 
 .toys-intro {
@@ -1405,8 +1632,41 @@ code.inline {
   color: var(--ink);
 }
 
+/* The laptop with its look below it, the pair centered in the well. */
 .toy-preview .preview-laptop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
   width: 92%;
+}
+
+.toy-preview .preview-laptop > :first-child {
+  width: 100%;
+}
+
+/* The laptop with its finish below it, the pair centered in the well. */
+.toy-preview .preview-laptop-front {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 84%;
+}
+
+.toy-preview .preview-laptop-front > :first-child {
+  width: 100%;
+}
+
+.toy-preview .preview-laptop .segmented,
+.toy-preview .preview-laptop-front .segmented {
+  height: 40px;
+}
+
+.toy-preview .preview-laptop .segmented button,
+.toy-preview .preview-laptop-front .segmented button {
+  padding: 0 12px;
+  font-size: 14px;
 }
 
 .toy-preview .preview-square {

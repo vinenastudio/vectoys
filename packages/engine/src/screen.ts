@@ -12,8 +12,11 @@ export type ScreenRect = { x: number; y: number; width: number; height: number; 
 export type ScreenQuad = { corners: [Flat, Flat, Flat, Flat]; facing: boolean; matrix?: string };
 
 // Enough digits that a corner lands within a millionth of a unit, the same
-// from the server as from the client.
-const digits = (value: number) => String(Number(value.toPrecision(12)) || 0);
+// from the server as from the client. A term under a billionth is rounding
+// dust, such as a face seen straight on picks up from its turns, and is
+// written as 0: left in, the browser draws the element's text through a
+// blurrier path than for the plain scale and move it is.
+const digits = (value: number) => String(Math.abs(value) < 1e-9 ? 0 : Number(value.toPrecision(12)) || 0);
 
 /**
  * The plane map that takes the unit square's corners (0, 0), (1, 0), (1, 1),

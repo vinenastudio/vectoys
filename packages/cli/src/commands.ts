@@ -4,6 +4,7 @@ import { dirname, relative, resolve, sep } from "node:path";
 import { CONFIG_FILE, DEFAULT_REGISTRY, defaults, readConfig, writeConfig, type Config } from "./config";
 import { fetchJson } from "./fetch";
 import { place, type ItemFile } from "./files";
+import { importExtension, withExtensions } from "./imports";
 import { detect, installCommand, isPackageSpec, missing } from "./pm";
 import { confirm } from "./prompt";
 import { indexUrl, itemUrl } from "./resolve";
@@ -52,9 +53,10 @@ export async function add(context: Context, specs: string[]) {
     }),
   );
   const root = resolve(context.cwd, config.dir);
+  const extension = importExtension(context.cwd);
   const writes = items.flatMap(({ url, item }) => {
     const folder = resolve(root, item.name);
-    return place(item.files).map((file) => {
+    return withExtensions(place(item.files), extension).map((file) => {
       const path = resolve(folder, file.to);
       if (!folder.startsWith(root + sep) || !path.startsWith(folder + sep)) throw new Error(`${url} has a file that would land outside ${config.dir}.`);
       return { path, content: file.content };

@@ -3,9 +3,10 @@ import { DESK, PHONE, type Perspective } from "../src/geometry";
 
 type Original = { DESK: Pick<Perspective, "DECK" | "lidArt">; PHONE: Pick<Perspective, "DECK" | "lidArt"> };
 
-// The Agent Caffeine laptop this item was ported from, copied unchanged. It is
-// imported by a computed name so the type checker, under this repo's stricter
-// settings, leaves it as it was.
+// The Agent Caffeine laptop this item was ported from, copied unchanged but
+// for the lock key's names, renamed as the item's are. It is imported by a
+// computed name so the type checker, under this repo's stricter settings,
+// leaves it as it was.
 const SOURCE = "./fixtures/original-geometry.ts";
 const original = (await import(SOURCE)) as Original;
 

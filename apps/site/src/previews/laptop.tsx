@@ -1,10 +1,21 @@
-import { DESK, Laptop } from "@vectoys/laptop";
+import { DESK, Laptop, type LaptopLook } from "@vectoys/laptop";
+import { useState } from "react";
+import { Segmented } from "../components/segmented";
 import { Wallpaper } from "./wallpaper";
 
-export const LaptopPreview = () => (
-  <div className="preview-laptop">
-    <Laptop closed={0.04} eye={DESK}>
-      <Wallpaper />
-    </Laptop>
-  </div>
-);
+const LOOKS: readonly (readonly [LaptopLook, string])[] = [
+  ["simple", "Simple"],
+  ["realistic", "Realistic"],
+];
+
+export const LaptopPreview = () => {
+  const [look, setLook] = useState<LaptopLook>("simple");
+  return (
+    <div className="preview-laptop">
+      <Laptop closed={0.04} eye={DESK} look={look}>
+        <Wallpaper />
+      </Laptop>
+      <Segmented label="Look" options={LOOKS} value={look} onChange={setLook} />
+    </div>
+  );
+};

@@ -9,7 +9,7 @@ Status: early.
 ## Packages
 
 - `packages/engine` (`@vinena/vectoys`): a perspective camera, 3D rotations and poses, 2D outline helpers and compact SVG path output. Zero runtime dependencies.
-- `packages/react` (`@vinena/vectoys-react`): `Stage`, `Faces` and `Screen`, the React pieces any item draws with, and the motion hooks `useSpring`, `useFrames` and `useReducedMotion`. MIT.
+- `packages/react` (`@vinena/vectoys-react`): `Stage`, `Faces` and `Screen`, the React pieces any item draws with, the motion hooks `useSpring`, `useFrames`, `useReducedMotion` and `useScrub`, `useNodes`, which keeps an item's elements by name so its handle can redraw them without a render, and the shading pieces `Gradient` (stops of color and opacity), `Grain` (a fine metal grain drawn once into a pattern), `Glare` (a glass's reflection over a `Screen`) and `mirrored`. MIT.
 - `packages/cli` (`@vinena/vectoys-cli`, command `vectoys`): the CLI that copies items into a project. MIT.
 - `packages/registry-build`: writes the registry JSON the site serves at `/r`.
 - `apps/site`: vectoys.com, the landing page and the gallery, which also serves the registry at `/r`.
@@ -21,8 +21,29 @@ Besides the camera, poses and paths, the engine has:
 - `slab({ taper })`: the top's outline stands in from the bottom's by `taper` on every side, so the sides lean in as a keycap's do.
 - `slab({ outline })` and `plate({ outline })`: a part takes any flat outline in place of its rounded box, such as a triangle for an envelope's flap.
 - `rotateAxis(axis, degrees)`: a turn about any axis.
+- `aimed(options, { yaw, pitch }, box)`: an eye's camera turned, and moved into a fixed `box` so a pose draws the same there, only shifted. `moved(eye, turn, scale, shift, middle)`: a camera that sees the model turned round `middle`, then grown about it on screen and shifted.
+- `banded(rings, pose, eye, middle, count, tone)`: the side faces between outlines at several heights of a convex solid, as path data for each of `count` tones that `tone` picks from a face's unit normal, and its outline on screen.
+- `panel(box, high, low)`: a rectangle as path data with its own top and bottom corner radii. `nearness(point, a, b)`: a point's squared distance to a segment.
 - `slerp(from, to, share)`: the rotation a share of the way between two, turning the short way round.
 - `spring(state, target, seconds, { stiffness, damping })` and `settled(state, target)`: a value on a spring, stepped in small fixed steps so any frame rate gives the same path. `useSpring(target)` in `@vinena/vectoys-react` follows a target on it.
+- `clamp(v, lo, hi)`, `lerp(a, b, t)` and `ease(t)`, which eases a share from 0 to 1 in and out. `segment(p, i, n)` is how far a progress `p` is through segment `i` of `n` equal ones, from 0 to 1.
+- `scrub(t, keys, { ease })`: every number the keyframes set, at progress `t`. Keys are sorted by `at`, such as `[{ at: 0, lid: 0, yaw: 0 }, { at: 0.12, lid: 1 }, { at: 0.3, yaw: -20 }]`. Each segment between two keys eases on its own, with `ease` unless you pass another. A key that leaves a field out keeps the value from the key before, and before a field's first key it holds that first value.
+- Eases for a share from 0 to 1: `backIn` draws back below 0 before it goes, `backOut` shoots past 1 and comes back, `backInOut` does both, and `settle` falls to 1 and bounces up a little a few times, lower each time, without passing 1, so it lands like a dropped ball. `cubicBezier(x1, y1, x2, y2)` returns the ease CSS writes as `cubic-bezier(...)`. A key in `scrub` may carry its own `ease`, which shapes the segment that ends at that key: a name from `EASES` (`linear`, `ease`, `backIn`, `backOut`, `backInOut`, `settle`), any function, or a cubic Bézier's four numbers, such as `{ at: 0.6, y: 0, ease: "settle" }`. A key without one takes the `ease` you pass to `scrub`.
+
+### Scroll scenes
+
+`useScrub(ref, { screens })` in `@vinena/vectoys-react` follows a tall track element as the page scrolls, for a scene pinned inside it with `position: sticky`. The track is `screens` times the viewport's height, set by your CSS; once it has a height, the measured one wins. It returns `{ progress, reduced }`. `progress.get()` is 0 while the track's top is at the viewport's top, and 1 once its bottom reaches the viewport's bottom. `progress.subscribe(fn)` calls `fn` with each new value, at most once a frame, and causes no React render. It does not call `fn` with the current value, so draw that first, for a page opened partway down. On the server `progress` is 0. `reduced` is true when the page asks for less motion, so you can show still frames with no pinning instead.
+
+```tsx
+const { progress } = useScrub(track, { screens: 4 });
+useEffect(() => {
+  const draw = (t: number) => laptop.current?.set(scrub(t, KICKFLIP));
+  draw(progress.get());
+  return progress.subscribe(draw);
+}, [progress]);
+```
+
+`placeScreen(element, camera, pose, rect)` lays a `Screen`'s element, which its `ref` gives you, onto a new pose without a render.
 
 ## Registry
 
@@ -32,6 +53,10 @@ Devices:
 
 - `registry/laptop`: a 14 inch laptop with a lid that opens and closes and live HTML on its display.
   `<Laptop eye={FRONT}>` shows it straight on, as a product shot drawn flat to sizes measured on product renders: the open lid with its notch, over the base's front face with the thumb's scoop and two feet. The lid is always open there, and its aluminum takes `--vectoys-finish`, silver by default (`#3d3b3e` reads as space black). The scene is the laptop's own bounds. Laptop takes no style or className, so to let a frame cut it, put it in a div with `width: 121.4%; margin-inline: -10.7%; margin-bottom: -3%` inside a wrapper with `overflow: hidden`. The lid then fills the wrapper's width, the base's ends are cut flush with the lid's sides, and the base's face just under the thumb's scoop.
+  `<Laptop eye={DESK} lid={1} yaw={-20} pitch={15}>` turns the laptop in perspective, from either `DESK` or `PHONE`. `lid` runs from 0 (shut) to 1 (open), and `closed`, its opposite, still works but is deprecated; `lid` wins when you pass both. `yaw` turns the laptop about its own upright axis, from -35 to 35 degrees; positive turns the display toward the page's right. `pitch` is the eye's height in degrees, from 5 to 30, 15 for `DESK` and 12 for `PHONE` by default. With none of these, the laptop draws exactly as before. `turning` draws in a fixed box that holds every pose, `LAPTOP_BOX[eye.id]` (`{ width, height, x, y }` in scene units), so the stage keeps one size while the laptop opens and turns. `x` and `y` are where the eye's own scene sits in the box: a point of the eye's own drawing lands `x` to the right and `y` down in it. Pass `ref` for a `LaptopHandle`: `ref.current.set({ lid, yaw, pitch })` moves the laptop at once with no React render, changing only the fields you pass. That fits a pose that changes every frame, such as one driven by the scroll. The handle owns the pose from its first `set` until a `lid`, `closed`, `yaw` or `pitch` prop changes, and then the props win. Renders for anything else, such as new content on the display, keep the handle's pose.
+  `<Laptop look="realistic">` draws the machine as it is, silver on any page and in every mode above: carved aluminum lit from above in the tones measured on the silver machine, with a fine grain, sheens that lie square across each face, shade where the lid meets the deck, a chamfer's bright line and darker turn round the display and a highlight on its edges, a faint glare on the glass with its edge sunk in the bezel, a soft contact shadow, black keys with a bevel's highlight in a black well, the speaker grilles, the trackpad, the thumb's scoop, the hinge, round feet in bright rings, and the underside's panel, slots and screws. Its lid is always the true one, as `FRONT` measures it, and it turns and moves as `free` does, so the handle and `KICKFLIP` work the same. Changing `look` lets go of the handle's pose, as changing `free` does, and the props' pose is drawn. `look="simple"`, the default, draws in the page's tones as before. `FRONT` is already the product shot, so it draws the same in both.
+  `<Laptop eye={DESK} free flat={1}>` lets the laptop turn any way and leave its box, for a trick. `free` lifts the ranges on `yaw`, `pitch` and `roll`, and the drawing may go past the stage, so size the box round where it lands. `flat` runs from 0, the eye's own look, to 1, FRONT's straight-on shot: open and with every angle 0, it draws as `<Laptop eye={FRONT}>` does, FRONT's scene across the eye's own scene from its top, silver from the page's `--vectoys-finish`. Between the two, the camera, the shapes and the tones ease from one to the other in any pose. `x` and `y` move the drawing on screen in shares of the laptop's width, `WIDTH`, with `y` up: `y` is the height over the ground, so the shadow stays on the ground and fades and spreads as the laptop goes up. `scale` grows it about its middle, 1 at rest. `roll` turns it about its long axis, from left to right, in degrees; positive lifts its front. With `free` or any of these, the laptop is a closed slab from every side, with its underside, feet, back and the lid's outer face, and the live glass hides whenever the display faces away or is seen from under the deck. Every one of these fields works as a prop and in `ref.current.set({ ... })`, and the handle holds them as it holds the others, until a pose prop, `free` or `look` changes. `KICKFLIP` is a keyframe preset for `scrub`: the lid shuts straight on, the laptop comes down, crouches, pops into a kickflip with a shove-it, hangs, lands with a small bounce in perspective and opens. Play it with `laptop.current?.set(scrub(t, KICKFLIP))`. It starts 0.6 of the laptop's width up and leaves `pitch` to the laptop.
+- `registry/laptop-front`: the same laptop straight on as its own item, `<LaptopFront>`, with live HTML on its display and `finish="silver"` or `finish="black"` for space black.
 - `registry/phone`: a modern flagship phone that turns any way, with side buttons, a camera bump and live HTML on its display.
 - `registry/tablet`: an 11 inch tablet that turns any way, upright or on its side, with live HTML on its display.
 - `registry/monitor`: a 27 inch monitor on a stand that turns any way, its panel tilting on the stand, with live HTML on its display.
@@ -56,7 +81,11 @@ Items are copied into your project as source, so you can change them. The engine
 npx @vinena/vectoys-cli add laptop
 ```
 
-This writes `vectoys.json`, copies the item to `src/components/vectoys/laptop/` (or `components/vectoys/` without a `src` folder), and installs `@vinena/vectoys` and `@vinena/vectoys-react` with your package manager. `npx @vinena/vectoys-cli list` shows every item. The shadcn CLI works too:
+This writes `vectoys.json`, copies the item to `src/components/vectoys/laptop/` (or `components/vectoys/` without a `src` folder), and installs `@vinena/vectoys` and `@vinena/vectoys-react` with your package manager. `npx @vinena/vectoys-cli list` shows every item.
+
+The CLI finds your package manager in the first folder up from where you run it that has a `packageManager` field, a lockfile or a workspace: your project's own, or the workspace's above it. In that folder the `packageManager` field wins over the lockfile. In a monorepo it installs in the app folder you run it from. If your tsconfig.json uses `node16` or `nodenext` module resolution, the CLI adds `.js` to the relative imports in the copied files (or `.ts` and `.tsx` with `allowImportingTsExtensions`). Bundler projects get the files unchanged.
+
+The shadcn CLI works too:
 
 ```sh
 npx shadcn add https://vectoys.com/r/laptop.json
@@ -88,7 +117,7 @@ npx @vinena/vectoys-cli submit registry/spinning-top
 
 `create` writes `spinning-top/` (under `--dir`, else the current folder) with an `item.json`, a working component that draws a tilted, shaded slab, a `package.json`, a `tsconfig.json` and a test, as the items in `registry/` have. It does not write over a folder that is already there unless you pass `--overwrite`. Made in `registry/` of this repository, `bun install` links its packages. Made anywhere else, it asks for `@vinena/vectoys` and `@vinena/vectoys-react` from npm by version, and writes a `tsconfig.json` of its own; `submit` turns both back into the form the items in `registry/` have.
 
-`check` prints a pass or fail line for each check and exits with 1 if any fails. It checks that `item.json` has what the registry needs, that the files are under 64 KB together, that the component renders on the server twice to the same markup with no `NaN` or `Infinity` in it, that its root is `role="img"` with an `aria-label` or its controls are labelled, and that neither `item.json` nor the rendered text names a brand or a device maker. It loads the component with [bun](https://bun.sh), so `check` needs bun, and the item's packages installed.
+`check` prints a pass or fail line for each check and exits with 1 if any fails. It checks that `item.json` has what the registry needs, that the files are under 96 KB together, that the component renders on the server twice to the same markup with no `NaN` or `Infinity` in it, that its root is `role="img"` with an `aria-label` or its controls are labelled, and that neither `item.json` nor the rendered text names a brand or a device maker. It loads the component with [bun](https://bun.sh), so `check` needs bun, and the item's packages installed.
 
 `preview` renders the item the same way into `preview.html` in its folder, in light and dark side by side, and prints the file's path; `--open` opens it. If the component takes a `yaw`, it also shows it turned to -45, -20, 0, 20 and 45 degrees. `create` writes a `.gitignore` that leaves `preview.html` out.
 
@@ -116,7 +145,7 @@ Every item reads its colors from CSS variables, so a page themes them all at onc
 - `--vectoys-surface`: the main surface of a body or a part, `#f5f5f5`.
 - `--vectoys-hairline`: the outlines and the darker edges, `#8a8a8a`.
 - `--vectoys-shadow`: the shadow on the ground, `rgba(0, 0, 0, 0.08)`.
-- `--vectoys-finish`: the color of a body: the back and stand of a device, a keycap, a keyboard's keys, a die, the card's back. By default the surface; the envelope's lining a shade under it, the floppy disk `#2c2c2e`, the gift box `#e5484d`, and the laptop seen from the front a silver `#f0f1f3` (`#3d3b3e` gives space black).
+- `--vectoys-finish`: the color of a body: the back and stand of a device, a keycap, a keyboard's keys, a die, the card's back. By default the surface; the envelope's lining a shade under it, the floppy disk `#2c2c2e`, the gift box `#e5484d`, and the laptop seen from the front and the laptop-front item a silver `#f0f1f3` (`#3d3b3e` gives space black; the laptop-front item's `finish` prop sets it too).
 - `--vectoys-accent`: the gift box's ribbon and bow, `#f5c84c`.
 - `--vectoys-band`: the watch's band, a shade under the surface.
 - `--vectoys-ink`: a keycap's label, a keyboard's legends, the die's pips and the browser's address, `#1d1d1c`.

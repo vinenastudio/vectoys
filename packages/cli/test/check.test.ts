@@ -31,7 +31,7 @@ test("a new item passes every check", () => {
   expect(lines).toEqual([
     "Checking plate",
     "  pass  item.json has what the registry needs",
-    expect.stringMatching(/^ {2}pass {2}the files are \d+\.\d KB, under 64\.0 KB$/),
+    expect.stringMatching(/^ {2}pass {2}the files are \d+\.\d KB, under 96\.0 KB$/),
     "  pass  item.json names no brands",
     "  pass  Plate renders on the server",
     "  pass  the markup has no NaN or Infinity",
