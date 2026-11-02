@@ -51,6 +51,7 @@ npx @vinena/vectoys-cli check registry/spinning-top
 - `item.json` has the fields the registry needs.
 - The files are under 96 KB together.
 - Neither `item.json` nor the rendered text names a brand or a device maker.
+- The component is in `src/<name>.tsx`, which `item.json` lists, and that file exports the toy's component name (`spinning-top` exports `SpinningTop`).
 - The component renders on the server.
 - Two renders give the same markup.
 - The markup has no `NaN` or `Infinity`.
