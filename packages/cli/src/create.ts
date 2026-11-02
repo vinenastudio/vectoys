@@ -1,10 +1,13 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { componentName } from "@vectoys/registry-build";
 import { devDependencies } from "../../../package.json";
 import { compilerOptions } from "../../../tsconfig.base.json";
 import { version } from "../package.json";
 import { ITEM_NAME, type Context } from "./commands";
+
+export { componentName };
 
 /** The tsconfig an item in registry/ of the vectoys repository extends. */
 export const BASE_TSCONFIG = "../../tsconfig.base.json";
@@ -28,15 +31,6 @@ export function inVectoysRepo(folder: string): boolean {
     }
     if (dirname(dir) === dir) return false;
   }
-}
-
-/** The component an item named `name` exports: `my-toy` is `MyToy`. */
-export function componentName(name: string): string {
-  const joined = name
-    .split(/[^a-zA-Z0-9]+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join("");
-  return /^[A-Za-z]/.test(joined) ? joined : `Item${joined}`;
 }
 
 /** `my-toy` as a title, `My toy`. */

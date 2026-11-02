@@ -13,6 +13,7 @@ import { LaptopFrontPreview } from "./previews/laptop-front";
 import { MonitorPreview } from "./previews/monitor";
 import { PhonePreview } from "./previews/phone";
 import { Placeholder } from "./previews/placeholder";
+import { SOURCES } from "./sources";
 import { TabletPreview } from "./previews/tablet";
 import { WatchPreview } from "./previews/watch";
 
@@ -39,9 +40,6 @@ export const PREVIEWS: Readonly<Record<string, ComponentType>> = {
   tablet: TabletPreview,
   watch: WatchPreview,
 };
-
-// Every item's module, loaded only when its card comes near the screen.
-const SOURCES = import.meta.glob<Record<string, unknown>>("../../../registry/*/src/index.ts");
 
 /** The preview a gallery card draws for an item: its hand-made one, else one from its own exports, else a placeholder. */
 export function previewFor(name: string): ComponentType {

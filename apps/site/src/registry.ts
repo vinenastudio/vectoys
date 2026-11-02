@@ -37,5 +37,8 @@ function isWebUrl(value: string) {
   }
 }
 
-/** The maker a gallery card credits: none for our own items. */
-export const makerOf = (entry: Entry): Maker | null => (entry.author && entry.author !== OWN_AUTHOR ? parseAuthor(entry.author) : null);
+/** The maker a gallery card credits: none for our own items, or when the index holds no text for one. */
+export function makerOf(entry: Entry): Maker | null {
+  const author: unknown = entry.author;
+  return typeof author === "string" && author !== OWN_AUTHOR ? parseAuthor(author) : null;
+}

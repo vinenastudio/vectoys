@@ -11,6 +11,7 @@ test("a card draws the item's Demo, else its main component, else its default ex
   expect(pickPreview({ Demo, Ball, default: Other }, "ball")).toBe(Demo);
   expect(pickPreview({ TestBall: Ball, default: Other, size: 3 }, "test-ball")).toBe(Ball);
   expect(pickPreview({ default: Other }, "ball")).toBe(Other);
+  expect(pickPreview({ Item3dBox: Ball }, "3d-box")).toBe(Ball);
   expect(pickPreview({ Demo: "not a component", size: 3 }, "ball")).toBeNull();
 });
 

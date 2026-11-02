@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AUTHOR, FIRST, SCHEMA, buildRegistry, header, type RegistryIndex, type RegistryItem } from "../src";
+import { AUTHOR, FIRST, SCHEMA, buildRegistry, checkItem, componentName, header, type RegistryIndex, type RegistryItem } from "../src";
 
 const root = resolve(import.meta.dir, "../../..");
 const out = await mkdtemp(join(tmpdir(), "vectoys-registry-"));
@@ -63,4 +63,17 @@ test("the index keeps an outside maker's name and credit", async () => {
   } finally {
     await rm(repo, { recursive: true, force: true });
   }
+});
+
+test("author and credit, when given, must be text", () => {
+  const item = { name: "ball", title: "Ball", description: "A ball.", files: ["src/ball.tsx"], license: "MIT" };
+  expect(checkItem({ ...item, author: "Jane (https://jane.example)", credit: "Jane" }, "item.json")).toMatchObject({ author: "Jane (https://jane.example)" });
+  expect(() => checkItem({ ...item, author: 42 }, "item.json")).toThrow('item.json "author" must be text like "Name (https://site)"');
+  expect(() => checkItem({ ...item, author: " " }, "item.json")).toThrow('item.json "author" must be text like "Name (https://site)"');
+  expect(() => checkItem({ ...item, credit: ["Jane"] }, "item.json")).toThrow('item.json "credit" must be text');
+});
+
+test("component names start with a letter", () => {
+  expect(componentName("laptop-front")).toBe("LaptopFront");
+  expect(componentName("3d-box")).toBe("Item3dBox");
 });

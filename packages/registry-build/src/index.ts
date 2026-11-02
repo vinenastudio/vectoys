@@ -1,6 +1,8 @@
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 
+export { componentName } from "./names";
+
 export const SCHEMA = "https://ui.shadcn.com/schema/registry-item.json";
 export const BASE_URL = "https://vectoys.com/r";
 /** Who made an item, and who to credit, when its item.json does not say. */
@@ -110,6 +112,10 @@ export function checkItem(value: unknown, file: string): ItemSource {
     if (typeof item[key] !== "string" || item[key] === "") throw new Error(`${file} needs a "${key}"`);
   }
   if (!Array.isArray(item.files) || item.files.length === 0) throw new Error(`${file} needs "files"`);
+  if (item.author !== undefined && (typeof item.author !== "string" || item.author.trim() === "")) {
+    throw new Error(`${file} "author" must be text like "Name (https://site)"`);
+  }
+  if (item.credit !== undefined && (typeof item.credit !== "string" || item.credit.trim() === "")) throw new Error(`${file} "credit" must be text`);
   return item as ItemSource;
 }
 

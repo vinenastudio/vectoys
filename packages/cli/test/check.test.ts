@@ -64,6 +64,10 @@ test("a bad item.json fails before anything renders", () => {
   expect(failed(folder)[0]).toStartWith("item.json is not valid JSON");
   writeFileSync(join(folder, "item.json"), JSON.stringify({ name: "bad", title: "Bad", description: "Bad", license: "MIT", files: ["src/gone.tsx"] }));
   expect(failed(folder)).toEqual(['files lists "src/gone.tsx", which is not a file in the folder']);
+  writeFileSync(join(folder, "item.json"), JSON.stringify({ name: "bad", title: "Bad", description: "Bad", license: "MIT", files: ["src/bad.tsx"], author: 42 }));
+  expect(failed(folder)).toEqual(['item.json "author" must be text like "Name (https://site)"']);
+  writeFileSync(join(folder, "item.json"), JSON.stringify({ name: "bad", title: "Bad", description: "Bad", license: "MIT", files: ["src/bad.tsx"], credit: "" }));
+  expect(failed(folder)).toEqual(['item.json "credit" must be text']);
 });
 
 test("files must be regular files, not folders or symlinks", () => {

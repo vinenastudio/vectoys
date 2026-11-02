@@ -1,4 +1,5 @@
 import { Component, Suspense, lazy, type ComponentType, type ReactNode } from "react";
+import { componentName } from "../../../packages/registry-build/src/names";
 import { Placeholder } from "./previews/placeholder";
 
 /** Loads an item's `src/index.ts`. */
@@ -6,13 +7,6 @@ export type Loader = () => Promise<Record<string, unknown>>;
 
 const isComponent = (value: unknown): value is ComponentType =>
   typeof value === "function" || (typeof value === "object" && value !== null && "$$typeof" in value);
-
-/** `my-toy` as the component an item exports, `MyToy`. */
-const componentName = (name: string) =>
-  name
-    .split(/[^a-zA-Z0-9]+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join("");
 
 /** What a gallery card draws for an item: its `Demo`, else its main component or default export with no props. */
 export function pickPreview(module: Record<string, unknown>, name: string): ComponentType | null {
