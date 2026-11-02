@@ -7,6 +7,7 @@ export { AUTHOR, componentName } from "./names";
 
 export const SCHEMA = "https://ui.shadcn.com/schema/registry-item.json";
 export const BASE_URL = "https://vectoys.com/r";
+const REACT = "@vinena/vectoys-react";
 
 /** The items the index lists first, in this order; the rest follow in name order. */
 export const FIRST = ["keyboard", "keycap"];
@@ -21,6 +22,7 @@ export type ItemSource = {
   license: string;
   author?: string;
   credit?: string;
+  docs?: string;
 };
 
 /** One item as served at `/r/<name>.json`, in the shadcn registry-item shape. */
@@ -35,6 +37,8 @@ export type RegistryItem = {
   dependencies: string[];
   files: { path: string; type: "registry:component"; target: string; content: string }[];
   meta: { license: string; source: string; credit: string };
+  /** Printed by `vectoys add` after the install. */
+  docs?: string;
 };
 
 /** One item as `/r/index.json` lists it, with its maker as "Name (url)" so the gallery can credit them. */
@@ -108,6 +112,11 @@ async function readItem(root: string, dir: string, baseUrl: string, versions: Ma
       };
     }),
   );
+  const dependencies = (source.dependencies ?? []).map((name) => (versions.has(name) ? `${name}@${versions.get(name)}` : name));
+  // CLIs before 0.3 skip a package the project lists at any version, so the item says what it needs.
+  const react = versions.get(REACT);
+  const needs = react && source.dependencies?.includes(REACT) ? `This toy needs ${REACT} ${react.slice(1)} or newer. If your project has an older one, run: npm install ${REACT}@latest` : undefined;
+  const docs = [source.docs, needs].filter(Boolean).join("\n") || undefined;
   return {
     $schema: SCHEMA,
     name: source.name,
@@ -116,9 +125,10 @@ async function readItem(root: string, dir: string, baseUrl: string, versions: Ma
     description: source.description,
     author: source.author ?? AUTHOR,
     // A range, so an install upgrades a project whose copy is too old for the item's code.
-    dependencies: (source.dependencies ?? []).map((name) => (versions.has(name) ? `${name}@${versions.get(name)}` : name)),
+    dependencies,
     files,
     meta: { license: source.license, source: url, credit },
+    ...(docs ? { docs } : {}),
   };
 }
 
@@ -131,6 +141,7 @@ export function checkItem(value: unknown, file: string): ItemSource {
   if (!Array.isArray(item.files) || item.files.length === 0) throw new Error(`${file} needs "files"`);
   if (item.author !== undefined && !isOneLine(item.author)) throw new Error(`${file} "author" must be one line of text like "Name (https://site)"`);
   if (item.credit !== undefined && !isOneLine(item.credit)) throw new Error(`${file} "credit" must be one line of text`);
+  if (item.docs !== undefined && typeof item.docs !== "string") throw new Error(`${file} "docs" must be text`);
   return item as ItemSource;
 }
 
