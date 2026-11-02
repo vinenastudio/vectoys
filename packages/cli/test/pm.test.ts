@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { detect, installCommand, missing, satisfies } from "../src/pm";
+import { detect, installCommand, missing, atLeast } from "../src/pm";
 
 const work = mkdtempSync(join(tmpdir(), "vectoys-pm-"));
 
@@ -50,20 +50,52 @@ test("a lockfile above the repository root does not count", () => {
   expect(detect(join(file, "home/site"))).toBe("npm");
 });
 
-test("caret ranges keep the first part that is not 0, and exact versions match only themselves", () => {
-  expect(satisfies("0.3.0", "^0.3.0")).toBe(true);
-  expect(satisfies("0.3.9", "^0.3.0")).toBe(true);
-  expect(satisfies("0.2.1", "^0.3.0")).toBe(false);
-  expect(satisfies("0.4.0", "^0.3.0")).toBe(false);
-  expect(satisfies("1.9.0", "^1.2.0")).toBe(true);
-  expect(satisfies("2.0.0", "^1.2.0")).toBe(false);
-  expect(satisfies("0.0.4", "^0.0.3")).toBe(false);
-  expect(satisfies("0.3.0", "0.3.0")).toBe(true);
-  expect(satisfies("0.3.1", "0.3.0")).toBe(false);
-  // Other ranges, and versions that are not X.Y.Z, count as met.
-  expect(satisfies("0.1.0", ">=0.3")).toBe(true);
-  expect(satisfies("workspace:*", "^0.3.0")).toBe(true);
-  expect(satisfies("0.1.0", "")).toBe(true);
+test("a version meets a range when it is at least the range's base version", () => {
+  expect(atLeast("0.3.0", "^0.3.0")).toBe(true);
+  expect(atLeast("0.3.9", "^0.3.0")).toBe(true);
+  expect(atLeast("0.2.1", "^0.3.0")).toBe(false);
+  // Newer versions are kept, so an install never goes down.
+  expect(atLeast("0.4.0", "^0.3.0")).toBe(true);
+  expect(atLeast("0.5.2", "^0.3.0")).toBe(true);
+  expect(atLeast("2.0.0", "^1.2.0")).toBe(true);
+  expect(atLeast("1.1.9", "^1.2.0")).toBe(false);
+  expect(atLeast("0.3.1", "0.3.0")).toBe(true);
+  expect(atLeast("0.2.9", "0.3.0")).toBe(false);
+  // Other ranges, and versions that are not semver, count as met.
+  expect(atLeast("0.1.0", ">=0.3")).toBe(true);
+  expect(atLeast("workspace:*", "^0.3.0")).toBe(true);
+  expect(atLeast("0.1.0", "")).toBe(true);
+});
+
+test("a prerelease is below its release", () => {
+  expect(atLeast("0.4.0-next.1", "^0.4.0")).toBe(false);
+  expect(atLeast("0.4.0-next.1", "^0.3.0")).toBe(true);
+  expect(atLeast("0.4.0-next.1", "^0.4.0-next.1")).toBe(true);
+  expect(atLeast("0.4.0-next.2", "^0.4.0-next.1")).toBe(true);
+  expect(atLeast("0.4.0-next.10", "^0.4.0-next.9")).toBe(true);
+  expect(atLeast("0.4.0-next.0", "^0.4.0-next.1")).toBe(false);
+  expect(atLeast("0.4.0", "^0.4.0-next.1")).toBe(true);
+  expect(atLeast("0.4.0-alpha", "^0.4.0-beta")).toBe(false);
+  expect(atLeast("0.4.0-1", "^0.4.0-alpha")).toBe(false);
+});
+
+test("a newer installed version is never replaced by an older one", () => {
+  const root = tree("newer", {
+    "package.json": JSON.stringify({ dependencies: { "@vinena/vectoys-react": "^0.5.0" } }),
+    "node_modules/@vinena/vectoys-react/package.json": JSON.stringify({ version: "0.5.2" }),
+  });
+  expect(missing(root, ["@vinena/vectoys-react@^0.3.0"])).toEqual([]);
+  const listedOnly = tree("newer-listed", { "package.json": JSON.stringify({ dependencies: { "@vinena/vectoys-react": "^0.5.0" } }) });
+  expect(missing(listedOnly, ["@vinena/vectoys-react@^0.3.0"])).toEqual([]);
+  const pre = tree("prerelease", {
+    "package.json": JSON.stringify({ dependencies: { "@vinena/vectoys-react": "0.4.0-next.1" } }),
+  });
+  expect(missing(pre, ["@vinena/vectoys-react@^0.4.0"])).toEqual(["@vinena/vectoys-react@^0.4.0"]);
+});
+
+test("names built into objects, such as constructor, are not listed packages", () => {
+  const root = tree("builtin", { "package.json": JSON.stringify({ dependencies: {} }) });
+  expect(missing(root, ["constructor@^1.0.0", "toString"])).toEqual(["constructor@^1.0.0", "toString"]);
 });
 
 test("a package listed at a version too old for the range is installed again, at the range", () => {
