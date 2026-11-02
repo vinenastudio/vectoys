@@ -1,10 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, extname, join, posix, relative, resolve, sep } from "node:path";
 import { checkItem, type ItemSource } from "@vectoys/registry-build";
 import { ITEM_NAME, type Context } from "./commands";
-import { BASE_TSCONFIG, componentName } from "./create";
+import { BASE_TSCONFIG, componentName, itemPackage, itemTsconfig } from "./create";
 import { isPackageSpec } from "./pm";
 
 /**
@@ -86,10 +86,11 @@ function isRendered(value: unknown): value is Rendered {
 export function runInBun(script: string, entry: string, dir: string, wanted: string): { value: unknown } | { error: string } {
   const work = mkdtempSync(join(tmpdir(), "vectoys-check-"));
   try {
-    // Bun runs in the empty work folder, so it never reads a bunfig.toml the item brings.
+    // Bun runs in the empty work folder, so it never reads a bunfig.toml the item
+    // brings, and with only PATH from the environment, so it sees no secrets.
     const runner = join(work, "render.mjs");
     writeFileSync(runner, script);
-    const result = spawnSync("bun", [runner, entry, dir, wanted], { cwd: work, encoding: "utf8", timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
+    const result = spawnSync("bun", [runner, entry, dir, wanted], { cwd: work, env: { PATH: process.env.PATH ?? "" }, encoding: "utf8", timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
     if (result.error) {
       const missing = "code" in result.error && result.error.code === "ENOENT";
       return { error: missing ? "it needs bun to load the item's TSX: https://bun.sh" : result.error.message };
@@ -150,6 +151,9 @@ function itemProblem(item: ItemSource, dir: string): string | undefined {
     const kind = stat.isSymbolicLink() ? "a symlink, " : stat.isDirectory() ? "a folder, " : "";
     return `files lists ${JSON.stringify(other)}, which is ${kind}not a regular file`;
   }
+  // A symlinked folder on the way can lead a listed file outside.
+  const outside = item.files.find((path) => !realpathSync(resolve(dir, path)).startsWith(realpathSync(dir) + sep));
+  if (outside !== undefined) return `files lists ${JSON.stringify(outside)}, which is outside the folder`;
   if (item.dependencies !== undefined && !(Array.isArray(item.dependencies) && item.dependencies.every(isPackageSpec))) {
     return "dependencies are not all plain npm package names";
   }
@@ -162,12 +166,19 @@ export const ALLOWED_DEPENDENCIES = ["@vinena/vectoys", "@vinena/vectoys-react"]
 /** The packages an item's files may import, with their subpaths, besides each other. */
 export const ALLOWED_IMPORTS = [...ALLOWED_DEPENDENCIES, "react"];
 
-/** One of an item's files, as bun reads it: its code without comments, types or JSX, and what it imports. */
-export type Source = { path: string; code: string; imports: { path: string; kind: string }[] } | { path: string; error: string };
+/** What its tests and index may import besides: what the tests in registry/ use. */
+export const ALLOWED_TEST_IMPORTS = ["bun:test", "react-dom/server"];
 
-// Run by bun: reads each file the item lists and hands back its code as plain
-// JavaScript, with comments gone and JSX turned into calls, and its imports.
-// Bun's transpiler only parses, so nothing in the files runs.
+// Shared helpers tests in registry/ import from outside their own folder:
+// the repository's happy-dom setup, and another item's src.
+const TEST_HELPERS = [/^\.\.\/\.\.\/\.\.\/packages\/react\/test\/dom$/, /^\.\.\/\.\.\/[a-z0-9][a-z0-9._-]*\/src$/];
+
+/** One file in an item's folder, as bun reads it: its text, its code without comments, types or JSX, and what it imports. */
+export type Source = { path: string; text: string; code: string; imports: { path: string; kind: string }[] } | { path: string; error: string };
+
+// Run by bun: reads each file and hands back its code as plain JavaScript,
+// with comments gone and JSX turned into calls, and its imports. Bun's
+// transpiler only parses, so nothing in the files runs.
 const SCANNER = `
 const [, dir, list] = process.argv.slice(2);
 const { join } = await import("node:path");
@@ -175,10 +186,10 @@ const code = (path) => /\\.[cm]?[jt]sx?$/.test(path);
 const sources = [];
 for (const path of JSON.parse(list)) {
   const text = await Bun.file(join(dir, path)).text();
-  if (!code(path)) { sources.push({ path, code: text, imports: [] }); continue; }
+  if (!code(path)) { sources.push({ path, text, code: text, imports: [] }); continue; }
   try {
     const transpiler = new Bun.Transpiler({ loader: path.endsWith("x") ? "tsx" : "ts", deadCodeElimination: false });
-    sources.push({ path, code: transpiler.transformSync(text), imports: transpiler.scan(text).imports });
+    sources.push({ path, text, code: transpiler.transformSync(text), imports: transpiler.scan(text).imports });
   } catch (error) {
     sources.push({ path, error: error instanceof Error ? error.message : String(error) });
   }
@@ -190,6 +201,8 @@ function isSource(value: unknown): value is Source {
   if (typeof value !== "object" || value === null || !("path" in value) || typeof value.path !== "string") return false;
   if ("error" in value) return typeof value.error === "string";
   return (
+    "text" in value &&
+    typeof value.text === "string" &&
     "code" in value &&
     typeof value.code === "string" &&
     "imports" in value &&
@@ -205,64 +218,130 @@ export function sources(dir: string, files: string[]): Source[] | string {
   return Array.isArray(ran.value) && ran.value.every(isSource) ? ran.value : "bun gave back something other than the files";
 }
 
+/** Every regular file in `dir` outside node_modules, as paths from `dir`. */
+function walk(dir: string, under = ""): string[] {
+  return readdirSync(join(dir, under), { withFileTypes: true }).flatMap((entry) => {
+    const path = under ? `${under}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) return entry.name === "node_modules" ? [] : walk(dir, path);
+    return entry.isFile() ? [path] : [];
+  });
+}
+
+const CODE = /\.[cm]?[jt]sx?$/;
+
+/** The code files in `dir` outside node_modules, as paths from `dir`: what the item ships, and its index and tests. */
+export function codeFiles(dir: string): string[] {
+  return walk(dir).filter((path) => CODE.test(path));
+}
+
 const STRING = "[\"'`]";
-const GLOBALS = ["fetch", "eval", "Function", "XMLHttpRequest", "WebSocket", "EventSource", "sendBeacon", "importScripts", "localStorage", "sessionStorage", "indexedDB", "cookie", "constructor"];
+const GLOBALS = ["fetch", "eval", "Function", "XMLHttpRequest", "WebSocket", "EventSource", "sendBeacon", "importScripts", "localStorage", "sessionStorage", "indexedDB", "cookie", "constructor", "open", "location", "postMessage", "clipboard"];
+const ELEMENTS = "script|iframe|frame|object|embed|form";
 
 /** What an item's code may not do, each with the words a failing line uses for it. */
 const UNSAFE: [RegExp, string][] = [
+  [/\b(Bun|process|Deno|module|exports|require|__dirname|__filename|globalThis)\b/, "uses the server runtime"],
   [/<script\b/i, "has a <script> tag"],
-  [new RegExp(`${STRING}script${STRING}`, "i"), "makes a script element"],
+  [/<(iframe|frame|object|embed|form)\b/i, "has a frame, object, embed or form tag"],
+  [new RegExp(`\\b(jsx\\w*|createElement)\\s*\\(\\s*${STRING}(${ELEMENTS})${STRING}`, "i"), "makes a script, frame, object, embed or form element"],
+  [new RegExp(`${STRING}(script|iframe|frame|embed|form)${STRING}`, "i"), "names a script, frame, embed or form element in a string"],
+  [/\bsrcdoc\b/i, "sets srcdoc"],
   [/\b(dangerouslySetInnerHTML|innerHTML|outerHTML|insertAdjacentHTML)\b/, "sets HTML from a string"],
   [/\bdocument\s*\.\s*write/, "writes into the document"],
-  [/\beval\s*\(/, "calls eval"],
-  [/\bFunction\s*\(|\.\s*constructor\b/, "makes a function from a string"],
+  [/\beval\b/, "uses eval"],
+  [/\bFunction\b|\.\s*constructor\b|\bconstructor\s*[:,}]/, "reaches the Function constructor"],
   [new RegExp(`\\bset(Timeout|Interval)\\s*\\(\\s*${STRING}`), "passes a string to setTimeout or setInterval"],
-  [/\bfetch\s*\(/, "calls fetch"],
+  [/\bfetch\b/, "uses fetch"],
   [/\b(XMLHttpRequest|WebSocket|EventSource|sendBeacon|importScripts)\b/, "makes a network call"],
+  [/\b(Worker|SharedWorker|serviceWorker|postMessage)\b/, "talks to a worker or another window"],
+  [/\bclipboard\b/, "uses the clipboard"],
+  [/\bwindow\s*\.\s*open\b|(?<![.\w$])open\s*\(/, "opens a window"],
+  [/\blocation\s*(\.\s*(href|assign|replace|reload)\b|=(?!=))|\b(window|document)\s*\.\s*location\b/, "moves the page"],
   [/\bimport\s*\(/, "has a dynamic import"],
-  [/\brequire\s*\(/, "calls require"],
   [/\b(localStorage|sessionStorage|indexedDB)\b|\bdocument\s*\.\s*cookie\b/, "uses browser storage or cookies"],
   [new RegExp(`${STRING}(${GLOBALS.join("|")})${STRING}`), "names a blocked browser feature in a string"],
-  [new RegExp(`${STRING}\\s*(?!https?://www\\.w3\\.org/)(https?:|//|javascript:|data:\\s*text/html)`, "i"), "has an outside URL"],
+  [/javascript\s*:/i, "has a javascript: URL"],
+  [new RegExp(`\\bhttps?://(?!www\\.w3\\.org/)|[${"\"'`"}}]\\s*//[a-z0-9]|${STRING}\\s*data:\\s*text/html`, "i"), "has an outside URL"],
   [/url\(\s*["']?\s*(https?:|\/\/)|@import\b/i, "loads a style from outside"],
 ];
+
+// What tests in registry/ need of the test runner: reading their own files
+// with Bun.file, putting fakes on globalThis, and reading innerHTML or outerHTML.
+const TEST_RUNTIME = /\bBun\.file\(|\bglobalThis\.(AudioContext|IntersectionObserver)\b|\bObject\.assign\(globalThis,|\.(innerHTML|outerHTML)\b(?!\s*=[^=])/g;
+
+/**
+ * `code` without the dynamic imports of a constant that names a file in the
+ * folder, `const SOURCE = "./fixtures/x.ts"; await import(SOURCE)`, as tests
+ * in registry/ load fixtures. The constant may appear nowhere else.
+ */
+function withoutFixtureImports(code: string, from: string, files: string[]): string {
+  return code.replace(/\bimport\s*\(\s*([A-Za-z_$][\w$]*)\s*\)/g, (match, name: string) => {
+    const uses = code.match(new RegExp(`(?<![\\w$.])${name.replace(/\$/g, "\\$")}(?![\\w$])`, "g")) ?? [];
+    const value = new RegExp(`\\bconst ${name.replace(/\$/g, "\\$")} = "(\\.[^"]*)";`).exec(code)?.[1];
+    return uses.length === 2 && value !== undefined && names(value, from, files) ? " " : match;
+  });
+}
 
 /** What rendered markup may not have, each with the words a failing line uses for it. */
 const UNSAFE_MARKUP: [RegExp, string][] = [
   [/<script\b/i, "has a <script> tag"],
-  [/\s(href|xlink:href|src|srcset|action|formaction)="\s*(https?:|\/\/|javascript:|data:\s*text\/html)/i, "links outside"],
+  [/<(iframe|frame|object|embed|form)\b/i, "has a frame, object, embed or form tag"],
+  [/\ssrcdoc=/i, "sets srcdoc"],
+  [/javascript\s*:/i, "has a javascript: URL"],
+  [/\s(href|xlink:href|src|srcset|action|formaction)="\s*(https?:|\/\/|data:\s*text\/html)/i, "links outside"],
   [/url\(\s*(&quot;|&#x27;|["'])?\s*(https?:|\/\/)/i, "loads a style from outside"],
 ];
 
-const allowed = (name: string) => ALLOWED_IMPORTS.some((pkg) => name === pkg || name.startsWith(`${pkg}/`));
+const allowed = (name: string, list: string[]) => list.some((pkg) => name === pkg || name.startsWith(`${pkg}/`));
 
-/** Whether the relative import `specifier` in `from` names another of the item's `files`. */
-function listed(specifier: string, from: string, files: string[]): boolean {
+/** Whether the relative import `specifier` in `from` names one of `files`. */
+function names(specifier: string, from: string, files: string[]): boolean {
   const base = posix.join(posix.dirname(from), specifier).replace(/\.js$/, "");
   return ["", ".ts", ".tsx", "/index.ts", "/index.tsx"].some((suffix) => files.includes(base + suffix));
 }
 
+/** The line in `text` where `found` is, from the longest of its words the text has, as ":12"; empty if it cannot tell. */
+function lineOf(text: string, found: string): string {
+  const lines = text.split("\n");
+  for (const word of (found.match(/[@A-Za-z_$][\w$]*|\/\/|<\w+/g) ?? []).sort((a, b) => b.length - a.length)) {
+    const at = lines.findIndex((line) => line.includes(word));
+    if (at !== -1) return `:${at + 1}`;
+  }
+  return "";
+}
+
 /**
- * What in an item's files could run code it does not show or reach outside
- * the page: scripts, eval, network calls, browser storage, outside URLs, and
- * imports of anything but its own files and the allowed packages. One line
- * for each, naming the file; none if the code is safe.
+ * What in an item's folder could run code it does not show or reach outside
+ * the page: the server runtime, scripts and frames, eval, network calls,
+ * windows, browser storage, outside URLs, and imports of anything but the
+ * item's own files and the allowed packages. `files` is every code file in
+ * the folder; those item.json does not list, its index and tests, may also
+ * import the test runner and any file in the folder. One line for each,
+ * naming the file; none if the code is safe.
  */
-export function safety(files: Source[], item: Pick<ItemSource, "dependencies">): string[] {
+export function safety(files: Source[], item: Pick<ItemSource, "dependencies" | "files">): string[] {
   const problems = (item.dependencies ?? []).filter((name) => !ALLOWED_DEPENDENCIES.includes(name)).map((name) => `item.json depends on ${name}, which is not ${ALLOWED_DEPENDENCIES.join(" or ")}`);
-  const paths = files.map((file) => file.path);
+  const all = files.map((file) => file.path);
   for (const file of files) {
     if ("error" in file) {
       problems.push(`${file.path} does not parse: ${file.error}`);
       continue;
     }
+    const shipped = item.files.includes(file.path);
+    const test = !shipped && file.path.startsWith("test/");
     for (const entry of file.imports) {
       if (entry.kind !== "import-statement") continue;
-      if (entry.path.startsWith(".") ? !listed(entry.path, file.path, paths) : !allowed(entry.path)) problems.push(`${file.path} imports ${entry.path}, which is not one of its files or ${ALLOWED_IMPORTS.join(", ")}`);
+      const fine = entry.path.startsWith(".")
+        ? names(entry.path, file.path, shipped ? item.files : all) || (test && TEST_HELPERS.some((helper) => helper.test(entry.path)))
+        : allowed(entry.path, shipped ? ALLOWED_IMPORTS : [...ALLOWED_IMPORTS, ...ALLOWED_TEST_IMPORTS]);
+      if (!fine) problems.push(`${file.path}${lineOf(file.text, JSON.stringify(entry.path))} imports ${entry.path}, which is not ${shipped ? "one of its files" : "a file in its folder"} or ${(shipped ? ALLOWED_IMPORTS : [...ALLOWED_IMPORTS, ...ALLOWED_TEST_IMPORTS]).join(", ")}`);
     }
+    const pragma = /@jsx\w*/.exec(file.text);
+    if (pragma) problems.push(`${file.path}${lineOf(file.text, pragma[0])} sets the JSX runtime in a comment: ${pragma[0]}`);
+    const code = test ? withoutFixtureImports(file.code.replace(TEST_RUNTIME, " "), file.path, all) : file.code;
     for (const [pattern, what] of UNSAFE) {
-      const found = pattern.exec(file.code);
-      if (found) problems.push(`${file.path} ${what}: ${found[0].trim()}`);
+      const found = pattern.exec(code);
+      if (found) problems.push(`${file.path}${lineOf(file.text, found[0])} ${what}: ${found[0].trim()}`);
     }
   }
   return problems;
@@ -276,25 +355,22 @@ export function markupSafety(html: string): string[] {
   });
 }
 
-/** The files and folders in `dir` that could set up bun or a package manager: bunfig.toml and any name starting with a dot but .gitignore. */
+/** The files and folders in `dir` that could set up bun or a package manager, or point outside it: bunfig.toml, any name starting with a dot but .gitignore, and symlinks. */
 export function configFiles(dir: string, under = ""): string[] {
   return readdirSync(join(dir, under), { withFileTypes: true }).flatMap((entry) => {
     const path = under ? `${under}/${entry.name}` : entry.name;
-    if (entry.name === "bunfig.toml" || (entry.name.startsWith(".") && entry.name !== ".gitignore")) return [path];
-    return entry.isDirectory() && entry.name !== "node_modules" ? configFiles(dir, path) : [];
+    if (entry.name === "node_modules") return [];
+    if (entry.name === "bunfig.toml" || entry.isSymbolicLink() || (entry.name.startsWith(".") && entry.name !== ".gitignore")) return [path];
+    return entry.isDirectory() ? configFiles(dir, path) : [];
   });
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 const TSCONFIG = /^[tj]sconfig.*\.json$/;
-
-/** The tsconfig and jsconfig files in `dir`, outside node_modules, as paths from `dir`. */
-function tsconfigFiles(dir: string, under = ""): string[] {
-  return readdirSync(join(dir, under), { withFileTypes: true }).flatMap((entry) => {
-    const path = under ? `${under}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) return entry.name === "node_modules" ? [] : tsconfigFiles(dir, path);
-    return TSCONFIG.test(entry.name) ? [path] : [];
-  });
-}
+const TSCONFIG_KEYS = ["extends", "compilerOptions", "include", "exclude"];
+// The options vectoys create writes outside the repository, which are the most an item sets.
+const TSCONFIG_OPTIONS = Object.keys(itemTsconfig(false).compilerOptions);
 
 /**
  * What in the item's tsconfig and jsconfig files could make an import load
@@ -303,20 +379,74 @@ function tsconfigFiles(dir: string, under = ""): string[] {
  * tsconfig.json. One line for each.
  */
 export function tsconfigProblems(dir: string): string[] {
-  return tsconfigFiles(dir).flatMap((file) => {
-    let config: unknown;
-    try {
-      config = JSON.parse(readFileSync(join(dir, file), "utf8"));
-    } catch {
-      return [`${file} is not plain JSON, so check cannot tell what it sets`];
-    }
-    if (typeof config !== "object" || config === null || Array.isArray(config)) return [`${file} is not an object`];
-    const problems: string[] = [];
-    // The base is only the shared one from the folder's own tsconfig.json; from a subfolder the same path names another file.
-    if ("extends" in config && (file !== "tsconfig.json" || config.extends !== BASE_TSCONFIG)) problems.push(`${file} extends ${JSON.stringify(config.extends)}, which is not ${BASE_TSCONFIG} from the folder's tsconfig.json`);
-    const options = "compilerOptions" in config && typeof config.compilerOptions === "object" && config.compilerOptions !== null ? config.compilerOptions : {};
-    for (const option of ["paths", "baseUrl", "rootDirs"]) if (option in options) problems.push(`${file} sets compilerOptions.${option}, which moves imports`);
-    return problems;
+  return walk(dir)
+    .filter((path) => TSCONFIG.test(basename(path)))
+    .flatMap((file) => {
+      let config: unknown;
+      try {
+        config = JSON.parse(readFileSync(join(dir, file), "utf8"));
+      } catch {
+        return [`${file} is not plain JSON, so check cannot tell what it sets`];
+      }
+      if (typeof config !== "object" || config === null || Array.isArray(config)) return [`${file} is not an object`];
+      const problems: string[] = [];
+      // The base is only the shared one from the folder's own tsconfig.json; from a subfolder the same path names another file.
+      if ("extends" in config && (file !== "tsconfig.json" || config.extends !== BASE_TSCONFIG)) problems.push(`${file} extends ${JSON.stringify(config.extends)}, which is not ${BASE_TSCONFIG} from the folder's tsconfig.json`);
+      for (const key of Object.keys(config)) if (!TSCONFIG_KEYS.includes(key)) problems.push(`${file} has ${key}, which items may not have`);
+      const options = "compilerOptions" in config && isRecord(config.compilerOptions) ? config.compilerOptions : {};
+      for (const [option, value] of Object.entries(options)) {
+        if (["paths", "baseUrl", "rootDirs"].includes(option)) problems.push(`${file} sets compilerOptions.${option}, which moves imports`);
+        else if (!TSCONFIG_OPTIONS.includes(option)) problems.push(`${file} sets compilerOptions.${option}, which items may not set`);
+        else if (option === "jsx" && value !== "react-jsx") problems.push(`${file} sets compilerOptions.jsx to ${JSON.stringify(value)}, not "react-jsx"`);
+      }
+      return problems;
+    });
+}
+
+/** `value` as JSON with its keys in order, to compare. */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (isRecord(value)) return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
+  return JSON.stringify(value) ?? "undefined";
+}
+
+const PLAIN_VERSION = /^\^?\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/;
+
+/** Whether `value` is `inRepo`, or has the keys of `outside` with each version plain where `outside`'s is. */
+function versionsFit(value: unknown, inRepo: unknown, outside: unknown): boolean {
+  if (canonical(value) === canonical(inRepo)) return true;
+  if (!isRecord(value) || !isRecord(outside)) return false;
+  const keys = Object.keys(value).sort();
+  if (canonical(keys) !== canonical(Object.keys(outside).sort())) return false;
+  return keys.every((key) => {
+    const version = value[key];
+    const want = outside[key];
+    return version === want || (typeof version === "string" && typeof want === "string" && PLAIN_VERSION.test(version) && PLAIN_VERSION.test(want));
+  });
+}
+
+/**
+ * What in the item's package.json differs from the one `vectoys create`
+ * writes, inside the repository or outside it: anything but its name and
+ * description, such as an install script or another dependency. One line for each.
+ */
+export function packageProblems(dir: string, item: Pick<ItemSource, "name">): string[] {
+  const path = join(dir, "package.json");
+  if (!existsSync(path)) return [];
+  let pkg: unknown;
+  try {
+    pkg = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return ["package.json is not valid JSON"];
+  }
+  if (!isRecord(pkg)) return ["package.json is not an object"];
+  const description = typeof pkg.description === "string" ? pkg.description : "";
+  const inRepo: Record<string, unknown> = { ...itemPackage(item.name, description, true) };
+  const outside: Record<string, unknown> = { ...itemPackage(item.name, description, false) };
+  return [...new Set([...Object.keys(inRepo), ...Object.keys(pkg)])].flatMap((key) => {
+    if (!(key in inRepo)) return [`package.json has ${key}, which items may not have`];
+    const fits = key === "dependencies" || key === "devDependencies" ? versionsFit(pkg[key], inRepo[key], outside[key]) : canonical(pkg[key]) === canonical(inRepo[key]);
+    return fits ? [] : [`package.json's ${key} is not what vectoys create writes`];
   });
 }
 
@@ -350,7 +480,7 @@ export function checks(dir: string): Result[] {
   if (typeof item === "string") return [{ pass: false, line: item }];
   const results: Result[] = [{ pass: true, line: "item.json has what the registry needs" }];
 
-  const config = [...configFiles(dir).map((file) => `the folder has ${file}, which items may not have`), ...tsconfigProblems(dir)];
+  const config = [...configFiles(dir).map((file) => `the folder has ${file}, which items may not have`), ...tsconfigProblems(dir), ...packageProblems(dir, item)];
   if (config.length) return [...results, ...config.map((line) => ({ pass: false, line }))];
 
   const size = item.files.reduce((sum, file) => sum + lstatSync(resolve(dir, file)).size, 0);
@@ -361,7 +491,7 @@ export function checks(dir: string): Result[] {
   results.push({ pass: named.length === 0, line: named.length ? `item.json names brands: ${named.join(", ")}` : "item.json names no brands" });
 
   // Before anything renders, so code that fails runs nowhere.
-  const read = sources(dir, item.files);
+  const read = sources(dir, [...new Set([...item.files, ...codeFiles(dir)])]);
   const unsafe = typeof read === "string" ? [`bun could not read the files: ${read}`] : safety(read, item);
   if (unsafe.length) return [...results, ...unsafe.map((line) => ({ pass: false, line }))];
   results.push({ pass: true, line: "the code is safe: no scripts, eval, network calls or outside imports" });

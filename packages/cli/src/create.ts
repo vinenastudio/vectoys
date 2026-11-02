@@ -45,27 +45,16 @@ function gitAuthor(cwd: string): string | undefined {
   return result.status === 0 ? result.stdout.trim() || undefined : undefined;
 }
 
-/** The files of a new item named `name`, by their path in its folder. */
-export function scaffold(name: string, author?: string, inRepo = false): Record<string, string> {
-  const component = componentName(name);
-  const title = titleOf(name);
-  const item = {
-    name,
-    title,
-    description: `${title}: a tilted slab drawn as SVG paths. Say what it is and what it does.`,
-    files: ["src/geometry.ts", `src/${name}.tsx`],
-    dependencies: ["@vinena/vectoys", "@vinena/vectoys-react"],
-    license: "MIT",
-    ...(author ? { author } : {}),
-  };
+/** An item's package.json, for the item `name` with the description `description`. */
+export function itemPackage(name: string, description: string, inRepo: boolean) {
   // In the repository the workspace links the packages; elsewhere they come
   // from npm at the version this CLI was released with, as all share one.
   const vectoys = inRepo ? "workspace:*" : `^${version}`;
-  const pkg = {
+  return {
     name: `@vectoys/${name}`,
     version: "0.0.0",
     private: true,
-    description: `${title} drawn with the vectoys engine.`,
+    description,
     type: "module",
     sideEffects: false,
     exports: { ".": "./src/index.ts" },
@@ -80,6 +69,22 @@ export function scaffold(name: string, author?: string, inRepo = false): Record<
       "react-dom": "19.0.0",
     },
   };
+}
+
+/** The files of a new item named `name`, by their path in its folder. */
+export function scaffold(name: string, author?: string, inRepo = false): Record<string, string> {
+  const component = componentName(name);
+  const title = titleOf(name);
+  const item = {
+    name,
+    title,
+    description: `${title}: a tilted slab drawn as SVG paths. Say what it is and what it does.`,
+    files: ["src/geometry.ts", `src/${name}.tsx`],
+    dependencies: ["@vinena/vectoys", "@vinena/vectoys-react"],
+    license: "MIT",
+    ...(author ? { author } : {}),
+  };
+  const pkg = itemPackage(name, `${title} drawn with the vectoys engine.`, inRepo);
   const tsconfig = itemTsconfig(inRepo);
   const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 
