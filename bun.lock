@@ -44,7 +44,7 @@
     },
     "packages/cli": {
       "name": "@vinena/vectoys-cli",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "bin": {
         "vectoys": "./dist/index.js",
       },
@@ -54,11 +54,11 @@
     },
     "packages/engine": {
       "name": "@vinena/vectoys",
-      "version": "0.2.0",
+      "version": "0.2.1",
     },
     "packages/react": {
       "name": "@vinena/vectoys-react",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "dependencies": {
         "@vinena/vectoys": "workspace:^",
       },

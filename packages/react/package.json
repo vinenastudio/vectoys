@@ -1,6 +1,6 @@
 {
   "name": "@vinena/vectoys-react",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "React pieces for vectoys scenes: a stage that scales with its parent, drawn faces and live screens.",
   "license": "MIT",
   "homepage": "https://github.com/vinenastudio/vectoys#readme",
