@@ -1,0 +1,11 @@
+{
+  "name": "dummy-ball",
+  "title": "Dummy ball",
+  "description": "Dummy ball: a flat ball drawn as one SVG circle with a highlight, for testing vectoys submit.",
+  "files": [
+    "src/dummy-ball.tsx"
+  ],
+  "dependencies": [],
+  "license": "MIT",
+  "author": "Test Maker (https://example.com)"
+}
