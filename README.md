@@ -125,6 +125,17 @@ To send a toy to this registry, read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 `submit` runs `check` and stops if any check fails. Then, with the [GitHub CLI](https://cli.github.com), it forks this repository, copies the files `item.json` lists, its `package.json`, `tsconfig.json`, `src/index.ts` and `test/` to `registry/<name>/` on a branch `item/<name>`, adds the item's package to `bun.lock` (this needs [bun](https://bun.sh) 1.3.2 or newer), and opens a pull request that lists the check results. `submit --registry <url>` reads `<url>/index.json` (or the URL itself if it ends in `.json`), checks that it lists items, and opens a pull request that adds your registry to `registries.json`. Submissions open when vectoys launches: until then `submit` checks, says what it would send, and sends nothing. `--dry-run` does the same at any time.
 
+### Visual tests
+
+Every item's gallery preview has three snapshots in `apps/site/visual/snapshots/`: light, dark and reduced motion. The `visual` job in CI draws each preview again and fails when one differs by more than 1% of its pixels. The snapshots come from Linux, so both commands run in the pinned Playwright image through Docker:
+
+```sh
+bun run test:visual
+bun run test:visual:update
+```
+
+`test:visual` checks the previews and writes a report to `apps/site/visual/report/`. `test:visual:update` writes new snapshots for every preview that changed or has none. A new item needs no setup: its snapshots are made the first time you run `test:visual:update`. Commit them in the same pull request as the item, and look at each new or changed PNG before you commit it. If the `visual` job fails, download its `visual-report` artifact to see what changed.
+
 ### Host your own registry
 
 Serve one JSON file per item at `<base>/<name>.json`, in the [shadcn registry-item format](https://ui.shadcn.com/docs/registry/registry-item-json) with each file's source in `content`, and an `index.json` at `<base>/index.json` that lists `{ "items": [{ "name", "title", "description" }] }`. Any static host works; `bun run registry:build` shows how this repo writes its own to `apps/site/public/r`.

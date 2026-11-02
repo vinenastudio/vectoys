@@ -9,10 +9,13 @@
     "release": "bun run build && cd packages/engine && bun publish && cd ../react && bun publish && cd ../cli && bun publish",
     "registry:build": "bun packages/registry-build/src/main.ts",
     "typecheck": "bun run --filter '*' typecheck",
-    "test": "bun run build && bun test"
+    "test": "bun run build && bun test",
+    "test:visual": "sh apps/site/visual/run.sh",
+    "test:visual:update": "sh apps/site/visual/run.sh --update-snapshots"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "20.14.5",
+    "@playwright/test": "1.63.0",
     "@types/bun": "1.3.14",
     "typescript": "7.0.2"
   }

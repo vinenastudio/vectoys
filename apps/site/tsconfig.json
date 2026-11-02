@@ -4,5 +4,5 @@
     "jsx": "react-jsx",
     "types": ["vite/client", "bun"]
   },
-  "include": ["src", "scripts", "test", "vite.config.ts", "worker.ts"]
+  "include": ["src", "scripts", "test", "visual", "vite.config.ts", "worker.ts"]
 }
