@@ -365,6 +365,7 @@ function Angled({
           transform: "translateX(-50%)",
           borderRadius: "0 0 0.8cqw 0.8cqw",
           background: "black",
+          pointerEvents: "none",
         }}
       >
         <div style={{ width: "0.7cqw", height: "0.7cqw", borderRadius: "50%", background: LENS }} />
