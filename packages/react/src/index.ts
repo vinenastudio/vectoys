@@ -6,3 +6,4 @@ export { PIXELS_PER_UNIT, Screen, placeScreen } from "./screen.tsx";
 export { useScrub, type Progress, type UseScrubOptions } from "./scrub.ts";
 export { useSpring } from "./spring.ts";
 export { Stage, type StyleWithVariables } from "./stage.tsx";
+export { Turntable, type Turn, type TurnLimits, type TurnOptions, type TurntableProps } from "./turntable.tsx";

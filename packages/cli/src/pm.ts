@@ -52,15 +52,65 @@ export function installCommand(pm: PackageManager, packages: string[]): [string,
   return [pm, [pm === "npm" ? "install" : "add", ...packages]];
 }
 
-/** The packages from `wanted` the project's package.json does not list yet. */
+/**
+ * The specs from `wanted` the project needs installed: a package its
+ * package.json does not list yet, or one older than the spec's version. The
+ * version is the installed one in node_modules, else the lowest the
+ * package.json range allows. A newer version is kept, never replaced.
+ */
 export function missing(cwd: string, wanted: string[]): string[] {
   const path = join(cwd, "package.json");
   if (!existsSync(path)) return wanted;
   const pkg = JSON.parse(readFileSync(path, "utf8"));
-  const have = new Set(
-    ["dependencies", "devDependencies", "peerDependencies"].flatMap((field) => Object.keys(pkg[field] ?? {})),
-  );
-  return wanted.filter((spec) => !have.has(packageName(spec)));
+  const listed: Record<string, unknown> = Object.assign({}, ...["peerDependencies", "devDependencies", "dependencies"].map((field) => pkg[field] ?? {}));
+  return wanted.filter((spec) => {
+    const name = packageName(spec);
+    if (!Object.hasOwn(listed, name)) return true;
+    const installed = readPackage(join(cwd, "node_modules", name, "package.json"))?.version;
+    const range = listed[name];
+    const have = typeof installed === "string" ? installed : typeof range === "string" ? range.replace(/^[\^~=v\s]+/, "") : "";
+    return !atLeast(have, spec.slice(name.length + 1));
+  });
+}
+
+type Version = { parts: number[]; pre: string[] };
+
+const parse = (version: string): Version | undefined => {
+  const found = /^(\d+)\.(\d+)\.(\d+)(?:-([\w.-]+))?(?:\+[\w.-]*)?$/.exec(version);
+  return found ? { parts: [Number(found[1]), Number(found[2]), Number(found[3])], pre: found[4]?.split(".") ?? [] } : undefined;
+};
+
+// Below 0 if `a` is the lower version, above 0 if it is the higher, by semver
+// order: a prerelease such as 0.4.0-next.1 is below 0.4.0.
+function compare(a: Version, b: Version): number {
+  for (const [at, part] of a.parts.entries()) {
+    const other = b.parts[at];
+    if (other === undefined) return 1;
+    if (part !== other) return part - other;
+  }
+  if (a.pre.length === 0 || b.pre.length === 0) return b.pre.length - a.pre.length;
+  for (const [at, id] of a.pre.entries()) {
+    const other = b.pre[at];
+    if (other === undefined) return 1;
+    if (id === other) continue;
+    const [x, y] = [/^\d+$/.test(id), /^\d+$/.test(other)];
+    if (x && y) return Number(id) - Number(other);
+    if (x !== y) return x ? -1 : 1;
+    return id < other ? -1 : 1;
+  }
+  return a.pre.length - b.pre.length;
+}
+
+/**
+ * Whether `version` is at least the base version of `range`, an exact version
+ * or a caret range such as ^0.3.0 or ^0.4.0-next.1. Any other range, or a
+ * version that is not semver, such as workspace:*, counts as met.
+ */
+export function atLeast(version: string, range: string): boolean {
+  const have = parse(version);
+  const want = parse(range.replace(/^\^/, ""));
+  if (!have || !want) return true;
+  return compare(have, want) >= 0;
 }
 
 // "@scope/name@1.2.0" is "@scope/name", "name@^1" is "name".
