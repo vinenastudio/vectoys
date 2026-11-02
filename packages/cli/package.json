@@ -1,6 +1,6 @@
 {
   "name": "@vinena/vectoys-cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Copy vectoys devices and toys into your project.",
   "license": "MIT",
   "homepage": "https://github.com/vinenastudio/vectoys#readme",
