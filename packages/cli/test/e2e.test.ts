@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { buildRegistry } from "@vectoys/registry-build";
+import { buildRegistry, componentName } from "@vectoys/registry-build";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -161,13 +161,18 @@ const USES: Record<string, { imports: string[]; jsx: string }> = {
   watch: { imports: ['import { Watch } from "./components/vectoys/watch/watch";'], jsx: '<Watch band="#333"><p>d</p></Watch>' },
 };
 
+const indexNames = (): string[] => JSON.parse(readFileSync(join(out, "index.json"), "utf8")).items.map((item: { name: string }) => item.name);
+
+/** How the page uses `name`: as USES says, else its component with no props, as a submitted item renders in check. */
+const use = (name: string) => USES[name] ?? { imports: [`import { ${componentName(name)} } from "./components/vectoys/${name}/${name}";`], jsx: `<${componentName(name)} />` };
+
 test("every item in the index adds, and the page uses each one", async () => {
-  const names: string[] = JSON.parse(readFileSync(join(out, "index.json"), "utf8")).items.map((item: { name: string }) => item.name);
-  expect(Object.keys(USES).sort()).toEqual([...names].sort());
+  const names = indexNames();
+  expect(Object.keys(USES).filter((name) => !names.includes(name))).toEqual([]);
   const { stderr, code } = await run("add", ...names, "--no-install", "--overwrite");
   expect(stderr).toBe("");
   expect(code).toBe(0);
-  for (const name of names) expect(existsSync(target(name, "geometry.ts"))).toBe(true);
+  for (const name of names) expect(existsSync(target(name, `${name}.tsx`))).toBe(true);
 });
 
 // A tsconfig for `dir` that maps the vectoys packages and React to this repo.
@@ -202,8 +207,9 @@ function tsconfig(dir: string, options: Record<string, unknown>) {
 
 // A page in `dir` that uses every item, with relative imports ending in `extension`.
 function page(dir: string, extension = "") {
-  const imports = Object.values(USES).flatMap((use) => use.imports.map((line) => line.replace(/(\/[\w-]+)";$/, `$1${extension}";`)));
-  writeFileSync(join(dir, "src/page.tsx"), [...imports, `export const Page = () => (<>${Object.values(USES).map((use) => use.jsx).join("")}</>);`].join("\n"));
+  const uses = indexNames().map(use);
+  const imports = uses.flatMap((each) => each.imports.map((line) => line.replace(/(\/[\w-]+)";$/, `$1${extension}";`)));
+  writeFileSync(join(dir, "src/page.tsx"), [...imports, `export const Page = () => (<>${uses.map((each) => each.jsx).join("")}</>);`].join("\n"));
 }
 
 function typecheck(dir: string) {

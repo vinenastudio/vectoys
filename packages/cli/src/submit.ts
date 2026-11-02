@@ -38,7 +38,7 @@ export type SubmitOptions = {
 };
 
 /** A pull request to open: on `branch`, with the files `write` puts in a clone. */
-type Change = { branch: string; title: string; body: string; steps: string[]; write: (clone: string) => void };
+type Change = { branch: string; title: string; body: string; steps: string[]; write: (clone: string, runner: Run) => void };
 
 /** Runs `args` and gives back its output, or fails with what it printed. */
 function must(runner: Run, command: string, args: string[], cwd: string): string {
@@ -68,7 +68,7 @@ function openPullRequest(change: Change, runner: Run, cwd: string): { url: strin
     const clone = join(work, "vectoys");
     must(runner, "gh", ["repo", "clone", `${login}/vectoys`, clone, "--", "--depth", "1"], work);
     must(runner, "git", ["checkout", "-b", change.branch], clone);
-    change.write(clone);
+    change.write(clone, runner);
     must(runner, "git", ["add", "--all"], clone);
     must(runner, "git", ["commit", "-m", change.title], clone);
     // The shallow clone tracks only main, so the lease names the branch's commit on the fork, or none if it has no such branch.
@@ -96,9 +96,9 @@ function steps(change: Pick<Change, "branch" | "title">, own: string[]): string[
   ];
 }
 
-/** The files of an item folder that go into the registry: those item.json lists, its package, tsconfig and tests. */
+/** The files of an item folder that go into the registry: those item.json lists, its package, tsconfig, index and tests. */
 export function itemFiles(dir: string, listed: string[]): string[] {
-  const extra = ["package.json", "tsconfig.json", "test"].filter((path) => existsSync(join(dir, path)));
+  const extra = ["package.json", "tsconfig.json", "src/index.ts", "test"].filter((path) => existsSync(join(dir, path)));
   return [...new Set(["item.json", ...listed, ...extra])];
 }
 
@@ -157,14 +157,16 @@ function itemChange(context: Context, dir: string): Change {
     branch,
     title,
     body,
-    steps: steps({ branch, title }, [`Copy ${files.join(", ")} into registry/${item.name}/`]),
-    write: (clone) => {
+    steps: steps({ branch, title }, [`Copy ${files.join(", ")} into registry/${item.name}/`, "Add the item's package to bun.lock with bun install --lockfile-only"]),
+    write: (clone, runner) => {
       for (const file of files) {
         const to = join(clone, "registry", item.name, file);
         mkdirSync(dirname(to), { recursive: true });
         cpSync(join(dir, file), to, { recursive: true });
       }
       inRepoForm(join(clone, "registry", item.name));
+      // The item is a new workspace package, and CI installs with a frozen lockfile.
+      must(runner, "bun", ["install", "--lockfile-only", "--ignore-scripts"], clone);
     },
   };
 }

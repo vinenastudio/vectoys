@@ -71,22 +71,24 @@ test("submit opens a pull request that adds the item's files to the registry", a
   expect(calls[1]).toBe("gh repo fork vinenastudio/vectoys --clone=false");
   expect(calls[2]).toBe("gh repo sync octo/vectoys --branch main");
   expect(calls[3]).toMatch(/^gh repo clone octo\/vectoys \S+ -- --depth 1$/);
-  expect(calls.slice(4, 10)).toEqual([
+  expect(calls.slice(4, 11)).toEqual([
     "git checkout -b item/plate",
+    "bun install --lockfile-only --ignore-scripts",
     "git add --all",
     "git commit -m Add the plate item",
     "git ls-remote origin refs/heads/item/plate",
     "git push --force-with-lease=refs/heads/item/plate: --set-upstream origin item/plate",
     "gh pr list --repo vinenastudio/vectoys --head octo:item/plate --state open --json url",
   ]);
-  expect(calls[10]).toStartWith("gh pr create --repo vinenastudio/vectoys --base main --head octo:item/plate --title Add the plate item --body Adds `registry/plate`");
-  expect(calls[10]).toContain("- pass: Plate renders on the server");
-  expect(calls[10]).toContain("I agree to license it under the MIT license.");
-  expect(calls).toHaveLength(11);
+  expect(calls[11]).toStartWith("gh pr create --repo vinenastudio/vectoys --base main --head octo:item/plate --title Add the plate item --body Adds `registry/plate`");
+  expect(calls[11]).toContain("- pass: Plate renders on the server");
+  expect(calls[11]).toContain("I agree to license it under the MIT license.");
+  expect(calls).toHaveLength(12);
   expect(Object.keys(committed).sort()).toEqual([
     "registry/plate/item.json",
     "registry/plate/package.json",
     "registry/plate/src/geometry.ts",
+    "registry/plate/src/index.ts",
     "registry/plate/src/plate.tsx",
     "registry/plate/test/plate.test.tsx",
     "registry/plate/tsconfig.json",
