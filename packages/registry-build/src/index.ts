@@ -31,6 +31,7 @@ export type RegistryItem = {
   title: string;
   description: string;
   author: string;
+  /** Package specs, as `@vinena/vectoys-react@^0.3.0` for the repository's own packages. */
   dependencies: string[];
   files: { path: string; type: "registry:component"; target: string; content: string }[];
   meta: { license: string; source: string; credit: string };
@@ -56,7 +57,8 @@ export async function buildRegistry({ root, out, baseUrl = BASE_URL }: Options):
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort(byPlace);
-  const items = await Promise.all(names.map((dir) => readItem(root, dir, baseUrl)));
+  const versions = await packageVersions(root);
+  const items = await Promise.all(names.map((dir) => readItem(root, dir, baseUrl, versions)));
 
   await rm(out, { recursive: true, force: true });
   await mkdir(out, { recursive: true });
@@ -70,13 +72,24 @@ export async function buildRegistry({ root, out, baseUrl = BASE_URL }: Options):
   return index;
 }
 
+/** The packages under packages/ that items depend on, by name, each with a caret range from its version; none for a root without them. */
+async function packageVersions(root: string): Promise<Map<string, string>> {
+  const versions = new Map<string, string>();
+  for (const dir of ["engine", "react"]) {
+    const path = join(root, "packages", dir, "package.json");
+    const pkg: { name?: unknown; version?: unknown } = await readFile(path, "utf8").then(JSON.parse, () => ({}));
+    if (typeof pkg.name === "string" && typeof pkg.version === "string") versions.set(pkg.name, `^${pkg.version}`);
+  }
+  return versions;
+}
+
 /** Orders folder names: those in FIRST by their place there, then the rest by name. */
 function byPlace(a: string, b: string) {
   const place = (name: string) => (FIRST.includes(name) ? FIRST.indexOf(name) : FIRST.length);
   return place(a) - place(b) || a.localeCompare(b);
 }
 
-async function readItem(root: string, dir: string, baseUrl: string): Promise<RegistryItem> {
+async function readItem(root: string, dir: string, baseUrl: string, versions: Map<string, string>): Promise<RegistryItem> {
   const file = `registry/${dir}/item.json`;
   const source = checkItem(JSON.parse(await readFile(join(root, file), "utf8")), file);
   // The site finds an item's code by its folder, so the two names must match.
@@ -102,7 +115,8 @@ async function readItem(root: string, dir: string, baseUrl: string): Promise<Reg
     title: source.title,
     description: source.description,
     author: source.author ?? AUTHOR,
-    dependencies: source.dependencies ?? [],
+    // A range, so an install upgrades a project whose copy is too old for the item's code.
+    dependencies: (source.dependencies ?? []).map((name) => (versions.has(name) ? `${name}@${versions.get(name)}` : name)),
     files,
     meta: { license: source.license, source: url, credit },
   };

@@ -52,15 +52,48 @@ export function installCommand(pm: PackageManager, packages: string[]): [string,
   return [pm, [pm === "npm" ? "install" : "add", ...packages]];
 }
 
-/** The packages from `wanted` the project's package.json does not list yet. */
+/**
+ * The specs from `wanted` the project needs installed: a package its
+ * package.json does not list yet, or one whose version falls outside the
+ * spec's range. The version is the installed one in node_modules, else the
+ * lowest the package.json range allows.
+ */
 export function missing(cwd: string, wanted: string[]): string[] {
   const path = join(cwd, "package.json");
   if (!existsSync(path)) return wanted;
   const pkg = JSON.parse(readFileSync(path, "utf8"));
-  const have = new Set(
-    ["dependencies", "devDependencies", "peerDependencies"].flatMap((field) => Object.keys(pkg[field] ?? {})),
-  );
-  return wanted.filter((spec) => !have.has(packageName(spec)));
+  const listed: Record<string, unknown> = Object.assign({}, ...["peerDependencies", "devDependencies", "dependencies"].map((field) => pkg[field] ?? {}));
+  return wanted.filter((spec) => {
+    const name = packageName(spec);
+    if (!(name in listed)) return true;
+    const installed = readPackage(join(cwd, "node_modules", name, "package.json"))?.version;
+    const have = typeof installed === "string" ? installed : typeof listed[name] === "string" ? listed[name].replace(/^[\^~=v\s]+/, "") : "";
+    return !satisfies(have, spec.slice(name.length + 1));
+  });
+}
+
+const parse = (version: string) => {
+  const found = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
+  return found ? [Number(found[1]), Number(found[2]), Number(found[3])] : undefined;
+};
+
+// Below 0 if `a` is the lower version, above 0 if it is the higher.
+const compare = (a: number[], b: number[]) => a.map((part, at) => part - b[at]!).find((difference) => difference !== 0) ?? 0;
+
+/**
+ * Whether `version` meets `range`: an exact version, or a caret range as npm
+ * reads it, where ^0.3.0 is at least 0.3.0 and under 0.4.0. Any other range,
+ * or a version that is not X.Y.Z, such as workspace:*, counts as met.
+ */
+export function satisfies(version: string, range: string): boolean {
+  const have = parse(version);
+  if (!have || !/^\^?\d+\.\d+\.\d+$/.test(range)) return true;
+  const want = parse(range.replace("^", ""))!;
+  if (!range.startsWith("^")) return compare(have, want) === 0;
+  // The first part that is not 0 stays; the next one up is too far.
+  const fixed = Math.max(0, want.findIndex((part) => part !== 0));
+  const below = want.map((part, at) => (at < fixed ? part : at === fixed ? part + 1 : 0));
+  return compare(have, want) >= 0 && compare(have, below) < 0;
 }
 
 // "@scope/name@1.2.0" is "@scope/name", "name@^1" is "name".

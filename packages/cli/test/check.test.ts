@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { ALLOWED_DEPENDENCIES, accessibleName, brands, bunScript, check, checks, markupSafety, runInBun, safety, sources } from "../src/check";
+import { ALLOWED_DEPENDENCIES, accessibleName, brands, bunScript, check, checks, markupSafety, runInBun, safety, sources, usesTurntable } from "../src/check";
 import type { Context } from "../src/commands";
 import { create } from "../src/create";
 
@@ -41,13 +41,14 @@ test("a new item passes every check", () => {
     "  pass  the markup has no scripts or outside links",
     "  pass  the rendered text names no brands",
     '  pass  the root is role="img" with an aria-label',
-    "All 10 checks pass.",
+    "  pass  the toy uses Turntable, so it turns and fills the screen",
+    "All 11 checks pass.",
   ]);
 }, 30_000);
 
 test("a render with NaN in it fails", () => {
   const { folder, edit } = item("broken");
-  edit("src/broken.tsx", (text) => text.replace("style={style}>", "style={{ ...style, width: Number.NaN }}>"));
+  edit("src/broken.tsx", (text) => text.replace("label={label} {...rest}>", "label={label} {...rest} style={{ ...rest.style, width: Number.NaN }}>"));
   expect(failed(folder)).toEqual(["the markup has NaN in it"]);
 }, 30_000);
 
@@ -56,7 +57,7 @@ test("brand names fail in item.json and in what renders", () => {
   edit("item.json", (text) => text.replace('"title": "Branded"', '"title": "Xbox slab"'));
   edit("src/branded.tsx", (text) => text.replace('label = "Branded"', 'label = "An iPhone on a desk"'));
   expect(failed(folder)).toEqual(["item.json names brands: xbox", "the rendered text names brands: iphone"]);
-  expect(() => check(quiet, "branded")).toThrow("2 of 10 checks fail.");
+  expect(() => check(quiet, "branded")).toThrow("2 of 11 checks fail.");
 }, 30_000);
 
 test("a bad item.json fails before anything renders", () => {
@@ -120,6 +121,30 @@ test("markup is named by a labelled image root or by its labelled controls", () 
   expect(accessibleName('<div><button type="button"></button></div>')).toBeUndefined();
   expect(accessibleName("<div><svg></svg></div>")).toBeUndefined();
 });
+
+// What Turntable renders around an item: its style, its root, the body, the hint and the full screen button.
+const turntable = (inner: string, root = '<div class="vectoys-turntable" tabindex="0" aria-describedby=":R0:">') =>
+  `<style data-precedence="default" data-href="vectoys-turntable">.vectoys-turntable{position:relative}</style>${root}<div class="vectoys-turntable-body" style="transform:perspective(1000px) rotateX(0deg) rotateY(0deg)">${inner}</div><span id=":R0:" class="vectoys-turntable-hint">Drag or use the arrow keys to turn</span><button type="button" class="vectoys-turntable-full" aria-label="Full screen"><svg aria-hidden="true"></svg></button></div>`;
+
+test("the name is looked for inside the Turntable, and its own button does not count", () => {
+  expect(accessibleName(turntable('<div role="img" aria-label="A die"><svg></svg></div>'))).toBe('the root is role="img" with an aria-label');
+  expect(accessibleName(turntable('<div role="group" aria-label="Keys"></div>', '<div class="vectoys-turntable my-toy">'))).toBe('the root is role="group" with an aria-label');
+  expect(accessibleName(turntable("<div><svg></svg></div>"))).toBeUndefined();
+  expect(accessibleName(turntable('<div><button type="button">Open</button></div>'))).toBe("its 1 control is labelled");
+});
+
+test("markup uses Turntable when its root is in it", () => {
+  expect(usesTurntable(turntable('<div role="img" aria-label="A die"></div>'))).toBe(true);
+  expect(usesTurntable('<div class="vectoys-turntable my-toy"><div class="vectoys-turntable-body"></div></div>')).toBe(true);
+  expect(usesTurntable('<div role="img" aria-label="A die"></div>')).toBe(false);
+  expect(usesTurntable('<div class="vectoys-turntable-body"></div>')).toBe(false);
+});
+
+test("an item that does not wrap itself in Turntable fails", () => {
+  const { folder, edit } = item("bare");
+  edit("src/bare.tsx", (text) => text.replace(/<Turntable [^>]*>\s*\{\(turn\) => (<Drawn [^>]*\/>)\}\s*<\/Turntable>/, "$1").replaceAll("turn.yaw", "0").replaceAll("turn.pitch", "0"));
+  expect(failed(folder)).toEqual(["the toy does not use Turntable from @vinena/vectoys-react"]);
+}, 30_000);
 
 // The safety lines for a folder with src/toy.tsx holding `code`, and `extra`
 // files, read by bun as `check` reads them. item.json lists every file but

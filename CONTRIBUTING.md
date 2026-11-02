@@ -30,6 +30,15 @@ bun install
 
 `npx @vinena/vectoys-cli skill` prints how a coding agent makes a toy, so you can point your agent at it.
 
+## Turn and full screen
+
+Every toy wraps itself in `Turntable` from `@vinena/vectoys-react`, as the toy `create` writes does. A mouse, a finger or the arrow keys turn the toy, and a button in its corner shows it full screen.
+
+- Use `mode="camera"` for a toy with a real 3D camera. Turntable gives its children the turn in degrees, and the toy adds it to its own `yaw` and `pitch`.
+- Use `mode="tilt"` for a flat toy or one with a fixed camera. Turntable tilts it a little with a CSS transform.
+- Take `TurnOptions` in the toy's props and pass them on: `draggable` (default `true`), `fullscreen` (default `true`), `limits` (how far it turns each way, in degrees) and `release` (`"stay"` by default, where a double click resets it, or `"return"` to spring back to rest).
+- Links, buttons and form fields never start a drag. Put `data-vectoys-nodrag` on other parts that must never start one, such as keys. Put `data-vectoys-grab` on a big button or link that covers the toy, such as a die or an envelope's front, so a drag on it still turns the toy and a click still presses it.
+
 ## Preview it
 
 The examples use the clone path `registry/spinning-top`. Outside the repository, use your own folder.
@@ -55,7 +64,8 @@ npx @vinena/vectoys-cli check registry/spinning-top
 - The component renders on the server.
 - Two renders give the same markup.
 - The markup has no `NaN` or `Infinity`.
-- The toy has an accessible name: its root is `role="img"` with an `aria-label`, or its controls are labeled. An interactive toy, or one with links inside, can use a root with `role="group"` and an `aria-label` instead.
+- The toy has an accessible name: its root is `role="img"` with an `aria-label`, or its controls are labeled. An interactive toy, or one with links inside, can use a root with `role="group"` and an `aria-label` instead. That root goes inside the Turntable.
+- The toy uses `Turntable`, so it turns and fills the screen.
 
 ### Safety
 

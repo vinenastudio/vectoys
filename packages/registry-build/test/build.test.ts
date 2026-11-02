@@ -2,6 +2,8 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { version as engine } from "../../engine/package.json";
+import { version as react } from "../../react/package.json";
 import { AUTHOR, FIRST, SCHEMA, buildRegistry, checkItem, componentName, header, type RegistryIndex, type RegistryItem } from "../src";
 
 const root = resolve(import.meta.dir, "../../..");
@@ -22,7 +24,8 @@ test("writes an index and one shadcn registry item per device", async () => {
     $schema: SCHEMA,
     name: "phone",
     type: "registry:component",
-    dependencies: ["@vinena/vectoys", "@vinena/vectoys-react"],
+    // Ranges from the packages' own versions, so an install upgrades an older copy.
+    dependencies: [`@vinena/vectoys@^${engine}`, `@vinena/vectoys-react@^${react}`],
     meta: { license: "MIT", source: "https://example.test/r/phone.json" },
   });
   expect(phone.files.map((file) => [file.path, file.target])).toEqual([
@@ -55,6 +58,10 @@ test("the index keeps an outside maker's name and credit", async () => {
     const item = { name: "ball", title: "Ball", description: "A ball.", files: ["src/ball.tsx"], license: "MIT", author: "Jane Doe (https://jane.example)", credit: "Jane Doe" };
     await writeFile(join(repo, "registry/ball/item.json"), JSON.stringify(item));
     const index = await buildRegistry({ root: repo, out: join(repo, "out") });
+    // A root without the vectoys packages keeps the names item.json gives.
+    await writeFile(join(repo, "registry/ball/item.json"), JSON.stringify({ ...item, dependencies: ["@vinena/vectoys-react"] }));
+    await buildRegistry({ root: repo, out: join(repo, "out2") });
+    expect(JSON.parse(await readFile(join(repo, "out2/ball.json"), "utf8")).dependencies).toEqual(["@vinena/vectoys-react"]);
     expect(index.items).toEqual([
       { name: "ball", title: "Ball", description: "A ball.", type: "registry:component", author: "Jane Doe (https://jane.example)", license: "MIT", credit: "Jane Doe" },
     ]);

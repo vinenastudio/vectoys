@@ -11,7 +11,7 @@ vectoys draws 3D objects as plain SVG paths. An item is a small React component 
 
 1. `npx @vinena/vectoys-cli create <name>` writes `./<name>/` (or under `--dir <dir>`): `item.json`, `src/geometry.ts`, `src/<name>.tsx`, `src/index.ts`, a test, `package.json` and `tsconfig.json`. It renders a shaded, tilted slab. Under `registry/` of a vectoys checkout it uses the workspace's packages, which `bun install` links. Anywhere else it asks for `@vinena/vectoys` and `@vinena/vectoys-react` from npm by version: install them with `npm install` (or your package manager) in the item folder before you check it.
 2. Edit `src/geometry.ts` (parts, camera, poses) and `src/<name>.tsx` (looks, motion, interaction). Write a real `title` and `description` in `item.json`. List every source file in `files`.
-3. `npx @vinena/vectoys-cli check <dir>` runs 10 checks: item.json is valid, the files are under 96 KB together, item.json names no brand, the code has none of the unsafe patterns check knows, the component renders on the server with no props, the markup has no `NaN` or `Infinity`, two renders give the same markup, the markup has no scripts or outside links, the rendered text names no brand, and the root has an accessible name. `check` catches common unsafe patterns, and a maintainer reviews every submission before it is listed. It fails any code file in the folder, tests included, that uses `Bun`, `process`, `require`, `globalThis`, `window`, `self`, `opener` or `defaultView`, `<script>`, frames, objects, embeds or forms, `innerHTML` or `dangerouslySetInnerHTML`, `eval` or `Function`, string timers, network calls, workers, `postMessage`, the clipboard, `window.open` or `location`, dynamic `import()`, browser storage or cookies, or outside or `javascript:` URLs. The files item.json lists import only each other, `react`, `@vinena/vectoys` and `@vinena/vectoys-react`, which are also the only dependencies item.json may list; tests may also import `bun:test` and `react-dom/server`. Inside a vectoys checkout, tests under `registry/<item>/test/` also use the helpers in `packages/react/test/dom.tsx` (`installGlobal`, `htmlOf`, `fireOnWindow`, and `readSibling`, which reads only files under `registry/`). An item made outside the repository has no such helpers, so keep its tests to rendering with `react-dom/server`. Keep `package.json` and `tsconfig.json` as `create` writes them, and add no dot files but `.gitignore`. It needs bun. Fix every FAIL line.
+3. `npx @vinena/vectoys-cli check <dir>` runs 11 checks: item.json is valid, the files are under 96 KB together, item.json names no brand, the code has none of the unsafe patterns check knows, the component renders on the server with no props, the markup has no `NaN` or `Infinity`, two renders give the same markup, the markup has no scripts or outside links, the rendered text names no brand, the root has an accessible name, and the item is wrapped in `Turntable`. `check` catches common unsafe patterns, and a maintainer reviews every submission before it is listed. It fails any code file in the folder, tests included, that uses `Bun`, `process`, `require`, `globalThis`, `window`, `self`, `opener` or `defaultView`, `<script>`, frames, objects, embeds or forms, `innerHTML` or `dangerouslySetInnerHTML`, `eval` or `Function`, string timers, network calls, workers, `postMessage`, the clipboard, `window.open` or `location`, dynamic `import()`, browser storage or cookies, or outside or `javascript:` URLs. The files item.json lists import only each other, `react`, `@vinena/vectoys` and `@vinena/vectoys-react`, which are also the only dependencies item.json may list; tests may also import `bun:test` and `react-dom/server`. Inside a vectoys checkout, tests under `registry/<item>/test/` also use the helpers in `packages/react/test/dom.tsx` (`installGlobal`, `htmlOf`, `fireOnWindow`, and `readSibling`, which reads only files under `registry/`). An item made outside the repository has no such helpers, so keep its tests to rendering with `react-dom/server`. Keep `package.json` and `tsconfig.json` as `create` writes them, and add no dot files but `.gitignore`. It needs bun. Fix every FAIL line.
 4. `npx @vinena/vectoys-cli preview <dir>` writes `<dir>/preview.html` (`--open` opens it): the item rendered on the server in light and dark, and at a row of yaws when the component takes a `yaw` prop. Look at it. Faces drawn in the wrong order, gaps, and parts that float show here, not in the checks.
 5. Iterate on 2 to 4 until it looks right in both themes and at every yaw.
 6. `npx @vinena/vectoys-cli submit <dir>` runs the checks, then opens a pull request (it needs the GitHub CLI, `gh`, and bun 1.3.2 or newer) that adds the item to vinenastudio/vectoys: the files `item.json` lists, its `package.json`, `tsconfig.json`, `src/index.ts` and `test/`, and the item's package in `bun.lock`. If you host your own registry, `npx @vinena/vectoys-cli submit --registry <url>` opens a pull request that lists it. Until submissions open at launch, submit prints what it would send and sends nothing. `--dry-run` does the same at any time.
@@ -63,6 +63,20 @@ Mix tones with `color-mix(in srgb, ...)` instead of new colors. `shading` darken
 - `useFrames()` returns `run(step)`. It calls `step(elapsedMs)` every frame until `step` returns false. Use it for timed runs or several springs at once, with `spring` and `settled` from the engine.
 - `useReducedMotion()` is true when the page asks for less motion. `useSpring` already jumps straight to its target then. In your own `useFrames` loop, set the end state at once instead.
 
+## Turn and full screen
+
+Every item wraps itself in `Turntable` from `@vinena/vectoys-react`. A mouse, a finger or the arrow keys turn it, and a button in its corner shows it full screen. `check` fails an item without it.
+
+- `mode="camera"`: for an item with a real 3D camera. The children are a function that gets `{ yaw, pitch, full }`: the turn from rest, in degrees, and whether it fills the screen. Add `yaw` and `pitch` to the item's own before you call `seen`. Call no hooks in that function; render a component from it, as the item `create` writes does.
+- `mode="tilt"`: for a flat item or one with a fixed camera. Turntable turns the children with a CSS transform, a little each way, so the item stays easy to read.
+- Take `TurnOptions` in the item's props and pass them on to Turntable, with `label` for the button's name:
+  - `draggable`: whether a drag or the arrow keys turn it. Default `true`.
+  - `fullscreen`: whether the full screen button shows. Default `true`.
+  - `limits`: `{ yaw: [min, max], pitch: [min, max] }`, in degrees from rest. By default yaw -180 to 180 and pitch -35 to 35 in camera mode, yaw -28 to 28 and pitch -20 to 20 in tilt mode. `[-Infinity, Infinity]` lets it spin freely.
+  - `release`: `"stay"` (the default) keeps the item where it is let go, and a double click resets it. `"return"` springs it back to rest.
+- A drag starts after the pointer moves 4 pixels, so clicks and taps still work. A press on a link, a button, a form field or a `role="button"` never starts a drag. Mark your own parts that must never start a drag with `data-vectoys-nodrag`, such as keys or a screen with a live app. Mark a big button or link that covers the item (a die, an envelope's front, a keycap) with `data-vectoys-grab`: a drag on it still turns the item, and a plain click still presses it.
+- Turntable's root is a plain wrapper. The item's own root, with its `role` and `aria-label`, goes inside it.
+
 ## Server rendering must be deterministic
 
 The same props must give the same markup on the server and the client, every time:
@@ -85,11 +99,11 @@ The same props must give the same markup on the server and the client, every tim
 - Keep the files under 96 KB together. Most items need far less; the limit leaves room for a device item with a full 3D model and a hand-drawn front.
 - React 19. Depend only on `@vinena/vectoys`, `@vinena/vectoys-react` and React. No other packages.
 - TypeScript strict. One component per item, named after the item (`my-toy` exports `MyToy`).
-- Props: `label`, `finish`, `yaw` (and `pitch`) for a device that turns, and the state as controlled plus default (`open` and `defaultOpen` with `onOpenChange`), as the registry items do.
+- Props: `label`, `finish`, `yaw` (and `pitch`) for a device that turns, the `TurnOptions` passed on to Turntable, and the state as controlled plus default (`open` and `defaultOpen` with `onOpenChange`), as the registry items do.
 
 ## Example
 
-A badge that lifts toward the mouse and shows live HTML on its face. It passes all 10 checks.
+A badge that lifts toward the mouse, turns with a drag and shows live HTML on its face. It passes all 11 checks.
 
 `src/geometry.ts`:
 
@@ -113,9 +127,9 @@ const scene = (pose: Pose): Scene => [
   }),
 ];
 
-/** The badge `lift` of the way up from rest (0 to 1): the camera, the faces, the face's pose and the shadow. */
-export function seen(lift = 0) {
-  const eye = camera({ width: 100, height: 80, perspective: 280, yaw: -24 + lift * 12, pitch: -16 });
+/** The badge `lift` of the way up from rest (0 to 1) and turned by `turn`: the camera, the faces, the face's pose and the shadow. */
+export function seen(lift = 0, turn = { yaw: 0, pitch: 0 }) {
+  const eye = camera({ width: 100, height: 80, perspective: 280, yaw: -24 + lift * 12 + turn.yaw, pitch: -16 + turn.pitch });
   // Stood upright, face to the eye, and raised a little as it lifts.
   const pose: Pose = { position: [0, DEEP / 2, lift * 3], rotation: rotateX(-90) };
   const parts = scene(pose);
@@ -126,7 +140,7 @@ export function seen(lift = 0) {
 `src/badge.tsx`:
 
 ```tsx
-import { Faces, Screen, Stage, useSpring, type Look } from "@vinena/vectoys-react";
+import { Faces, Screen, Stage, Turntable, useSpring, type Look, type TurnOptions } from "@vinena/vectoys-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { FACE, seen } from "./geometry";
 
@@ -136,12 +150,12 @@ const SHADOW = "var(--vectoys-shadow, rgba(0, 0, 0, 0.08))";
 const fill = (color: string): Look => ({ style: { fill: color } });
 const STYLES: Record<string, Look> = { top: fill(FINISH), side: fill(FINISH), bottom: fill(FINISH), face: fill(SURFACE) };
 
-/** A badge that lifts and turns toward a mouse over it, with live HTML on its face. */
-export function Badge({ children, label = "Badge" }: { children?: ReactNode; label?: string }) {
-  const [over, setOver] = useState(false);
-  // Springs to its target each frame; under reduced motion it jumps there.
-  const lift = useSpring(over ? 1 : 0, { stiffness: 260, damping: 24 });
-  const view = useMemo(() => seen(lift), [lift]);
+type BadgeProps = TurnOptions & { children?: ReactNode; label?: string };
+type DrawnProps = { children?: ReactNode; label: string; lift: number; yaw: number; pitch: number; onOver: (over: boolean) => void };
+
+/** The badge drawn `lift` of the way up and turned by `yaw` and `pitch`. */
+function Drawn({ children, label, lift, yaw, pitch, onOver }: DrawnProps) {
+  const view = useMemo(() => seen(lift, { yaw, pitch }), [lift, yaw, pitch]);
   const screen = (
     <Screen camera={view.camera} pose={view.face} rect={FACE} width={250} style={{ overflow: "hidden", borderRadius: 14 }}>
       {children}
@@ -151,8 +165,8 @@ export function Badge({ children, label = "Badge" }: { children?: ReactNode; lab
     <div
       role={children == null ? "img" : "group"}
       aria-label={label}
-      onPointerEnter={(event) => event.pointerType === "mouse" && setOver(true)}
-      onPointerLeave={() => setOver(false)}
+      onPointerEnter={(event) => event.pointerType === "mouse" && onOver(true)}
+      onPointerLeave={() => onOver(false)}
     >
       <Stage camera={view.camera} overlay={screen}>
         <path d={view.shadow} style={{ fill: SHADOW }} />
@@ -161,11 +175,27 @@ export function Badge({ children, label = "Badge" }: { children?: ReactNode; lab
     </div>
   );
 }
+
+/** A badge that lifts and turns toward a mouse over it, with live HTML on its face. A drag turns it, and a button shows it full screen. */
+export function Badge({ children, label = "Badge", ...turning }: BadgeProps) {
+  const [over, setOver] = useState(false);
+  // Springs to its target each frame; under reduced motion it jumps there.
+  const lift = useSpring(over ? 1 : 0, { stiffness: 260, damping: 24 });
+  return (
+    <Turntable mode="camera" label={label} {...turning}>
+      {(turn) => (
+        <Drawn label={label} lift={lift} yaw={turn.yaw} pitch={turn.pitch} onOver={setOver}>
+          {children}
+        </Drawn>
+      )}
+    </Turntable>
+  );
+}
 ```
 
 ## Before you submit
 
-- `npx @vinena/vectoys-cli check <dir>` passes all 10 checks.
+- `npx @vinena/vectoys-cli check <dir>` passes all 11 checks.
 - The preview looks right in light and dark and at every yaw.
 - Pointer, touch and keyboard all work, and reduced motion keeps the state changes.
 - `item.json` has a plain title and a description that says what the item is and what it does.

@@ -130,7 +130,7 @@ export function seen(yaw: number = TILT.yaw, pitch: number = TILT.pitch) {
 
 export type View = ReturnType<typeof seen>;
 `,
-    [`src/${name}.tsx`]: `import { Faces, Stage, type Look, type StyleWithVariables } from "@vinena/vectoys-react";
+    [`src/${name}.tsx`]: `import { Faces, Stage, Turntable, type Look, type StyleWithVariables, type TurnOptions } from "@vinena/vectoys-react";
 import { useMemo, type CSSProperties } from "react";
 import { TILT, seen } from "./geometry";
 
@@ -155,7 +155,9 @@ const OUTLINE: Look = {
   style: { stroke: HAIRLINE, fill: "none" },
 };
 
-export type ${component}Props = {
+// A drag, a finger or the arrow keys turn the item, and a button shows it
+// full screen: props draggable, fullscreen, limits and release tune them.
+export type ${component}Props = TurnOptions & {
   /** What the item shows, for assistive technology. */
   label?: string;
   /** The slab's color; by default the page's \`--vectoys-finish\`. */
@@ -168,18 +170,29 @@ export type ${component}Props = {
   style?: CSSProperties;
 };
 
-/** ${title}: a slab tilted toward the eye, drawn the same on the server and the client. */
-export function ${component}({ label = ${JSON.stringify(title)}, finish, yaw = TILT.yaw, pitch = TILT.pitch, className, style }: ${component}Props) {
+/** The slab drawn at one turn. */
+function Drawn({ label, finish, yaw, pitch }: { label: string; finish: string | undefined; yaw: number; pitch: number }) {
   const view = useMemo(() => seen(yaw, pitch), [yaw, pitch]);
   const body = view.drawn.hulls.find((hull) => hull.part === "body");
   const vars: StyleWithVariables = finish ? { "--vectoys-finish": finish } : {};
   return (
-    <div role="img" aria-label={label} className={className} style={style}>
+    <div role="img" aria-label={label}>
       <Stage camera={view.camera} style={vars}>
         <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
         {body && <path d={body.d} {...OUTLINE} />}
       </Stage>
     </div>
+  );
+}
+
+/** ${title}: a slab tilted toward the eye, drawn the same on the server and the client. */
+export function ${component}({ label = ${JSON.stringify(title)}, finish, yaw = TILT.yaw, pitch = TILT.pitch, ...rest }: ${component}Props) {
+  // Camera mode adds the turn to the slab's own, so it turns in 3D; a flat item uses mode="tilt".
+  // The rest, className, style and the turn options, go to the Turntable.
+  return (
+    <Turntable mode="camera" label={label} {...rest}>
+      {(turn) => <Drawn label={label} finish={finish} yaw={yaw + turn.yaw} pitch={pitch + turn.pitch} />}
+    </Turntable>
   );
 }
 
@@ -193,9 +206,10 @@ export { Demo, ${component}, type ${component}Props } from "./${name}";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ${component} } from "../src";
 
-test("renders on the server as a labelled image with no NaN", () => {
+test("renders on the server as a labelled image that turns, with no NaN", () => {
   const html = renderToStaticMarkup(<${component} label="A blue slab" finish="#3b82f6" />);
-  expect(html).toStartWith('<div role="img" aria-label="A blue slab"');
+  expect(html).toContain('<div class="vectoys-turntable"');
+  expect(html).toContain('<div role="img" aria-label="A blue slab"');
   expect(html).toContain("--vectoys-finish:#3b82f6");
   expect(html).not.toContain("NaN");
 });

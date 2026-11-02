@@ -170,7 +170,7 @@ test("a failing check stops submit before gh", async () => {
   const path = join(work, "branded/item.json");
   writeFileSync(path, readFileSync(path, "utf8").replace('"title": "Branded"', '"title": "Xbox slab"'));
   const { runner, calls } = fake();
-  await expect(submit(context().context, "branded", { registry: undefined, dryRun: false, submissionsOpen: true, run: runner })).rejects.toThrow("1 of 10 checks fail.");
+  await expect(submit(context().context, "branded", { registry: undefined, dryRun: false, submissionsOpen: true, run: runner })).rejects.toThrow("1 of 11 checks fail.");
   expect(calls).toEqual([]);
 }, 30_000);
 

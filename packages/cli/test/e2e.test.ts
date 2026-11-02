@@ -3,6 +3,8 @@ import { buildRegistry, componentName } from "@vectoys/registry-build";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { version as engine } from "../../engine/package.json";
+import { version as react } from "../../react/package.json";
 
 // The built CLI, run with node against a registry built from this repo and
 // served over HTTP, in a fresh project, as someone would use it.
@@ -75,7 +77,7 @@ test("add copies the items in with headers, and says what to install", async () 
     registries: {},
   });
   expect(stdout).toContain("Packages install with bun.");
-  expect(stdout).toContain("Install what the items need with: bun add @vinena/vectoys @vinena/vectoys-react");
+  expect(stdout).toContain(`Install what the items need with: bun add @vinena/vectoys@^${engine} @vinena/vectoys-react@^${react}`);
 
   for (const [name, component] of [["laptop", "laptop.tsx"], ["phone", "phone.tsx"], ["tablet", "tablet.tsx"]] as const) {
     const source = readFileSync(join(repo, "registry", name, "src", component), "utf8");
