@@ -41,3 +41,14 @@ test("a reset takes the short way round", () => {
   expect(nearest(-725)).toBe(-5);
   expect(nearest(20)).toBe(20);
 });
+
+test("a flick travels as far at a low frame rate as at a high one", () => {
+  const travel = (seconds: number) => {
+    let state: Glide = { axis: { value: 0, velocity: 900 }, home: null };
+    for (let frame = 0; frame < 2000 && state.axis.velocity !== 0; frame++) state = glide(state, [-Infinity, Infinity], seconds);
+    return state.axis.value;
+  };
+  const fast = travel(1 / 120);
+  expect(Math.abs(travel(0.064) - fast) / fast).toBeLessThan(0.02);
+  expect(Math.abs(travel(1 / 60) - fast) / fast).toBeLessThan(0.02);
+});

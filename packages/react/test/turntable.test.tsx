@@ -525,3 +525,134 @@ test("a press on the toy never selects its text, while a text box inside still d
   const { host: still } = await place(<Turntable mode="tilt" draggable={false}>{toy}</Turntable>);
   expect(getComputedStyle(rootOf(still)).userSelect).not.toBe("none");
 });
+
+test("a reset takes the short way round on pitch too", async () => {
+  const frames = fakeFrames();
+  cleanup.push(frames.restore);
+  const { host } = await place(
+    <Turntable mode="camera" limits={{ pitch: [-Infinity, Infinity] }}>
+      {toy}
+    </Turntable>,
+  );
+  const root = rootOf(host);
+  // 760 pixels up at 0.45 degrees each is 342 degrees.
+  await dragOn(root, 0, -760);
+  await fire(root, pointer("pointerup", 0, -760));
+  await frames.advance(2000);
+  expect(read(host).pitch).toBeGreaterThan(300);
+  await fire(root, new MouseEvent("dblclick", { bubbles: true }));
+  await frames.advance(16);
+  expect(Math.abs(read(host).pitch)).toBeLessThan(180);
+  await frames.advance(2000);
+  expect(read(host).pitch).toBe(0);
+});
+
+test("grabbing a spinning toy stops it where it is, and a press that does not drag lets it rest inside its limits", async () => {
+  const frames = fakeFrames();
+  cleanup.push(frames.restore);
+  const { host } = await place(
+    <Turntable mode="camera" limits={{ yaw: [-20, 20] }}>
+      {toy}
+    </Turntable>,
+  );
+  const root = rootOf(host);
+  const at = async (type: string, x: number, time: number) => {
+    const event = pointer(type, x);
+    Object.defineProperty(event, "timeStamp", { value: time });
+    await fire(root, event);
+  };
+  await at("pointerdown", 0, 1000);
+  await at("pointermove", 30, 1020);
+  await at("pointerup", 30, 1030);
+  await frames.advance(48);
+  const coasting = read(host).yaw;
+  expect(coasting).toBeGreaterThan(14);
+  await fire(root, pointer("pointerdown", 0));
+  await frames.advance(160);
+  const grabbed = read(host).yaw;
+  expect(grabbed).toBe(coasting);
+  await fire(root, pointer("pointermove", 10));
+  expect(read(host).yaw).toBeGreaterThan(grabbed);
+  await fire(root, pointer("pointerup", 10));
+  await frames.advance(2000);
+
+  // Past a limit and on its way back, a press that does not drag still lets it spring back.
+  await dragOn(root, 200);
+  await fire(root, pointer("pointerup", 200));
+  await frames.advance(16);
+  expect(read(host).yaw).toBeGreaterThan(30);
+  await fire(root, pointer("pointerdown", 0));
+  await fire(root, pointer("pointerup", 0));
+  await frames.advance(2000);
+  expect(read(host).yaw).toBe(20);
+});
+
+test("turning dragging off during a drag ends it, so it turns again once back on", async () => {
+  const frames = fakeFrames();
+  cleanup.push(frames.restore);
+  const { host, rerender } = await place(<Turntable mode="camera">{toy}</Turntable>);
+  const root = rootOf(host);
+  await dragOn(root, 40);
+  expect(root.dataset.dragging).toBe("true");
+  await rerender(
+    <Turntable mode="camera" draggable={false}>
+      {toy}
+    </Turntable>,
+  );
+  expect(root.dataset.dragging).toBeUndefined();
+  await rerender(<Turntable mode="camera">{toy}</Turntable>);
+  const before = read(host).yaw;
+  await dragOn(root, 40);
+  expect(read(host).yaw).toBeGreaterThan(before);
+});
+
+test("the overlay is a dialog that holds keyboard focus, and gives it back when it closes", async () => {
+  const { host } = await place(
+    <>
+      <button type="button" className="outside">
+        Outside
+      </button>
+      <Turntable mode="camera" label="card">
+        {toy}
+      </Turntable>
+    </>,
+  );
+  const root = rootOf(host);
+  const button = host.querySelector<HTMLElement>(".vectoys-turntable-full")!;
+  await act(async () => button.focus());
+  await fire(button, new MouseEvent("click", { bubbles: true }));
+  expect(root.getAttribute("role")).toBe("dialog");
+  expect(root.getAttribute("aria-modal")).toBe("true");
+  expect(root.getAttribute("aria-label")).toBe("card");
+  expect(document.activeElement).toBe(button);
+  const tab = async (shiftKey = false) => {
+    const event = new KeyboardEvent("keydown", { key: "Tab", shiftKey, bubbles: true, cancelable: true });
+    await fire(document.activeElement ?? document.body, event);
+    return event.defaultPrevented;
+  };
+  // The exit button is the last stop, so Tab wraps to the turntable, and Shift+Tab back.
+  expect(await tab()).toBe(true);
+  expect(document.activeElement).toBe(root);
+  expect(await tab(true)).toBe(true);
+  expect(document.activeElement).toBe(button);
+  // Focus that got out, such as by a click on the page, comes back in on Tab.
+  await act(async () => host.querySelector<HTMLElement>(".outside")!.focus());
+  expect(await tab()).toBe(true);
+  expect(root.contains(document.activeElement)).toBe(true);
+  await fire(document.body, new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  expect(root.getAttribute("role")).toBeNull();
+  expect(document.activeElement).toBe(button);
+});
+
+test("the overlay moves focus to its exit button when it opens", async () => {
+  const { host } = await place(<Turntable mode="camera">{toy}</Turntable>);
+  const root = rootOf(host);
+  Object.assign(root, { requestFullscreen: () => Promise.reject(new TypeError("Permissions check failed")) });
+  await act(async () => root.focus());
+  await fire(host.querySelector(".vectoys-turntable-full")!, new MouseEvent("click", { bubbles: true }));
+  await act(async () => new Promise((done) => setTimeout(done, 0)));
+  expect(document.activeElement).toBe(host.querySelector(".vectoys-turntable-full"));
+  expect(root.getAttribute("aria-label")).toBe("Full screen");
+  await fire(document.body, new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  expect(document.activeElement).toBe(root);
+});

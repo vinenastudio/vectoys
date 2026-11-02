@@ -55,8 +55,10 @@ export function installCommand(pm: PackageManager, packages: string[]): [string,
 /**
  * The specs from `wanted` the project needs installed: a package its
  * package.json does not list yet, or one older than the spec's version. The
- * version is the installed one in node_modules, else the lowest the
- * package.json range allows. A newer version is kept, never replaced.
+ * version is the higher of the installed one in node_modules and the lowest
+ * the package.json range allows, so a newer one is kept, never replaced. A
+ * listed package with neither version readable is installed, unless it is a
+ * workspace package.
  */
 export function missing(cwd: string, wanted: string[]): string[] {
   const path = join(cwd, "package.json");
@@ -66,18 +68,22 @@ export function missing(cwd: string, wanted: string[]): string[] {
   return wanted.filter((spec) => {
     const name = packageName(spec);
     if (!Object.hasOwn(listed, name)) return true;
-    const installed = readPackage(join(cwd, "node_modules", name, "package.json"))?.version;
+    const want = base(spec.slice(name.length + 1));
     const range = listed[name];
-    const have = typeof installed === "string" ? installed : typeof range === "string" ? range.replace(/^[\^~=v\s]+/, "") : "";
-    return !atLeast(have, spec.slice(name.length + 1));
+    if (!want || (typeof range === "string" && range.startsWith("workspace:"))) return false;
+    const installed = readPackage(join(cwd, "node_modules", name, "package.json"))?.version;
+    const have = [installed, range].flatMap((version) => (typeof version === "string" ? (base(version) ?? []) : []));
+    return !have.some((version) => compare(version, want) >= 0);
   });
 }
 
 type Version = { parts: number[]; pre: string[] };
 
-const parse = (version: string): Version | undefined => {
-  const found = /^(\d+)\.(\d+)\.(\d+)(?:-([\w.-]+))?(?:\+[\w.-]*)?$/.exec(version);
-  return found ? { parts: [Number(found[1]), Number(found[2]), Number(found[3])], pre: found[4]?.split(".") ?? [] } : undefined;
+// The lowest version `range` allows: a version, or a ^ or ~ range of one to
+// three parts, such as 0.3.0, ^0.4.0-next.1, ~0.3 or ^1. Any other range is undefined.
+const base = (range: string): Version | undefined => {
+  const found = /^[\^~]?=?v?(\d+)(?:\.(\d+)(?:\.(\d+)(?:-([\w.-]+))?)?)?(?:\+[\w.-]*)?$/.exec(range.trim());
+  return found ? { parts: [found[1], found[2], found[3]].map((part) => Number(part ?? 0)), pre: found[4]?.split(".") ?? [] } : undefined;
 };
 
 // Below 0 if `a` is the lower version, above 0 if it is the higher, by semver
@@ -102,13 +108,13 @@ function compare(a: Version, b: Version): number {
 }
 
 /**
- * Whether `version` is at least the base version of `range`, an exact version
- * or a caret range such as ^0.3.0 or ^0.4.0-next.1. Any other range, or a
+ * Whether `version` is at least the base version of `range`, a version or a
+ * ^ or ~ range such as ^0.3.0, ~0.3 or ^0.4.0-next.1. Any other range, or a
  * version that is not semver, such as workspace:*, counts as met.
  */
 export function atLeast(version: string, range: string): boolean {
-  const have = parse(version);
-  const want = parse(range.replace(/^\^/, ""));
+  const have = base(version);
+  const want = base(range);
   if (!have || !want) return true;
   return compare(have, want) >= 0;
 }
