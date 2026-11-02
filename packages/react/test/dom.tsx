@@ -76,10 +76,10 @@ export function reducedMotion(reduce: boolean) {
 
 /** Puts `value` on the page as the global `name`, such as a stand-in AudioContext; the returned function puts the real one back. */
 export function installGlobal(name: string, value: unknown): () => void {
-  const had = Object.prototype.hasOwnProperty.call(globalThis, name);
-  const real: unknown = Reflect.get(globalThis, name);
-  Object.assign(globalThis, { [name]: value });
-  return () => void (had ? Object.assign(globalThis, { [name]: real }) : Reflect.deleteProperty(globalThis, name));
+  if (name === "__proto__") throw new Error("installGlobal does not set __proto__");
+  const real = Object.getOwnPropertyDescriptor(globalThis, name);
+  Object.defineProperty(globalThis, name, { value, configurable: true, writable: true, enumerable: real?.enumerable ?? true });
+  return () => void (real ? Object.defineProperty(globalThis, name, real) : Reflect.deleteProperty(globalThis, name));
 }
 
 /**

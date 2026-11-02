@@ -27,3 +27,15 @@ test("readSibling throws for a file outside registry/ or a caller outside an ite
   expect(() => readSibling(keycapTest, "file:///etc/passwd")).toThrow("readSibling reads only files under registry/");
   expect(() => readSibling(import.meta.url, "./dom.tsx")).toThrow("readSibling reads only from a test under registry/<item>/test/");
 });
+
+test("installGlobal sets an own property, puts back the real descriptor, and refuses __proto__", () => {
+  const prototype = Object.getPrototypeOf(globalThis);
+  expect(() => installGlobal("__proto__", {})).toThrow("installGlobal does not set __proto__");
+  expect(Object.getPrototypeOf(globalThis)).toBe(prototype);
+
+  const real = Object.getOwnPropertyDescriptor(globalThis, "requestIdleCallback");
+  const restore = installGlobal("requestIdleCallback", 3);
+  expect(Object.getOwnPropertyDescriptor(globalThis, "requestIdleCallback")?.value).toBe(3);
+  restore();
+  expect(Object.getOwnPropertyDescriptor(globalThis, "requestIdleCallback")).toEqual(real);
+});
