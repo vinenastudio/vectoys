@@ -39,6 +39,9 @@ const refs = (): Plugin => ({
 export default defineConfig({
   plugins: [react(), refs()],
   resolve: {
+    // One React for every item, read from here, so an item under registry/
+    // draws on its card even before its own packages are installed.
+    dedupe: ["react", "react-dom"],
     alias: {
       "@vinena/vectoys-react": source("react"),
       "@vinena/vectoys": source("engine"),

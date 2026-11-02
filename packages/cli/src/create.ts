@@ -183,9 +183,12 @@ export function ${component}({ label = ${JSON.stringify(title)}, finish, yaw = T
     </div>
   );
 }
+
+/** How the vectoys.com gallery shows the item on its card, with no props. Change it to show the item at its best. */
+export const Demo = () => <${component} />;
 `,
     "src/index.ts": `export { HEIGHT, THICKNESS, TILT, WIDTH, seen, type View } from "./geometry";
-export { ${component}, type ${component}Props } from "./${name}";
+export { Demo, ${component}, type ${component}Props } from "./${name}";
 `,
     [`test/${name}.test.tsx`]: `import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";

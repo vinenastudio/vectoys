@@ -1,12 +1,11 @@
 import { CopyCommand } from "../components/copy-command";
 import { LazyPreview } from "../components/lazy-preview";
-import { PREVIEWS } from "../items";
-import { Placeholder } from "../previews/placeholder";
+import { previewFor } from "../items";
 import { REPO, addCommand, makerOf, type Entry, type RegistryIndex } from "../registry";
 import { useItems } from "../use-items";
 
 function Toy({ item }: { item: Entry }) {
-  const Preview = PREVIEWS[item.name] ?? Placeholder;
+  const Preview = previewFor(item.name);
   const maker = makerOf(item);
   return (
     <li className="toy" id={item.name}>
