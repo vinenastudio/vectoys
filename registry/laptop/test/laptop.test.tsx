@@ -408,3 +408,14 @@ test.each([DESK, PHONE])("LAPTOP_BOX gives where the eye's own scene sits in the
     expect(moved[index]?.[1] ?? 0).toBeCloseTo(y + box.y, 1);
   });
 });
+
+test("angled, the notch over the live display lets clicks through to the content under it", () => {
+  for (const eye of [DESK, PHONE]) {
+    const html = renderToString(
+      <Laptop eye={eye}>
+        <button type="button">Live</button>
+      </Laptop>,
+    );
+    expect(html).toMatch(/background:black;pointer-events:none"><div style="width:0.7cqw/);
+  }
+});
