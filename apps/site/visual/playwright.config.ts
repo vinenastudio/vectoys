@@ -20,7 +20,10 @@ export default defineConfig({
     deviceScaleFactor: 1,
   },
   // Room for a slow, emulated machine to draw two equal frames in a row.
-  expect: { timeout: 15_000, toHaveScreenshot: { maxDiffPixelRatio: 0.01 } },
+  // Repeated runs differ by at most 7 pixels, each by one shade, at a toy's
+  // antialiased edges; the smallest real change, a recolored gift, moves
+  // thousands. 50 pixels absorbs the first and catches far less than the second.
+  expect: { timeout: 15_000, toHaveScreenshot: { maxDiffPixels: 50 } },
   projects: [
     { name: "light", use: { colorScheme: "light", contextOptions: { reducedMotion: "no-preference" } } },
     { name: "dark", use: { colorScheme: "dark", contextOptions: { reducedMotion: "no-preference" } } },

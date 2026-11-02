@@ -17,10 +17,13 @@ fi
 
 # A copy of the repository without its installs and builds, so the Mac's
 # node_modules never meet Linux. The snapshots and the report come back.
-exec docker run --rm --platform linux/amd64 --ipc=host \
+exec docker run --rm --init --platform linux/amd64 --ipc=host \
   -v "$root:/src" -w /work -e VECTOYS_VISUAL_IN_CONTAINER=1 -e HOST_IDS="$(id -u):$(id -g)" \
   "$IMAGE" sh -c '
+    set -eu
     tar -C /src --exclude=node_modules --exclude=dist --exclude=.git --exclude=apps/site/visual/report --exclude=apps/site/visual/results -cf - . | tar -xf -
+    # sh has no pipefail, so check the copy arrived before anything is copied back over the host.
+    test -f apps/site/visual/run.sh
     npm install --global --silent bun@1.3.14
     bun install --frozen-lockfile
     status=0
