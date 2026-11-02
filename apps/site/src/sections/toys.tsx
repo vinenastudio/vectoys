@@ -2,17 +2,30 @@ import { CopyCommand } from "../components/copy-command";
 import { LazyPreview } from "../components/lazy-preview";
 import { PREVIEWS } from "../items";
 import { Placeholder } from "../previews/placeholder";
-import { REPO, addCommand, type Entry, type RegistryIndex } from "../registry";
+import { REPO, addCommand, makerOf, type Entry, type RegistryIndex } from "../registry";
 import { useItems } from "../use-items";
 
 function Toy({ item }: { item: Entry }) {
   const Preview = PREVIEWS[item.name] ?? Placeholder;
+  const maker = makerOf(item);
   return (
     <li className="toy" id={item.name}>
       <LazyPreview className="toy-preview">{() => <Preview />}</LazyPreview>
       <div className="use-text">
         <h2>{item.title}</h2>
         <p>{item.description}</p>
+        {maker && (
+          <p className="toy-maker">
+            by{" "}
+            {maker.url ? (
+              <a href={maker.url} target="_blank" rel="noopener noreferrer nofollow ugc">
+                {maker.name}
+              </a>
+            ) : (
+              maker.name
+            )}
+          </p>
+        )}
       </div>
       <CopyCommand command={addCommand(item.name)} className="command-in-card" />
       <a className="toy-source" href={`${REPO}/tree/main/registry/${item.name}`} target="_blank" rel="noreferrer">

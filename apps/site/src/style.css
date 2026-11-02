@@ -1608,6 +1608,23 @@ code.inline {
   line-height: 1.5;
 }
 
+.toy .use-text .toy-maker {
+  font-size: 14px;
+}
+
+.toy-maker a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 3px;
+  transition: color 150ms var(--ease);
+}
+
+.toy-maker a:hover,
+.toy-maker a:focus-visible {
+  color: var(--ink);
+}
+
 .toy-preview {
   position: relative;
   display: grid;

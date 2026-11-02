@@ -1,8 +1,8 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { FIRST, SCHEMA, buildRegistry, header, type RegistryIndex, type RegistryItem } from "../src";
+import { AUTHOR, FIRST, SCHEMA, buildRegistry, header, type RegistryIndex, type RegistryItem } from "../src";
 
 const root = resolve(import.meta.dir, "../../..");
 const out = await mkdtemp(join(tmpdir(), "vectoys-registry-"));
@@ -15,7 +15,7 @@ test("writes an index and one shadcn registry item per device", async () => {
   const folders = (await readdir(join(root, "registry"), { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
   expect(FIRST).toEqual(["keyboard", "keycap"]);
   expect(index.items.map((item) => item.name)).toEqual([...FIRST, ...folders.filter((name) => !FIRST.includes(name)).sort()]);
-  expect(index.items.find((item) => item.name === "phone")).toMatchObject({ name: "phone", title: "Phone", type: "registry:component", license: "MIT" });
+  expect(index.items.find((item) => item.name === "phone")).toMatchObject({ name: "phone", title: "Phone", type: "registry:component", license: "MIT", author: AUTHOR, credit: AUTHOR });
 
   const phone: RegistryItem = JSON.parse(await readFile(join(out, "phone.json"), "utf8"));
   expect(phone).toMatchObject({
@@ -45,4 +45,22 @@ test("headers follow the file's syntax", () => {
   expect(header("a.tsx", ["one"])).toBe("// one\n");
   expect(header("a.css", ["one", "two"])).toBe("/*\n * one\n * two\n */\n");
   expect(header("a.json", ["one"])).toBe("");
+});
+
+test("the index keeps an outside maker's name and credit", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "vectoys-maker-"));
+  try {
+    await mkdir(join(repo, "registry/ball/src"), { recursive: true });
+    await writeFile(join(repo, "registry/ball/src/ball.tsx"), "export const Ball = () => null;\n");
+    const item = { name: "ball", title: "Ball", description: "A ball.", files: ["src/ball.tsx"], license: "MIT", author: "Jane Doe (https://jane.example)", credit: "Jane Doe" };
+    await writeFile(join(repo, "registry/ball/item.json"), JSON.stringify(item));
+    const index = await buildRegistry({ root: repo, out: join(repo, "out") });
+    expect(index.items).toEqual([
+      { name: "ball", title: "Ball", description: "A ball.", type: "registry:component", author: "Jane Doe (https://jane.example)", license: "MIT", credit: "Jane Doe" },
+    ]);
+    const written: RegistryIndex = JSON.parse(await readFile(join(repo, "out/index.json"), "utf8"));
+    expect(written.items).toEqual(index.items);
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
 });

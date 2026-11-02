@@ -3,7 +3,8 @@ import { extname, join } from "node:path";
 
 export const SCHEMA = "https://ui.shadcn.com/schema/registry-item.json";
 export const BASE_URL = "https://vectoys.com/r";
-const AUTHOR = "vectoys (https://vectoys.com)";
+/** Who made an item, and who to credit, when its item.json does not say. */
+export const AUTHOR = "vectoys (https://vectoys.com)";
 
 /** The items the index lists first, in this order; the rest follow in name order. */
 export const FIRST = ["keyboard", "keycap"];
@@ -33,7 +34,8 @@ export type RegistryItem = {
   meta: { license: string; source: string; credit: string };
 };
 
-export type IndexEntry = Pick<RegistryItem, "name" | "title" | "description" | "type"> & { license: string };
+/** One item as `/r/index.json` lists it, with its maker as "Name (url)" so the gallery can credit them. */
+export type IndexEntry = Pick<RegistryItem, "name" | "title" | "description" | "type" | "author"> & { license: string; credit: string };
 
 /** What `/r/index.json` holds. */
 export type RegistryIndex = { name: string; homepage: string; items: IndexEntry[] };
@@ -60,7 +62,7 @@ export async function buildRegistry({ root, out, baseUrl = BASE_URL }: Options):
   const index: RegistryIndex = {
     name: "vectoys",
     homepage: new URL(baseUrl).origin,
-    items: items.map(({ name, title, description, type, meta }) => ({ name, title, description, type, license: meta.license })),
+    items: items.map(({ name, title, description, type, author, meta }) => ({ name, title, description, type, author, license: meta.license, credit: meta.credit })),
   };
   await writeJson(join(out, "index.json"), index);
   return index;
