@@ -35,7 +35,7 @@ test("a keycap is held while pressed by pointer or key, and runs the page's own 
   await fire(button, new KeyboardEvent("keyup", { bubbles: true, key: " " }));
   expect(button.hasAttribute("data-pressed")).toBe(false);
 
-  await fire(button, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
   await fire(button, new FocusEvent("focusout", { bubbles: true }));
   expect(calls).toEqual(["pointerdown", "pointerup", "keydown", "keyup", "press", "blur"]);
   expect(onPress).toHaveBeenCalledTimes(1);
@@ -52,7 +52,7 @@ test("a disabled keycap is never held", async () => {
   await unmount();
 });
 
-const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 1, pointerType: "mouse", button: 0, bubbles: true });
+const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
 
 test("a drag on the key turns it and lets the key up without pressing it, and a click still presses", async () => {
   const onPress = mock(() => {});
@@ -69,11 +69,11 @@ test("a drag on the key turns it and lets the key up without pressing it, and a 
   await frames.advance(400);
   expect(drawing()).not.toBe(rest);
   await fire(button, pointer("pointerup", 60));
-  await fire(button, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
   expect(onPress).toHaveBeenCalledTimes(0);
   await fire(button, pointer("pointerdown", 0));
   await fire(button, pointer("pointerup", 0));
-  await fire(button, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
   expect(onPress).toHaveBeenCalledTimes(1);
   await frames.advance(400);
   await unmount();

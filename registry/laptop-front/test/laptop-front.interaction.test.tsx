@@ -34,9 +34,9 @@ test("renders on the client with no React warnings, its content live in the glas
   }
 });
 
-const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 1, pointerType: "mouse", button: 0, bubbles: true });
+const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
 
-test("a drag on the laptop's frame tilts it, a drag on its display does not, and the display's content still takes clicks", async () => {
+test("a drag on the laptop's display tilts it as one on its frame does, and the display's content still takes clicks", async () => {
   let clicks = 0;
   const { host, unmount } = await mount(
     <LaptopFront>
@@ -47,17 +47,20 @@ test("a drag on the laptop's frame tilts it, a drag on its display does not, and
   );
   const body = host.querySelector<HTMLElement>(".vectoys-turntable-body")!;
   const text = host.querySelector("span")!;
+  await fire(text, new MouseEvent("click", { bubbles: true, detail: 1 }));
+  expect(clicks).toBe(1);
   await fire(text, pointer("pointerdown", 0));
   await fire(text, pointer("pointermove", 60));
-  expect(body.style.transform).toContain("rotateY(0deg)");
+  expect(body.style.transform).not.toContain("rotateY(0deg)");
   await fire(text, pointer("pointerup", 60));
-  await fire(text, new MouseEvent("click", { bubbles: true }));
+  // The click that ends the drag is the turn's, not the content's.
+  await fire(text, new MouseEvent("click", { bubbles: true, detail: 1 }));
   expect(clicks).toBe(1);
   const frame = host.querySelector("svg path")!;
   await fire(frame, pointer("pointerdown", 0));
-  await fire(frame, pointer("pointermove", 60));
+  await fire(frame, pointer("pointermove", -60));
   expect(body.style.transform).not.toContain("rotateY(0deg)");
-  await fire(frame, pointer("pointerup", 60));
+  await fire(frame, pointer("pointerup", -60));
   await unmount();
 });
 

@@ -33,13 +33,13 @@ test("without an address the disk is a button, held while a key or pointer is do
   expect(button.getAttribute("data-pressed")).toBe("true");
   await fire(button, new KeyboardEvent("keyup", { bubbles: true, key: "Enter" }));
   expect(button.hasAttribute("data-pressed")).toBe(false);
-  await fire(button, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
   expect(onPress).toHaveBeenCalledTimes(1);
   await frames.advance(600);
   await unmount();
 });
 
-const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 1, pointerType: "mouse", button: 0, bubbles: true });
+const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
 
 test("a drag on the disk turns it and lets the press go without pressing, and a click still presses", async () => {
   const onPress = mock(() => {});
@@ -53,11 +53,11 @@ test("a drag on the disk turns it and lets the press go without pressing, and a 
   expect(button.hasAttribute("data-pressed")).toBe(false);
   expect(drawing()).not.toBe(rest);
   await fire(button, pointer("pointerup", 60));
-  await fire(button, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
   expect(onPress).toHaveBeenCalledTimes(0);
   await fire(button, pointer("pointerdown", 0));
   await fire(button, pointer("pointerup", 0));
-  await fire(button, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
   expect(onPress).toHaveBeenCalledTimes(1);
   await frames.advance(600);
   await unmount();

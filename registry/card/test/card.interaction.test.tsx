@@ -45,7 +45,7 @@ test("a drag on a face turns the card, and the click that ends it does not flip 
   await fire(face, pointer("pointerdown", 0));
   await fire(face, pointer("pointermove", 60, 10));
   await fire(face, pointer("pointerup", 60, 10, 0));
-  await fire(face, new MouseEvent("click", { bubbles: true, clientX: 60, clientY: 10 }));
+  await fire(face, new MouseEvent("click", { bubbles: true, detail: 1, clientX: 60, clientY: 10 }));
   expect(drawing()).not.toBe(before);
   expect(button.getAttribute("aria-pressed")).toBe("false");
 
@@ -64,7 +64,7 @@ test("a drag from the flip button turns the card, and a plain click on it still 
   await fire(button, pointer("pointerdown", 0));
   await fire(button, pointer("pointermove", 60, 10));
   await fire(button, pointer("pointerup", 60, 10, 0));
-  await fire(button, new MouseEvent("click", { bubbles: true, clientX: 60, clientY: 10 }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1, clientX: 60, clientY: 10 }));
   expect(drawing()).not.toBe(before);
   expect(button.getAttribute("aria-pressed")).toBe("false");
 

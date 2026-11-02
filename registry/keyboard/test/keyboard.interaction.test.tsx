@@ -650,7 +650,7 @@ test("the full screen button fills the screen with the turntable, follows full s
   }
 });
 
-const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 7, pointerType: "mouse", button: 0, bubbles: true });
+const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 7, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
 
 test("a drag from a key tilts the keyboard and lets the key up, and a press with no drag holds it", async () => {
   const { host, unmount } = await mount(<Keyboard />);
@@ -691,4 +691,29 @@ test("with dragging off a pointer that moves keeps its key down", async () => {
   expect(isDown(host, "KeyJ")).toBe(true);
   await fire(key(host, "KeyJ"), pointer("pointerup", 60));
   await unmount();
+});
+
+test("keys still type after the full screen button is clicked, as the browser leaves focus on it", async () => {
+  const { host, unmount } = await mount(<Keyboard typing />);
+  const button = buttonNamed(host, "Full screen Keyboard")!;
+  button.focus();
+  await act(async () => button.click());
+  expect(document.activeElement).toBe(button);
+  await press("keydown", "KeyH", { key: "h" });
+  expect(isDown(host, "KeyH")).toBe(true);
+  expect(document.activeElement).toBe(box(host));
+  await press("keyup", "KeyH", { key: "h" });
+  await fire(document.body, new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await unmount();
+});
+
+test("the text row leaves room for the full screen button, so it never covers Clear", async () => {
+  const row = async (fullscreen: boolean) => {
+    const { host, unmount } = await mount(<Keyboard typing fullscreen={fullscreen} />);
+    const padding = box(host).parentElement!.style.paddingRight;
+    await unmount();
+    return padding;
+  };
+  expect(await row(true)).toBe("40px");
+  expect(await row(false)).toBe("");
 });

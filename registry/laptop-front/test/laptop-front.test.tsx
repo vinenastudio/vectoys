@@ -17,10 +17,10 @@ test("renders on the server the same twice, with the scene's viewBox", () => {
   expect(render()).not.toContain("NaN");
 });
 
-/** The toy inside its turntable, as the server draws it with no tab stop and no button, less what marks the display as its own. */
+/** The toy inside its turntable, as the server draws it with no tab stop and no button. */
 const drawing = (html: string) => {
   const body = html.indexOf(">", html.indexOf('class="vectoys-turntable-body"')) + 1;
-  return html.slice(body, html.lastIndexOf("</div></div>")).replace(' data-vectoys-nodrag=""', "");
+  return html.slice(body, html.lastIndexOf("</div></div>"));
 };
 
 // The laptop item draws the same laptop with `eye={FRONT}`; the two never drift apart.

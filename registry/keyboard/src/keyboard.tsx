@@ -67,6 +67,8 @@ const TOGGLE: CSSProperties = {
 };
 const ROW: CSSProperties = { display: "flex", alignItems: "center", gap: 8 };
 const CONTROLS: CSSProperties = { ...ROW, justifyContent: "flex-end", marginTop: 8 };
+// Room at the end of the text row for the turntable's full screen button, 32 pixels wide and 8 from the edge, so it never covers Clear.
+const ROOM: CSSProperties = { paddingRight: 40 };
 const TEXT: CSSProperties = {
   flex: 1,
   minWidth: 0,
@@ -113,7 +115,8 @@ const WRITE: CSSProperties = {
   caretColor: INK,
 };
 const FIT_BOARD: CSSProperties = { width: `min(100%, 1100px, calc((100cqh - ${WRITE_HEIGHT} - 80px) * ${EYE.width} / ${EYE.height}))` };
-const CORNER_STYLE: CSSProperties = { ...ROW, position: "absolute", top: "clamp(12px, 3vmin, 28px)", right: "clamp(12px, 3vmin, 28px)", margin: 0 };
+// The page is 92dvh tall in the middle of the screen, so its top is 4dvh down; the buttons stay below the full screen button, whose bottom is 40 pixels down.
+const CORNER_STYLE: CSSProperties = { ...ROW, position: "absolute", top: "max(clamp(12px, 3vmin, 28px), calc(48px - 4dvh))", right: "clamp(12px, 3vmin, 28px)", margin: 0 };
 
 // Where a hold comes from: the real keyboard, a pointer by its id, or the demo.
 const BY_KEY = "key";
@@ -245,7 +248,7 @@ export function Keyboard({ label = "Keyboard", draggable, fullscreen, limits, re
       {...(limits && { limits })}
       {...(release && { release })}
     >
-      {({ full }) => <Board {...props} label={label} full={full} drag={draggable !== false} />}
+      {({ full }) => <Board {...props} label={label} full={full} drag={draggable !== false} room={fullscreen !== false} />}
     </Turntable>
   );
 }
@@ -267,7 +270,8 @@ function Board({
   style,
   full,
   drag,
-}: Omit<KeyboardProps, keyof TurnOptions> & { full: boolean; drag: boolean }) {
+  room,
+}: Omit<KeyboardProps, keyof TurnOptions> & { full: boolean; drag: boolean; room: boolean }) {
   const id = `keyboard-${useId().replace(/[^\w-]/g, "")}`;
   const reduced = useReducedMotion();
   const frames = useFrames();
@@ -379,7 +383,8 @@ function Board({
       const active = document.activeElement;
       return !active || active === document.body || active === document.documentElement || active === root.current?.closest(`.${TURN}`);
     };
-    const mine = () => free() || (root.current?.contains(document.activeElement) ?? false);
+    // Inside the turntable counts too, as its full screen button keeps focus after a click.
+    const mine = () => free() || (root.current?.closest(`.${TURN}`)?.contains(document.activeElement) ?? false);
     /** Focuses the text box before the browser types a character pressed while nothing editable has focus, so it lands there. */
     const aim = (event: KeyboardEvent) => {
       const field = box.current;
@@ -517,7 +522,7 @@ function Board({
     >
       <style>{SHEET}</style>
       {writing && (
-        <div style={full ? { display: "contents" } : { ...ROW, marginBottom: 12 }}>
+        <div style={full ? { display: "contents" } : { ...ROW, marginBottom: 12, ...(room && ROOM) }}>
           <textarea
             ref={box}
             rows={2}

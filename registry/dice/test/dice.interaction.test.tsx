@@ -1,5 +1,6 @@
 import { afterAll, expect, mock, test } from "bun:test";
 import { renderToString } from "react-dom/server";
+import type { TurnLimits } from "@vinena/vectoys-react";
 import { fakeFrames, fire, htmlOf, mount } from "../../../packages/react/test/dom";
 import { Dice, ROLL_MS, WOBBLE_MS } from "../src";
 
@@ -15,7 +16,7 @@ test("a roll lands on the given face, reads it out, and reads it out again on th
   expect(live.textContent).toBe("Showing 3");
 
   for (const round of [1, 2]) {
-    await fire(button, new MouseEvent("click", { bubbles: true }));
+    await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
     await frames.advance(32);
     // Empty in the air, so the same face landing again is still read out.
     expect(live.textContent).toBe("");
@@ -27,7 +28,7 @@ test("a roll lands on the given face, reads it out, and reads it out again on th
   await unmount();
 });
 
-const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 1, pointerType: "mouse", button: 0, bubbles: true });
+const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
 
 test("a drag on the die turns it without rolling, and a click still rolls", async () => {
   const onRoll = mock((value: number) => value);
@@ -39,12 +40,12 @@ test("a drag on the die turns it without rolling, and a click still rolls", asyn
   await fire(button, pointer("pointermove", 60));
   expect(drawing()).not.toBe(rest);
   await fire(button, pointer("pointerup", 60));
-  await fire(button, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
   await frames.advance(ROLL_MS + WOBBLE_MS + 100);
   expect(onRoll).toHaveBeenCalledTimes(0);
   await fire(button, pointer("pointerdown", 0));
   await fire(button, pointer("pointerup", 0));
-  await fire(button, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
   await frames.advance(ROLL_MS + WOBBLE_MS + 100);
   expect(onRoll).toHaveBeenCalledTimes(1);
   await unmount();
@@ -55,4 +56,20 @@ test("with dragging and full screen off the die has no tab stop of its own and n
   expect(html).not.toContain('tabindex="0"');
   expect(html).not.toContain("Full screen");
   expect(renderToString(<Dice />)).toContain('aria-label="Full screen die"');
+});
+
+test("limits given for one axis keep the die's own free spin on the other", async () => {
+  const turned = async (limits: TurnLimits) => {
+    const { host, unmount } = await mount(<Dice value={2} limits={limits} />);
+    const button = host.querySelector("button[aria-label='Roll the die']")!;
+    await fire(button, pointer("pointerdown", 0));
+    await fire(button, pointer("pointermove", 1000));
+    await fire(button, pointer("pointerup", 1000));
+    await frames.advance(3000);
+    // Less the ids, which differ between two dice.
+    const drawing = htmlOf(host.querySelector("svg")).replace(/dice-[\w-]+?-(near|far)/g, "$1");
+    await unmount();
+    return drawing;
+  };
+  expect(await turned({ pitch: [-10, 10] })).toBe(await turned({ yaw: [-Infinity, Infinity], pitch: [-10, 10] }));
 });

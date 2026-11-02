@@ -132,7 +132,7 @@ const LIMITS = { yaw: [-40, 40], pitch: [-20, 14] } as const;
  * goes back. Under a pointer the lid peeks up a little. A drag turns the
  * eye round it, and a button shows it full screen.
  */
-export function Gift({ children, open, defaultOpen = false, onOpenChange, finish, ribbon, label = "Open the gift", className, style, limits = LIMITS, ...turning }: GiftProps) {
+export function Gift({ children, open, defaultOpen = false, onOpenChange, finish, ribbon, label = "Open the gift", className, style, limits, ...turning }: GiftProps) {
   const id = `gift-${useId().replace(/[^\w-]/g, "")}`;
   const reduced = useReducedMotion();
   const frames = useFrames();
@@ -236,7 +236,7 @@ export function Gift({ children, open, defaultOpen = false, onOpenChange, finish
   };
 
   return (
-    <Turntable mode="camera" label="gift" limits={limits} {...turning}>
+    <Turntable mode="camera" label="gift" limits={{ ...LIMITS, ...limits }} {...turning}>
       {drawn}
     </Turntable>
   );

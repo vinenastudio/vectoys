@@ -331,7 +331,7 @@ test.each([
   }
 });
 
-const pointer = (type: string, x: number, y = 0) => new PointerEvent(type, { clientX: x, clientY: y, pointerId: 1, pointerType: "mouse", button: 0, bubbles: true });
+const pointer = (type: string, x: number, y = 0) => new PointerEvent(type, { clientX: x, clientY: y, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
 
 test("a drag on the display turns the laptop, held to its ranges, and the handle then adds the turn", async () => {
   const handle = createRef<LaptopHandle>();

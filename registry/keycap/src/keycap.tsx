@@ -289,7 +289,7 @@ export const Keycap = memo(function Keycap({
   soundToggle = false,
   draggable = true,
   fullscreen,
-  limits = LIMITS,
+  limits,
   release,
   ...button
 }: KeycapProps) {
@@ -346,7 +346,7 @@ export const Keycap = memo(function Keycap({
   if (shared) return drawn({ yaw: 0, pitch: 0 });
   const title = typeof children === "string" || typeof children === "number" ? `${children} key` : "key";
   return (
-    <Turntable mode="camera" label={title} draggable={draggable} limits={limits} {...(fullscreen !== undefined && { fullscreen })} {...(release && { release })}>
+    <Turntable mode="camera" label={title} draggable={draggable} limits={{ ...LIMITS, ...limits }} {...(fullscreen !== undefined && { fullscreen })} {...(release && { release })}>
       {(turn) =>
         soundToggle ? (
           <div style={COLUMN}>

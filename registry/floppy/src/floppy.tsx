@@ -159,7 +159,7 @@ const LIMITS = { yaw: [-40, 40], pitch: [-20, 20] } as const;
  * the motion. A drag turns the eye round it, and a button shows it full
  * screen.
  */
-export const Floppy = memo(function Floppy({ children, href, download = true, onPress, label, finish, limits = LIMITS, ...turning }: FloppyProps) {
+export const Floppy = memo(function Floppy({ children, href, download = true, onPress, label, finish, limits, ...turning }: FloppyProps) {
   const id = `floppy-${useId().replace(/[^\w-]/g, "")}`;
   const { raised, held, handlers } = usePointing(href ? LINK_KEYS : BUTTON_KEYS, turning.draggable !== false);
   const hover = Math.max(0, Math.min(1, useSpring(raised ? 1 : 0, { stiffness: 260, damping: 26 })));
@@ -177,7 +177,7 @@ export const Floppy = memo(function Floppy({ children, href, download = true, on
   );
 
   return (
-    <Turntable mode="camera" label="floppy disk" limits={limits} {...turning}>
+    <Turntable mode="camera" label="floppy disk" limits={{ ...LIMITS, ...limits }} {...turning}>
       {(turn) => {
         const view = seen(hover, press, turn);
         const body = view.drawn.hulls.find((hull) => hull.part === "body");

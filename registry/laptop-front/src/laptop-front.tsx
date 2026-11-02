@@ -116,9 +116,9 @@ type LaptopFrontProps = {
 
 /**
  * A 14 inch laptop straight on, drawn flat, with live content on its display
- * under the notch. A drag on its frame tilts it, and a button shows it full
- * screen; the display keeps its own pointer, so its content is used as on a
- * real screen.
+ * under the notch. A drag on it, the display too, tilts it, and a button
+ * shows it full screen; the links, buttons and fields on the display are used
+ * as on a real screen.
  */
 export const LaptopFront = memo(function LaptopFront({ finish, children, label = "Laptop", ...turning }: LaptopFrontProps) {
   const id = `laptop-${FRONT.id}-${useId().replace(/[^\w-]/g, "")}`;
@@ -128,9 +128,7 @@ export const LaptopFront = memo(function LaptopFront({ finish, children, label =
 
   const glass = (
     <Screen camera={camera} pose={FRONT.pose} rect={FRONT.glass} style={GLASS_STYLE}>
-      <div style={FILL} data-vectoys-nodrag={children == null ? undefined : ""}>
-        {children}
-      </div>
+      <div style={FILL}>{children}</div>
       <svg
         viewBox={`0 0 ${fixed(notch.width)} ${notch.height}`}
         preserveAspectRatio="none"

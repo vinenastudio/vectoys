@@ -19,20 +19,20 @@ test("a click opens the gift and makes its surprise live, and another shuts it",
   expect(button.getAttribute("aria-expanded")).toBe("false");
   expect(surprise.hasAttribute("inert")).toBe(true);
 
-  await fire(button, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
   expect(button.getAttribute("aria-expanded")).toBe("true");
   expect(surprise.hasAttribute("inert")).toBe(false);
   expect(onOpenChange).toHaveBeenLastCalledWith(true);
   await frames.advance(1400);
 
-  await fire(button, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
   expect(button.getAttribute("aria-expanded")).toBe("false");
   expect(surprise.hasAttribute("inert")).toBe(true);
   await frames.advance(1400);
   await unmount();
 });
 
-const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 1, pointerType: "mouse", button: 0, bubbles: true });
+const pointer = (type: string, x: number) => new PointerEvent(type, { clientX: x, clientY: 0, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
 
 test("a drag on the gift turns it without opening it, and a click still opens it", async () => {
   const { host, unmount } = await mount(<Gift>SAVE20</Gift>);
@@ -43,11 +43,11 @@ test("a drag on the gift turns it without opening it, and a click still opens it
   await fire(button, pointer("pointermove", 60));
   expect(drawing()).not.toBe(rest);
   await fire(button, pointer("pointerup", 60));
-  await fire(button, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
   expect(button.getAttribute("aria-expanded")).toBe("false");
   await fire(button, pointer("pointerdown", 0));
   await fire(button, pointer("pointerup", 0));
-  await fire(button, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true, detail: 1 }));
   expect(button.getAttribute("aria-expanded")).toBe("true");
   await frames.advance(1400);
   await unmount();

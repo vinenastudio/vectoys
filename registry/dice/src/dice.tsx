@@ -110,7 +110,7 @@ const random = (): Value => VALUES[Math.floor(Math.random() * VALUES.length)] ??
  * following on the ground. The face on top is read out as it lands. A drag
  * turns the eye round it, and a button shows it full screen.
  */
-export function Dice({ value, onRoll, finish, label = "Roll the die", className, style, limits = LIMITS, ...turning }: DiceProps) {
+export function Dice({ value, onRoll, finish, label = "Roll the die", className, style, limits, ...turning }: DiceProps) {
   const id = `dice-${useId().replace(/[^\w-]/g, "")}`;
   const reduced = useReducedMotion();
   const frames = useFrames();
@@ -173,7 +173,7 @@ export function Dice({ value, onRoll, finish, label = "Roll the die", className,
   );
 
   return (
-    <Turntable mode="camera" label="die" limits={limits} {...turning}>
+    <Turntable mode="camera" label="die" limits={{ ...LIMITS, ...limits }} {...turning}>
       {(turn) => {
         const view = seen(state.rotation, state.hop, turn);
         const die = view.drawn.hulls.find((hull) => hull.part === "die");

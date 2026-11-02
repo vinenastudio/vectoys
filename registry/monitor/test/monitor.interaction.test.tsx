@@ -5,7 +5,7 @@ import { Monitor } from "../src";
 const frames = fakeFrames();
 afterAll(frames.restore);
 
-const pointer = (type: string, x: number, y = 0) => new PointerEvent(type, { clientX: x, clientY: y, pointerId: 1, pointerType: "mouse", button: 0, bubbles: true });
+const pointer = (type: string, x: number, y = 0) => new PointerEvent(type, { clientX: x, clientY: y, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
 
 test("a drag on the desktop turns the monitor", async () => {
   const { host, unmount } = await mount(
