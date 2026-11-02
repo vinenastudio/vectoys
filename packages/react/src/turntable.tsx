@@ -59,6 +59,8 @@ const ROOT = "vectoys-turntable";
 const BODY = `${ROOT}-body`;
 const BUTTON = `${ROOT}-full`;
 const HINT = `${ROOT}-hint`;
+// What Tab stops on inside the overlay.
+const TABBABLE = "a[href], button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [contenteditable], [tabindex]:not([tabindex='-1'])";
 const FOCUS = "outline:var(--vectoys-focus-width,1px) solid var(--vectoys-focus,currentColor);outline-offset:4px";
 const CSS = `.${ROOT}{position:relative}
 .${ROOT}[tabindex]{cursor:grab;touch-action:pan-y pinch-zoom;user-select:none;-webkit-user-select:none}
@@ -169,11 +171,19 @@ export function Turntable({ mode, label, children, className, style, draggable =
     clearTimeout(keyRest.current);
   };
 
+  const still = () => {
+    const { yaw, pitch } = pose.current;
+    pose.current = { yaw: { ...yaw, velocity: 0 }, pitch: { ...pitch, velocity: 0 } };
+  };
+
   /** After a release or a reset: the toy coasts and springs back inside its limits, or springs home. */
   const settle = (home: boolean) => {
     stop();
     let { yaw, pitch } = pose.current;
-    if (home) yaw = { ...yaw, value: nearest(yaw.value) };
+    if (home) {
+      yaw = { ...yaw, value: nearest(yaw.value) };
+      pitch = { ...pitch, value: nearest(pitch.value) };
+    }
     if (reduced) {
       const rest = (axis: Spring, range: Range) => ({ value: home ? 0 : clamp(axis.value, ...range), velocity: 0 });
       return show(rest(yaw, yawRange), rest(pitch, pitchRange));
@@ -191,6 +201,13 @@ export function Turntable({ mode, label, children, className, style, draggable =
   };
 
   useEffect(() => () => clearTimeout(keyRest.current), []);
+
+  // With dragging off the pointer handlers are gone, so a drag under way ends here.
+  useEffect(() => {
+    if (draggable) return;
+    drag.current = null;
+    setDragging(false);
+  }, [draggable]);
 
   // A click that ends a drag stops here, before the toy's own listeners hear it.
   useEffect(() => {
@@ -220,20 +237,32 @@ export function Turntable({ mode, label, children, className, style, draggable =
     };
   }, [fullscreen]);
 
-  // The stand-in for full screen covers the page: the page stays still under it and esc closes it.
+  // The stand-in for full screen covers the page: the page stays still under it, Tab stays in it, and esc closes it and gives focus back.
   useEffect(() => {
-    if (full !== "overlay") return;
+    const element = root.current;
+    if (full !== "overlay" || !element) return;
     if (overlays++ === 0) {
       pageOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
     }
+    const before = document.activeElement;
+    element.querySelector<HTMLElement>(`.${BUTTON}`)?.focus();
     const key = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") setFull(false);
+      if (event.key === "Escape") return setFull(false);
+      if (event.key !== "Tab") return;
+      const stops = [element, ...element.querySelectorAll<HTMLElement>(TABBABLE)].filter((item) => item.matches(TABBABLE));
+      const [first, last] = [stops[0], stops.at(-1)];
+      const at = document.activeElement;
+      const to = !(at instanceof Node && element.contains(at)) ? first : event.shiftKey && at === first ? last : !event.shiftKey && at === last ? first : undefined;
+      if (!to) return;
+      event.preventDefault();
+      to.focus();
     };
     document.addEventListener("keydown", key);
     return () => {
       if (--overlays === 0) document.body.style.overflow = pageOverflow;
       document.removeEventListener("keydown", key);
+      if (before instanceof HTMLElement) before.focus();
     };
   }, [full]);
 
@@ -254,6 +283,8 @@ export function Turntable({ mode, label, children, className, style, draggable =
     if (drag.current?.active) return;
     swallow.current = false;
     if (event.button !== 0 || onControl(event.target)) return;
+    // A grab stops a spin where it is, so the drag starts from there.
+    stop();
     const { yaw, pitch } = pose.current;
     drag.current = {
       id: event.pointerId,
@@ -308,22 +339,19 @@ export function Turntable({ mode, label, children, className, style, draggable =
     drag.current = null;
     if (!current.active) {
       // A second tap soon after the first resets the toy, as a double click does.
-      if (current.touch && event.type === "pointerup") {
-        const double = event.timeStamp - lastTap.current < DOUBLE_TAP_MS;
-        if (double) settle(true);
-        // A third tap starts over, so it never resets again.
-        lastTap.current = double ? -Infinity : event.timeStamp;
-      }
-      return;
+      const tap = current.touch && event.type === "pointerup";
+      const double = tap && event.timeStamp - lastTap.current < DOUBLE_TAP_MS;
+      // A third tap starts over, so it never resets again.
+      if (tap) lastTap.current = double ? -Infinity : event.timeStamp;
+      // A press stopped any spin, so the toy rests from where it was held, inside its limits.
+      still();
+      return settle(double || release === "return");
     }
     setDragging(false);
     // A finger that drags gives no click to swallow.
     swallow.current = event.type === "pointerup" && !current.touch;
     // A pointer that stopped before it let go gives no spin.
-    if (event.timeStamp - current.time > 80) {
-      const { yaw, pitch } = pose.current;
-      pose.current = { yaw: { ...yaw, velocity: 0 }, pitch: { ...pitch, velocity: 0 } };
-    }
+    if (event.timeStamp - current.time > 80) still();
     settle(release === "return");
   };
 
@@ -368,6 +396,7 @@ export function Turntable({ mode, label, children, className, style, draggable =
       style={style}
       data-full={full || undefined}
       data-dragging={dragging || undefined}
+      {...(full === "overlay" && { role: "dialog", "aria-modal": true, "aria-label": label ?? "Full screen" })}
       {...(draggable && {
         tabIndex: 0,
         "aria-describedby": hint,

@@ -8,6 +8,8 @@ const RESIST = 0.3;
 // After a release the spin slows by this share every 16 milliseconds, and stops below this many degrees per second.
 const FRICTION = 0.92;
 const STOP = 10;
+// The same slowing, as a rate per second.
+const DECAY = (-Math.log(FRICTION) * 1000) / 16;
 
 /** Where a drag to `value` shows the toy: as far as `value` inside the range, held back past it. */
 export function rubber(value: number, [lo, hi]: Range): number {
@@ -39,7 +41,8 @@ export function glide({ axis, home }: Glide, range: Range, seconds: number): Gli
   }
   const velocity = axis.velocity * FRICTION ** ((seconds * 1000) / 16);
   if (Math.abs(velocity) < STOP) return { axis: { value: axis.value, velocity: 0 }, home };
-  return { axis: { value: axis.value + velocity * seconds, velocity }, home };
+  // The distance the slowing spin covers in `seconds`, the same at any frame rate.
+  return { axis: { value: axis.value + (axis.velocity - velocity) / DECAY, velocity }, home };
 }
 
 /** The same turn as `yaw` within half a turn of 0, so a reset never spins the long way round. */

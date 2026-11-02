@@ -47,7 +47,7 @@ test("the package manager comes from the lockfile", () => {
 test("only packages the project does not list are installed", () => {
   fresh();
   writeFileSync(join(dir, "package.json"), JSON.stringify({ dependencies: { "@vinena/vectoys": "0.1.0" }, devDependencies: { left: "1" } }));
-  expect(missing(dir, ["@vinena/vectoys", "@vinena/vectoys-react@0.1.0", "left@^2", "right"])).toEqual(["@vinena/vectoys-react@0.1.0", "right"]);
+  expect(missing(dir, ["@vinena/vectoys", "@vinena/vectoys-react@0.1.0", "left@^1", "right"])).toEqual(["@vinena/vectoys-react@0.1.0", "right"]);
 });
 
 test("only plain package specs count as dependencies", () => {

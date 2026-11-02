@@ -61,6 +61,13 @@ test("a version meets a range when it is at least the range's base version", () 
   expect(atLeast("1.1.9", "^1.2.0")).toBe(false);
   expect(atLeast("0.3.1", "0.3.0")).toBe(true);
   expect(atLeast("0.2.9", "0.3.0")).toBe(false);
+  // Tilde ranges and ranges of one or two parts start at their base too.
+  expect(atLeast("0.2.0", "~0.3.0")).toBe(false);
+  expect(atLeast("0.3.4", "~0.3.0")).toBe(true);
+  expect(atLeast("0.2.0", "^0.3")).toBe(false);
+  expect(atLeast("0.3.0", "^0.3")).toBe(true);
+  expect(atLeast("0.9.0", "^1")).toBe(false);
+  expect(atLeast("1.0.0", "~1")).toBe(true);
   // Other ranges, and versions that are not semver, count as met.
   expect(atLeast("0.1.0", ">=0.3")).toBe(true);
   expect(atLeast("workspace:*", "^0.3.0")).toBe(true);
@@ -107,12 +114,28 @@ test("a package listed at a version too old for the range is installed again, at
   expect(installCommand("npm", missing(listed, wanted))).toEqual(["npm", ["install", "@vinena/vectoys-react@^0.3.0", "left-pad@^1.0.0"]]);
 });
 
-test("the installed version in node_modules wins over the range package.json gives", () => {
+test("a version in node_modules newer than the range package.json gives counts", () => {
   const root = tree("installed", {
     "package.json": JSON.stringify({ dependencies: { "@vinena/vectoys": "^0.2.0", "@vinena/vectoys-react": "^0.3.0" } }),
     "node_modules/@vinena/vectoys/package.json": JSON.stringify({ version: "0.3.2" }),
     "node_modules/@vinena/vectoys-react/package.json": JSON.stringify({ version: "0.2.1" }),
   });
-  expect(missing(root, ["@vinena/vectoys@^0.3.0", "@vinena/vectoys-react@^0.3.0"])).toEqual(["@vinena/vectoys-react@^0.3.0"]);
+  expect(missing(root, ["@vinena/vectoys@^0.3.0", "@vinena/vectoys-react@^0.4.0"])).toEqual(["@vinena/vectoys-react@^0.4.0"]);
   expect(missing(join(root, "nowhere"), ["@vinena/vectoys@^0.3.0"])).toEqual(["@vinena/vectoys@^0.3.0"]);
+});
+
+test("a newer range in package.json is kept even when node_modules has an older version", () => {
+  const root = tree("stale", {
+    "package.json": JSON.stringify({ dependencies: { "@vinena/vectoys-react": "^0.5.0", "@vinena/vectoys": "~0.4" } }),
+    "node_modules/@vinena/vectoys-react/package.json": JSON.stringify({ version: "0.2.0" }),
+  });
+  expect(missing(root, ["@vinena/vectoys-react@^0.3.0", "@vinena/vectoys@^0.3.0"])).toEqual([]);
+});
+
+test("a listed package is installed when its range is too old, or when no version of it can be read", () => {
+  const root = tree("unread", {
+    "package.json": JSON.stringify({ dependencies: { a: "~0.2.0", b: "^0.2", c: ">=0.1.0 <0.3.0", d: ">=0.1.0 <0.3.0", e: "latest" } }),
+    "node_modules/d/package.json": JSON.stringify({ version: "0.3.1" }),
+  });
+  expect(missing(root, ["a@~0.3.0", "b@^0.3", "c@^0.3.0", "d@^0.3.0", "e@^1.0.0"])).toEqual(["a@~0.3.0", "b@^0.3", "c@^0.3.0", "e@^1.0.0"]);
 });
