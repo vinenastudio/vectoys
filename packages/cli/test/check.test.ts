@@ -188,7 +188,14 @@ test("each unsafe thing in the code fails, naming the file, the line and what it
     ['navigator.serviceWorker.register("/sw.js");', "src/toy.tsx:1 talks to a worker or another window: serviceWorker"],
     ['parent.postMessage(document.title, "*");', "src/toy.tsx:1 talks to a worker or another window: postMessage"],
     ['navigator.clipboard.writeText("x");', "src/toy.tsx:1 uses the clipboard: clipboard"],
-    ['window.open("/x");', "src/toy.tsx:1 opens a window: window.open"],
+    ['window.open("/x");', "src/toy.tsx:1 opens a window: open("],
+    ['window?.open("/x");', "src/toy.tsx:1 reaches the window object: window"],
+    ['window?.open("/x");', "src/toy.tsx:1 opens a window: open("],
+    ['top.open("/x");', "src/toy.tsx:1 opens a window: open("],
+    ['parent.open("/x");', "src/toy.tsx:1 opens a window: open("],
+    ['frames.open("/x");', "src/toy.tsx:1 opens a window: open("],
+    ['const a = <a href="/\\evil.example">x</a>;', 'src/toy.tsx has an outside URL: "/\\\\'],
+    ['const a = "\\\\\\\\evil.example";', 'src/toy.tsx has an outside URL: "\\\\\\'],
     ['open("/x");', "src/toy.tsx:1 opens a window: open("],
     ['location.href = "/logout";', "src/toy.tsx:1 moves the page: location.href"],
     ['location.assign("/logout");', "src/toy.tsx:1 moves the page: location.assign"],
@@ -262,6 +269,8 @@ test("tests get no more room than the item: the runtime, the window and HTML str
     ['export const f = (el: Element) => { el.outerHTML ||= "<img>"; };', ["test/x.test.ts:1 sets HTML from a string: outerHTML"]],
     ['const SOURCE = "./fixtures/old.ts"; const old = await import(SOURCE);', ["test/x.test.ts:1 has a dynamic import: import("]],
     ['{ const SOURCE = "./x.test.ts"; }\nawait import(SOURCE);', ["test/x.test.ts:2 has a dynamic import: import("]],
+    ['const t = readSibling("file:///registry/a/test/x.ts", "../../../.npmrc");', ["test/x.test.ts:1 reads a file from somewhere other than its own test: readSibling("]],
+    ["const from = import.meta.url; const t = readSibling(from, path);", ["test/x.test.ts:1 reads a file from somewhere other than its own test: readSibling("]],
   ];
   for (const [code, lines] of cases) expect({ code, lines: unsafe("export const a = 1;", { "test/x.test.ts": code }) }).toEqual({ code, lines });
 });
@@ -294,6 +303,7 @@ test("markup with a script, a frame, a form or an outside link fails", () => {
   expect(markupSafety('<form action="/x"></form>')).toEqual(["the markup has a frame, object, embed or form tag: <form"]);
   expect(markupSafety('<svg><image xlink:href="https://example.com/a.png"></image></svg>')).toEqual(['the markup links outside: xlink:href="https:']);
   expect(markupSafety('<a href=" JavaScript:go()">a</a>')).toEqual(["the markup has a javascript: URL: JavaScript:"]);
+  expect(markupSafety('<a href="/\\evil.example">a</a>')).toEqual(['the markup links outside: href="/\\']);
   expect(markupSafety('<div style="background:url(&quot;//example.com/a.png&quot;)"></div>')).toEqual(["the markup loads a style from outside: url(&quot;//"]);
 });
 

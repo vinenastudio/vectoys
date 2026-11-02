@@ -247,7 +247,7 @@ const ELEMENTS = "script|iframe|frame|object|embed|form";
  */
 const UNSAFE: [RegExp, string][] = [
   [/\b(Bun|process|Deno|module|exports|require|__dirname|__filename|globalThis)\b/, "uses the server runtime"],
-  [/\bdefaultView\b|(?<![.\w$])(window|self|opener)(?=\s*[.[(=;,)\]}])/, "reaches the window object"],
+  [/\bdefaultView\b|(?<![.\w$])(window|self|opener)(?=\s*[?.[(=;,)\]}])/, "reaches the window object"],
   [/<script\b/i, "has a <script> tag"],
   [/<(iframe|frame|object|embed|form)\b/i, "has a frame, object, embed or form tag"],
   [new RegExp(`\\b(jsx\\w*|createElement)\\s*\\(\\s*${STRING}(${ELEMENTS})${STRING}`, "i"), "makes a script, frame, object, embed or form element"],
@@ -262,13 +262,15 @@ const UNSAFE: [RegExp, string][] = [
   [/\b(XMLHttpRequest|WebSocket|EventSource|sendBeacon|importScripts)\b/, "makes a network call"],
   [/\b(Worker|SharedWorker|serviceWorker|postMessage)\b/, "talks to a worker or another window"],
   [/\bclipboard\b/, "uses the clipboard"],
-  [/\bwindow\s*\.\s*open\b|(?<![.\w$])open\s*\(/, "opens a window"],
+  [/(?<![\w$])open\s*\(/, "opens a window"],
+  [/\breadSibling\s*\((?!\s*import\.meta\.url\s*,)/, "reads a file from somewhere other than its own test"],
   [/\blocation\s*(\.\s*(href|assign|replace|reload)\b|=(?!=))|\b(window|document)\s*\.\s*location\b/, "moves the page"],
   [/\bimport\s*\(/, "has a dynamic import"],
   [/\b(localStorage|sessionStorage|indexedDB)\b|\bdocument\s*\.\s*cookie\b/, "uses browser storage or cookies"],
   [new RegExp(`${STRING}(${GLOBALS.join("|")})${STRING}`), "names a blocked browser feature in a string"],
   [/javascript\s*:/i, "has a javascript: URL"],
   [new RegExp(`\\bhttps?://(?!www\\.w3\\.org/)|[${"\"'`"}}]\\s*//[a-z0-9]|${STRING}\\s*data:\\s*text/html`, "i"), "has an outside URL"],
+  [/["'`}]\s*(?:\/\\\\|\\\\[\/\\])/, "has an outside URL"],
   [/url\(\s*["']?\s*(https?:|\/\/)|@import\b/i, "loads a style from outside"],
 ];
 
@@ -278,7 +280,7 @@ const UNSAFE_MARKUP: [RegExp, string][] = [
   [/<(iframe|frame|object|embed|form)\b/i, "has a frame, object, embed or form tag"],
   [/\ssrcdoc=/i, "sets srcdoc"],
   [/javascript\s*:/i, "has a javascript: URL"],
-  [/\s(href|xlink:href|src|srcset|action|formaction)="\s*(https?:|\/\/|data:\s*text\/html)/i, "links outside"],
+  [/\s(href|xlink:href|src|srcset|action|formaction)="\s*(https?:|[\/\\]{2}|data:\s*text\/html)/i, "links outside"],
   [/url\(\s*(&quot;|&#x27;|["'])?\s*(https?:|\/\/)/i, "loads a style from outside"],
 ];
 

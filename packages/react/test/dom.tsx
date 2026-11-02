@@ -81,8 +81,18 @@ export function installGlobal(name: string, value: unknown): () => void {
   return () => void Object.assign(globalThis, { [name]: real });
 }
 
-/** The text of the file at `path` from the test file at `from`, its `import.meta.url`. */
-export const readSibling = (from: string, path: string) => Bun.file(new URL(path, from)).text();
+/**
+ * The text of the file at `path` from the test file at `from`, its
+ * `import.meta.url`. Only a test under registry/<item>/test/ may read, and
+ * only files under registry/.
+ */
+export function readSibling(from: string, path: string): Promise<string> {
+  const registry = /^(file:\/\/.*\/registry\/)[^/]+\/test\//.exec(from)?.[1];
+  if (!registry) throw new Error(`readSibling reads only from a test under registry/<item>/test/, not ${from}`);
+  const url = new URL(path, from);
+  if (!url.href.startsWith(registry)) throw new Error(`readSibling reads only files under registry/, not ${url.href}`);
+  return Bun.file(url).text();
+}
 
 /** The markup inside `element`, or of `element` itself with `outer`. */
 export const htmlOf = (element: Element | null | undefined, outer = false) => (outer ? element?.outerHTML : element?.innerHTML) ?? "";
