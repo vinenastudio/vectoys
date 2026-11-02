@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { basename, extname, join, posix, relative, resolve, sep } from "node:path";
 import { checkItem, type ItemSource } from "@vectoys/registry-build";
 import { ITEM_NAME, type Context } from "./commands";
-import { componentName } from "./create";
+import { BASE_TSCONFIG, componentName } from "./create";
 import { isPackageSpec } from "./pm";
 
 /**
@@ -285,6 +285,41 @@ export function configFiles(dir: string, under = ""): string[] {
   });
 }
 
+const TSCONFIG = /^[tj]sconfig.*\.json$/;
+
+/** The tsconfig and jsconfig files in `dir`, outside node_modules, as paths from `dir`. */
+function tsconfigFiles(dir: string, under = ""): string[] {
+  return readdirSync(join(dir, under), { withFileTypes: true }).flatMap((entry) => {
+    const path = under ? `${under}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) return entry.name === "node_modules" ? [] : tsconfigFiles(dir, path);
+    return TSCONFIG.test(entry.name) ? [path] : [];
+  });
+}
+
+/**
+ * What in the item's tsconfig and jsconfig files could make an import load
+ * some other file: compilerOptions paths, baseUrl or rootDirs, or extending
+ * any config but the repository's shared base from the folder's own
+ * tsconfig.json. One line for each.
+ */
+export function tsconfigProblems(dir: string): string[] {
+  return tsconfigFiles(dir).flatMap((file) => {
+    let config: unknown;
+    try {
+      config = JSON.parse(readFileSync(join(dir, file), "utf8"));
+    } catch {
+      return [`${file} is not plain JSON, so check cannot tell what it sets`];
+    }
+    if (typeof config !== "object" || config === null || Array.isArray(config)) return [`${file} is not an object`];
+    const problems: string[] = [];
+    // The base is only the shared one from the folder's own tsconfig.json; from a subfolder the same path names another file.
+    if ("extends" in config && (file !== "tsconfig.json" || config.extends !== BASE_TSCONFIG)) problems.push(`${file} extends ${JSON.stringify(config.extends)}, which is not ${BASE_TSCONFIG} from the folder's tsconfig.json`);
+    const options = "compilerOptions" in config && typeof config.compilerOptions === "object" && config.compilerOptions !== null ? config.compilerOptions : {};
+    for (const option of ["paths", "baseUrl", "rootDirs"]) if (option in options) problems.push(`${file} sets compilerOptions.${option}, which moves imports`);
+    return problems;
+  });
+}
+
 /** Reads and checks item.json; the item, or the reason it fails. */
 export function readItem(dir: string): ItemSource | string {
   const path = join(dir, "item.json");
@@ -315,8 +350,8 @@ export function checks(dir: string): Result[] {
   if (typeof item === "string") return [{ pass: false, line: item }];
   const results: Result[] = [{ pass: true, line: "item.json has what the registry needs" }];
 
-  const config = configFiles(dir);
-  if (config.length) return [...results, ...config.map((file) => ({ pass: false, line: `the folder has ${file}, which items may not have` }))];
+  const config = [...configFiles(dir).map((file) => `the folder has ${file}, which items may not have`), ...tsconfigProblems(dir)];
+  if (config.length) return [...results, ...config.map((line) => ({ pass: false, line }))];
 
   const size = item.files.reduce((sum, file) => sum + lstatSync(resolve(dir, file)).size, 0);
   const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;

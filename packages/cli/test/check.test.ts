@@ -217,3 +217,28 @@ test("config files and dot files in the folder fail, but .gitignore and node_mod
   writeFileSync(join(folder, "src/.env"), "A=1\n");
   expect(failed(folder)).toEqual(["the folder has .npmrc, which items may not have", "the folder has src/.env, which items may not have"]);
 }, 30_000);
+
+test("tsconfig settings that move imports fail before anything renders", () => {
+  const { folder, edit } = item("moved");
+  writeFileSync(join(folder, "src/evil.ts"), 'require("node:fs").writeFileSync("marker", "ran"); export {};');
+  edit("tsconfig.json", (text) => JSON.stringify({ ...JSON.parse(text), compilerOptions: { jsx: "react-jsx", paths: { react: ["./src/evil.ts"] } } }));
+  expect(checks(folder).slice(1)).toEqual([{ pass: false, line: "tsconfig.json sets compilerOptions.paths, which moves imports" }]);
+
+  edit("tsconfig.json", () => JSON.stringify({ extends: "./other.json", compilerOptions: { baseUrl: ".", rootDirs: ["src", "x"] } }));
+  writeFileSync(join(folder, "jsconfig.json"), "{ // a comment\n}");
+  writeFileSync(join(folder, "src/tsconfig.build.json"), JSON.stringify({ extends: "../../tsconfig.base.json" }));
+  expect(failed(folder).sort()).toEqual([
+    "jsconfig.json is not plain JSON, so check cannot tell what it sets",
+    "src/tsconfig.build.json extends \"../../tsconfig.base.json\", which is not ../../tsconfig.base.json from the folder's tsconfig.json",
+    'tsconfig.json extends "./other.json", which is not ../../tsconfig.base.json from the folder\'s tsconfig.json',
+    "tsconfig.json sets compilerOptions.baseUrl, which moves imports",
+    "tsconfig.json sets compilerOptions.rootDirs, which moves imports",
+  ]);
+});
+
+test("both tsconfig forms create writes pass: the shared base inside the repository, the options written out outside it", () => {
+  const { folder, edit } = item("formed");
+  expect(failed(folder)).toEqual([]);
+  edit("tsconfig.json", () => JSON.stringify({ extends: "../../tsconfig.base.json", compilerOptions: { jsx: "react-jsx" }, include: ["src", "test"] }));
+  expect(failed(folder)).toEqual([]);
+}, 30_000);
