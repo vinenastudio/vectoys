@@ -1,4 +1,4 @@
-import { Faces, Screen, Stage, type Look } from "@vinena/vectoys-react";
+import { Faces, Screen, Stage, Turntable, type Look, type TurnOptions } from "@vinena/vectoys-react";
 import { memo, useId, useMemo, type CSSProperties, type ReactNode } from "react";
 import { DISPLAY, TURN, seen, type Turn, type View } from "./geometry";
 
@@ -59,22 +59,18 @@ const Shadow = ({ id, shadow }: { id: string; shadow: NonNullable<View["shadow"]
   </>
 );
 
-type MonitorProps = Turn & {
-  /** The color of the back and the stand; by default the page's `--vectoys-finish`, else its surface. */
-  finish?: string;
-  /** The device's name for assistive technology. */
-  label?: string;
-  /** Live content on the display, laid out as on a screen `VIEWPORT` pixels wide. */
-  children?: ReactNode;
-};
+type MonitorProps = Turn &
+  TurnOptions & {
+    /** The color of the back and the stand; by default the page's `--vectoys-finish`, else its surface. */
+    finish?: string;
+    /** The device's name for assistive technology. */
+    label?: string;
+    /** Live content on the display, laid out as on a screen `VIEWPORT` pixels wide. */
+    children?: ReactNode;
+  };
 
-/**
- * A desktop monitor on its stand that turns any way, its panel tilting on
- * the stand: one SVG drawn from its parts, and live content laid onto its
- * display, hidden while the display faces away.
- */
-export const Monitor = memo(function Monitor({ yaw = TURN.yaw, pitch = TURN.pitch, tilt = TURN.tilt, finish, children, label = "Monitor" }: MonitorProps) {
-  const id = `monitor-${useId().replace(/[^\w-]/g, "")}`;
+/** The monitor drawn at one turn, under the shadow's names `id`. */
+const Drawn = memo(function Drawn({ id, yaw, pitch, tilt, finish, children, label }: Required<Turn> & { id: string; finish: string | undefined; label: string; children: ReactNode }) {
   const view = useMemo(() => seen({ yaw, pitch, tilt }), [yaw, pitch, tilt]);
   const panel = view.drawn.hulls.find((hull) => hull.part === "panel");
 
@@ -92,5 +88,24 @@ export const Monitor = memo(function Monitor({ yaw = TURN.yaw, pitch = TURN.pitc
       <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
       {panel && <path d={panel.d} {...OUTLINE} />}
     </Stage>
+  );
+});
+
+/**
+ * A desktop monitor on its stand that turns any way, its panel tilting on
+ * the stand: one SVG drawn from its parts, and live content laid onto its
+ * display, hidden while the display faces away. A drag or the arrow keys
+ * turn it from the turn it is given, and a button shows it full screen.
+ */
+export const Monitor = memo(function Monitor({ yaw = TURN.yaw, pitch = TURN.pitch, tilt = TURN.tilt, finish, children, label = "Monitor", ...turning }: MonitorProps) {
+  const id = `monitor-${useId().replace(/[^\w-]/g, "")}`;
+  return (
+    <Turntable mode="camera" label={label} {...turning}>
+      {(turn) => (
+        <Drawn id={id} yaw={yaw + turn.yaw} pitch={pitch + turn.pitch} tilt={tilt} finish={finish} label={label}>
+          {children}
+        </Drawn>
+      )}
+    </Turntable>
   );
 });

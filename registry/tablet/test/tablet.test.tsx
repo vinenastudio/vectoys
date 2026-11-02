@@ -58,3 +58,13 @@ test.each(ORIENTATIONS)("%s: the display clips live HTML to its rounded corners"
     expect(style).toContain(`clip-path:inset(0 round ${radius})`);
   }
 });
+
+test("with dragging and full screen off there is no tab stop and no button", () => {
+  const on = renderToString(<Tablet />);
+  expect(on).toContain('tabindex="0"');
+  expect(on).toContain('aria-label="Full screen Tablet"');
+  const off = renderToString(<Tablet draggable={false} fullscreen={false} />);
+  expect(off).not.toContain("tabindex=");
+  expect(off).not.toContain("<button");
+  expect(off).toContain('role="img" aria-label="Tablet"');
+});

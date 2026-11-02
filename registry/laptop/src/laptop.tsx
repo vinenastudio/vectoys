@@ -1,5 +1,5 @@
 import { clamp, fixed, lerp } from "@vinena/vectoys";
-import { Glare, Gradient, Grain, Screen, Stage, mirrored, placeScreen, useNodes, type Nodes, type Stop } from "@vinena/vectoys-react";
+import { Glare, Gradient, Grain, Screen, Stage, Turntable, mirrored, placeScreen, useNodes, type Nodes, type Stop, type TurnLimits, type TurnOptions } from "@vinena/vectoys-react";
 import { memo, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, type CSSProperties, type ReactNode, type Ref, type SVGProps } from "react";
 import { BEZEL, DEPTH, DESK, FRONT, GLASS, HOLE, PITCH, ROUND, SHADES, TONES, WIDTH, YAW, type LaptopPose, type Perspective, type Posed, type Straight, type Trick, type TrickPose, type View } from "./geometry";
 
@@ -37,9 +37,8 @@ const stroke = {
 
 // Which field of holes shows: the full one where a hole is about a device
 // pixel (a scene 560px wide at two pixels a px), the half one down to half
-// that, the quarter one below. The stage is the container these ask about;
-// in a wider scene, as `turning` draws, the laptop is smaller in it, so the
-// widths grow with the scene and the fields go by names of their own.
+// that, the quarter one below. In a wider scene, as `turning` draws, the
+// widths grow with it and the fields go by names of their own.
 const HOLES = "vectoys-laptop-holes";
 const holesShown = (name: string, scene: number) => {
   const [fine, coarse] = [fixed((560 * scene) / 100), fixed((280 * scene) / 100)];
@@ -131,7 +130,7 @@ export type LaptopHandle = { set(pose: Partial<TrickPose>): void };
 /** How the laptop is drawn: `simple` in the page's own tones, or `realistic`, the machine's own silver with its edges, keys and feet. */
 export type LaptopLook = "simple" | "realistic";
 
-type LaptopProps = {
+type LaptopProps = TurnOptions & {
   /** How far the lid is open, from 0 (shut on the base) to 1 (open); open by default. `FRONT` is always open. */
   lid?: number;
   /** @deprecated Use `lid`. How far the lid has closed, from 0 (open) to 1 (shut); `lid` wins when both are given. */
@@ -173,14 +172,10 @@ type LaptopProps = {
   /** The eye that sees it: `DESK`, `PHONE` or `FRONT`; `DESK` by default. */
   eye?: View;
   /**
-   * `simple` by default, drawn in the page's tones. `realistic` draws the
-   * machine as it is, silver on any page: carved aluminum lit from above,
-   * black keys in a black well, speaker grilles, the trackpad, round feet in
-   * rings and the underside's slots and screws. It turns and moves as `free`
-   * does in every pose, and the handle sets it the same way. Changing the
-   * look lets go of the handle's pose, as changing `free` does, and draws
-   * the props' pose. `FRONT` is already the product shot, so it draws the
-   * same in both.
+   * `simple` by default, in the page's tones. `realistic` draws the machine
+   * as it is, silver on any page, with its keys, grilles, feet and underside.
+   * It turns and moves as `free` does, and changing it lets go of the
+   * handle's pose. `FRONT` draws the same in both.
    */
   look?: LaptopLook;
   /** The laptop's name for assistive technology. */
@@ -190,12 +185,10 @@ type LaptopProps = {
   /**
    * A handle whose `set({ lid, yaw, pitch })` redraws the laptop in a new
    * pose without a render, for a pose that moves every frame, as a scroll
-   * does. The handle owns the pose from its first `set` until a pose prop,
-   * `free` or `look` changes; then the props' pose is drawn. Renders for
-   * anything else, such as new content on the display, keep the handle's
-   * pose. `flat`, `x`, `y`, `scale` and `roll` move a laptop given `free` or
-   * any of them as a prop, and no other. `FRONT` does not move, so there it
-   * does nothing.
+   * does, with a drag's turn added. It owns the pose from its first `set`
+   * until a pose prop, `free`, `look` or a drag changes it. `flat`, `x`, `y`,
+   * `scale` and `roll` move only a laptop given `free` or one of them.
+   * `FRONT` does not move.
    */
   ref?: Ref<LaptopHandle>;
 };
@@ -203,14 +196,51 @@ type LaptopProps = {
 /**
  * A 14 inch laptop seen from the eye you pass (DESK, PHONE or FRONT): one SVG
  * drawn from the laptop's projected outline, and the display's glass laid onto the lid with
- * live content on it, hidden while the lid faces away.
+ * live content on it, hidden while the lid faces away. A drag or the arrow
+ * keys turn it, but for FRONT, and a button shows it full screen.
  */
-export const Laptop = memo(function Laptop(props: LaptopProps) {
+export const Laptop = memo(function Laptop({ draggable, fullscreen = true, limits, release = "stay", ref, ...props }: LaptopProps) {
+  const { yaw = 0, pitch, free, eye = DESK, label = "Laptop" } = props;
+  const uid = useId();
+  const inner = useRef<LaptopHandle>(null);
+  const turned = useRef({ yaw: 0, pitch: 0 });
+  // A drag up looks from lower, so it takes from the eye's height.
+  useImperativeHandle(ref, () => ({
+    set: (next) => {
+      const { yaw, pitch } = turned.current;
+      inner.current?.set({ ...next, ...(next.yaw !== undefined && { yaw: next.yaw + yaw }), ...(next.pitch !== undefined && { pitch: next.pitch - pitch }) });
+    },
+  }));
+  const front = "art" in eye;
+  // Held to the ranges of a laptop that is not free, so a drag stops where its pose does.
+  const rest = { lid: 0, yaw, pitch: pitch ?? (front ? 15 : eye.pitch) };
+  const at = free ? rest : held(rest);
+  const range: Required<TurnLimits> = free ? { yaw: [-180, 180], pitch: [-35, 35] } : { yaw: [-YAW - at.yaw, YAW - at.yaw], pitch: [at.pitch - PITCH[1], at.pitch - PITCH[0]] };
+  return (
+    <Turntable mode="camera" label={label} draggable={draggable ?? !front} fullscreen={fullscreen} release={release} limits={{ ...range, ...limits }}>
+      {(turn) => {
+        turned.current = turn;
+        return (
+          <Drawn
+            {...props}
+            uid={uid}
+            {...(ref && { ref: inner })}
+            {...(turn.yaw !== 0 && { yaw: at.yaw + turn.yaw })}
+            {...(turn.pitch !== 0 && { pitch: at.pitch - turn.pitch })}
+          />
+        );
+      }}
+    </Turntable>
+  );
+});
+
+/** The laptop at one pose, under the ids `uid` makes. */
+function Drawn({ uid, ...props }: Omit<LaptopProps, keyof TurnOptions> & { uid: string }) {
   const { lid, closed = 0, yaw, pitch, flat, x, y, scale, roll, free = false, turning = false, eye = DESK, look = "simple", children, label = "Laptop", ref } = props;
   const real = look === "realistic";
   if ("art" in eye) {
     return (
-      <Front eye={eye} label={label} handle={ref}>
+      <Front uid={uid} eye={eye} label={label} handle={ref}>
         {children}
       </Front>
     );
@@ -218,7 +248,7 @@ export const Laptop = memo(function Laptop(props: LaptopProps) {
   if (real || free || [flat, x, y, scale, roll].some((value) => value !== undefined)) {
     const pose = loose({ lid: lid ?? 1 - closed, yaw: yaw ?? 0, pitch: pitch ?? eye.pitch, flat: flat ?? 0, x: x ?? 0, y: y ?? 0, scale: scale ?? 1, roll: roll ?? 0 }, free);
     return (
-      <Free pose={pose} free={free} real={real} turning={turning} eye={eye} label={label} handle={ref}>
+      <Free uid={uid} pose={pose} free={free} real={real} turning={turning} eye={eye} label={label} handle={ref}>
         {children}
       </Free>
     );
@@ -229,11 +259,11 @@ export const Laptop = memo(function Laptop(props: LaptopProps) {
   const live = turning || lid !== undefined || yaw !== undefined || pitch !== undefined || ref != null;
   const pose = held({ lid: lid ?? 1 - closed, yaw: yaw ?? 0, pitch: pitch ?? eye.pitch });
   return (
-    <Angled pose={pose} closed={lid === undefined ? closed : 1 - pose.lid} live={live} turning={turning} eye={eye} label={label} handle={ref}>
+    <Angled uid={uid} pose={pose} closed={lid === undefined ? closed : 1 - pose.lid} live={live} turning={turning} eye={eye} label={label} handle={ref}>
       {children}
     </Angled>
   );
-});
+}
 
 /** A pose held to the ranges a laptop takes. */
 const held = ({ lid, yaw, pitch }: LaptopPose): LaptopPose => ({ lid: clamp(lid, 0, 1), yaw: clamp(yaw, -YAW, YAW), pitch: clamp(pitch, ...PITCH) });
@@ -293,6 +323,7 @@ function painter(eye: Perspective, turning: boolean, nodes: Nodes, id: string) {
 
 /** The laptop in perspective, in a pose. */
 function Angled({
+  uid,
   pose,
   closed,
   live,
@@ -302,6 +333,7 @@ function Angled({
   label,
   handle,
 }: {
+  uid: string;
   pose: LaptopPose;
   closed: number;
   live: boolean;
@@ -311,7 +343,7 @@ function Angled({
   children?: ReactNode;
   handle?: Ref<LaptopHandle> | undefined;
 }) {
-  const id = `laptop-${eye.id}-${useId().replace(/[^\w-]/g, "")}`;
+  const id = `laptop-${eye.id}-${uid.replace(/[^\w-]/g, "")}`;
   const { yaw, pitch } = pose;
   const view = useMemo(() => eye.at({ yaw, pitch }, turning), [eye, yaw, pitch, turning]);
   const { DECK, camera } = view;
@@ -425,12 +457,9 @@ function Angled({
   );
 }
 
-// Straight on, the aluminum is the page's finish, silver by default. Every
-// tone is a share of it toward black, as measured on a silver machine's
-// renders, so a dark finish such as #3d3b3e reads as a space black one. The
-// gasket, the glass and the hinge's band, #0c0c0c on average, darker toward
-// the base, are the machine's own near blacks. The realistic look takes the
-// machine's own silver, `SILVER`, in place of the page's finish.
+// Straight on, the aluminum is the page's finish, silver by default, and
+// every tone a share of it toward black, so a dark finish reads as space
+// black. The realistic look takes `SILVER` in its place.
 const FINISH = "var(--vectoys-finish, #f0f1f3)";
 const SILVER = "#f0f1f3";
 const tone = (share: number, finish = FINISH) => (share >= 100 ? finish : `color-mix(in srgb, ${finish} ${share}%, black)`);
@@ -551,8 +580,8 @@ const frontDefs = (
 );
 
 /** The laptop straight on, drawn flat, with live content on its display under the notch. */
-function Front({ eye, children, label, handle }: { eye: Straight; label: string; children?: ReactNode; handle?: Ref<LaptopHandle> | undefined }) {
-  const id = `laptop-${eye.id}-${useId().replace(/[^\w-]/g, "")}`;
+function Front({ uid, eye, children, label, handle }: { uid: string; eye: Straight; label: string; children?: ReactNode; handle?: Ref<LaptopHandle> | undefined }) {
+  const id = `laptop-${eye.id}-${uid.replace(/[^\w-]/g, "")}`;
   useImperativeHandle(handle, () => ({ set() {} }), []);
   const { art, notch, camera } = eye;
   const url = (name: string) => `url(#${id}-${name})`;
@@ -640,12 +669,9 @@ const FOOT_PAD = tone(28);
 // foot, its top hidden under the face, so they fit the foot's own box.
 const FOOT_BOX = FOOT.map(([offset, share]): readonly [number, number] => [fixed((0.3 + offset * 0.6) / 0.9), share]);
 
-// The realistic look's own colors, measured on product renders and photos of
-// the silver machine, whatever the page's colors: the aluminum's `SHADES` from
-// the darkest turn of a side to a highlight, a bright line where an edge
-// catches the light, black key caps with a bevel's highlight on a black well,
-// the gasket, the hinge, the feet's rubber in bright rings, the underside's
-// slots and screws.
+// The realistic look's own colors, measured on photos of the silver machine:
+// the aluminum's `SHADES` from the darkest side to a highlight, then its
+// edges, keys, gasket, hinge, feet and underside.
 const RGB = [
   [0x6e, 0x6f, 0x71],
   [0xf3, 0xf4, 0xf6],
@@ -768,6 +794,7 @@ function trickPainter(eye: Perspective, turning: boolean, nodes: Nodes, real: bo
 
 /** The laptop free to turn any way and to ease into FRONT's look, in a pose. */
 function Free({
+  uid,
   pose,
   free,
   real,
@@ -777,6 +804,7 @@ function Free({
   label,
   handle,
 }: {
+  uid: string;
   pose: TrickPose;
   free: boolean;
   real: boolean;
@@ -786,7 +814,7 @@ function Free({
   children?: ReactNode;
   handle?: Ref<LaptopHandle> | undefined;
 }) {
-  const id = `laptop-${eye.id}-${useId().replace(/[^\w-]/g, "")}`;
+  const id = `laptop-${eye.id}-${uid.replace(/[^\w-]/g, "")}`;
   const key = FIELDS.map((field) => pose[field]).join();
   // `key` is the pose, field by field, so a new pose object with the same fields keeps the frame.
   const frame = useMemo(() => eye.trick(pose, turning, real), [eye, turning, real, key]);

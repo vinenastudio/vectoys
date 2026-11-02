@@ -1,5 +1,5 @@
 import { fixed } from "@vinena/vectoys";
-import { Faces, Screen, Stage, type Look, type StyleWithVariables } from "@vinena/vectoys-react";
+import { Faces, Screen, Stage, Turntable, type Look, type StyleWithVariables, type TurnOptions } from "@vinena/vectoys-react";
 import { memo, useId, useMemo, type CSSProperties, type ReactNode } from "react";
 import { DISPLAY, DISPLAY_ROUND, TURN, seen, type Turn, type View } from "./geometry";
 
@@ -76,23 +76,20 @@ const Shadow = ({ id, shadow }: { id: string; shadow: NonNullable<View["shadow"]
   </>
 );
 
-type WatchProps = Turn & {
-  /** The case's color; by default the page's `--vectoys-finish`, else its surface. */
-  finish?: string;
-  /** The band's color; by default the page's `--vectoys-band`, else a shade under its surface. */
-  band?: string;
-  /** The device's name for assistive technology. */
-  label?: string;
-  /** Live content on the display, laid out as on a screen `VIEWPORT` pixels wide. */
-  children?: ReactNode;
-};
+type WatchProps = Turn &
+  TurnOptions & {
+    /** The case's color; by default the page's `--vectoys-finish`, else its surface. */
+    finish?: string;
+    /** The band's color; by default the page's `--vectoys-band`, else a shade under its surface. */
+    band?: string;
+    /** The device's name for assistive technology. */
+    label?: string;
+    /** Live content on the display, laid out as on a screen `VIEWPORT` pixels wide. */
+    children?: ReactNode;
+  };
 
-/**
- * A smartwatch that turns any way: one SVG drawn from its parts, and live
- * content laid onto its display, hidden while the display faces away.
- */
-export const Watch = memo(function Watch({ yaw = TURN.yaw, pitch = TURN.pitch, roll = TURN.roll, finish, band, children, label = "Smartwatch" }: WatchProps) {
-  const id = `watch-${useId().replace(/[^\w-]/g, "")}`;
+/** The watch drawn at one turn, under the shadow's names `id`. */
+const Drawn = memo(function Drawn({ id, yaw, pitch, roll, finish, band, children, label }: Required<Turn> & { id: string; finish: string | undefined; band: string | undefined; label: string; children: ReactNode }) {
   const view = useMemo(() => seen({ yaw, pitch, roll }), [yaw, pitch, roll]);
   const body = view.drawn.hulls.find((hull) => hull.part === "case");
   const colours: StyleWithVariables = { ...(finish && { "--vectoys-finish": finish }), ...(band && { "--vectoys-band": band }) };
@@ -111,5 +108,24 @@ export const Watch = memo(function Watch({ yaw = TURN.yaw, pitch = TURN.pitch, r
       <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
       {body && <path d={body.d} {...OUTLINE} />}
     </Stage>
+  );
+});
+
+/**
+ * A smartwatch that turns any way: one SVG drawn from its parts, and live
+ * content laid onto its display, hidden while the display faces away. A
+ * drag or the arrow keys turn it from the turn it is given, and a button
+ * shows it full screen.
+ */
+export const Watch = memo(function Watch({ yaw = TURN.yaw, pitch = TURN.pitch, roll = TURN.roll, finish, band, children, label = "Smartwatch", ...turning }: WatchProps) {
+  const id = `watch-${useId().replace(/[^\w-]/g, "")}`;
+  return (
+    <Turntable mode="camera" label={label} {...turning}>
+      {(turn) => (
+        <Drawn id={id} yaw={yaw + turn.yaw} pitch={pitch + turn.pitch} roll={roll} finish={finish} band={band} label={label}>
+          {children}
+        </Drawn>
+      )}
+    </Turntable>
   );
 });

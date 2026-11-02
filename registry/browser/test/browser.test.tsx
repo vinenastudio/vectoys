@@ -68,3 +68,13 @@ test("the page clips live HTML to its rounded bottom corners", () => {
     expect(style).toContain(`clip-path:inset(0 round ${radius})`);
   }
 });
+
+test("with dragging and full screen off there is no tab stop and no button", () => {
+  const on = renderToString(<Browser />);
+  expect(on).toContain('tabindex="0"');
+  expect(on).toContain('aria-label="Full screen Browser window"');
+  const off = renderToString(<Browser draggable={false} fullscreen={false} />);
+  expect(off).not.toContain("tabindex=");
+  expect(off).not.toContain("<button");
+  expect(off).toContain('role="img" aria-label="Browser window"');
+});

@@ -50,3 +50,13 @@ test("the shadow is left out when the eye is under the desk", () => {
   expect(seen().shadow).not.toBeNull();
   expect(seen({ pitch: 40 }).shadow).toBeNull();
 });
+
+test("with dragging and full screen off there is no tab stop and no button", () => {
+  const on = renderToString(<Monitor />);
+  expect(on).toContain('tabindex="0"');
+  expect(on).toContain('aria-label="Full screen Monitor"');
+  const off = renderToString(<Monitor draggable={false} fullscreen={false} />);
+  expect(off).not.toContain("tabindex=");
+  expect(off).not.toContain("<button");
+  expect(off).toContain('role="img" aria-label="Monitor"');
+});

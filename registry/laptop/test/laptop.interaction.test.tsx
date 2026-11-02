@@ -21,12 +21,12 @@ test("FRONT renders on the client with no React warnings", async () => {
 });
 
 /**
- * The stage's markup with each laptop's own ids made one and every style's
+ * The stage's markup, inside its turntable, with each laptop's own ids made one and every style's
  * declarations sorted, to compare two laptops: a style the handle writes
  * again goes to the end of its attribute.
  */
 const markup = (host: HTMLElement) =>
-  htmlOf(host.firstElementChild, true)
+  htmlOf(host.querySelector(".vectoys-turntable-body")?.firstElementChild, true)
     .replace(/laptop-(desk|phone)-[\w-]*?-(?=deck|far|near|sheen|lid-|holes)/g, "laptop-$1-X-")
     .replace(/style="([^"]*)"/g, (_, style: string) => `style="${style.split(/;\s*/).filter(Boolean).sort().join(";")}"`);
 
@@ -329,4 +329,37 @@ test.each([
     expect(realMarkup(moved.host)).toBe(realMarkup(held.host));
     for (const done of [moved, drawn, held]) await done.unmount();
   }
+});
+
+const pointer = (type: string, x: number, y = 0) => new PointerEvent(type, { clientX: x, clientY: y, pointerId: 1, pointerType: "mouse", button: 0, bubbles: true });
+
+test("a drag on the display turns the laptop, held to its ranges, and the handle then adds the turn", async () => {
+  const handle = createRef<LaptopHandle>();
+  const { host } = await mount(
+    <Laptop eye={DESK} turning ref={handle}>
+      <Live />
+    </Laptop>,
+  );
+  const before = markup(host);
+  const display = host.querySelector("p");
+  if (!display) throw new Error("no display");
+  await act(async () => void display.dispatchEvent(pointer("pointerdown", 0)));
+  await act(async () => void display.dispatchEvent(pointer("pointermove", 40, 0)));
+  await act(async () => void display.dispatchEvent(pointer("pointerup", 40, 0)));
+  const dragged = markup(host);
+  expect(dragged).not.toBe(before);
+  // The handle's yaw 0 is drawn turned by the drag, so as it was right after the drag.
+  await act(async () => handle.current?.set({ yaw: 0 }));
+  expect(markup(host)).toBe(dragged);
+});
+
+test("FRONT does not turn unless asked, and the switches take away the tab stop and the button", async () => {
+  const front = await mount(<Laptop eye={FRONT} />);
+  expect(front.host.querySelector(".vectoys-turntable")?.hasAttribute("tabindex")).toBe(false);
+  expect(front.host.querySelector('button[aria-label="Full screen Laptop"]')).not.toBeNull();
+  const off = await mount(<Laptop eye={DESK} draggable={false} fullscreen={false} />);
+  expect(off.host.querySelector(".vectoys-turntable")?.hasAttribute("tabindex")).toBe(false);
+  expect(off.host.querySelector("button")).toBeNull();
+  const on = await mount(<Laptop eye={DESK} />);
+  expect(on.host.querySelector(".vectoys-turntable")?.getAttribute("tabindex")).toBe("0");
 });

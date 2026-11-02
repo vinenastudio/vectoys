@@ -1,5 +1,5 @@
 import { fixed } from "@vinena/vectoys";
-import { Faces, Screen, Stage, type Look } from "@vinena/vectoys-react";
+import { Faces, Screen, Stage, Turntable, type Look, type TurnOptions } from "@vinena/vectoys-react";
 import { memo, useId, useMemo, type CSSProperties, type ReactNode } from "react";
 import { ADDRESS, ADDRESS_VIEWPORT, PAGE, PAGE_ROUND, TURN, seen, type Place, type Turn, type View } from "./geometry";
 
@@ -81,7 +81,8 @@ const Shadow = ({ id, shadow }: { id: string; shadow: NonNullable<View["shadow"]
 );
 
 type BrowserProps = Turn &
-  Place & {
+  Place &
+  TurnOptions & {
     /** The address shown in the bar. */
     url?: string;
     /** Light or dark tones for what the page's variables leave unset; by default the page's color scheme. */
@@ -94,31 +95,21 @@ type BrowserProps = Turn &
     label?: string;
   };
 
-/**
- * A browser window that floats and turns any way: one SVG drawn from its
- * parts, with the address and live content laid onto it, hidden while its
- * face turns away.
- *
- * To stack windows, lay several over each other in one box, each
- * `position: absolute; inset: 0`, with the same turn, the back one first and
- * deepest: say `depth={160} offset={[-120, -80]}`, then `depth={80}
- * offset={[-60, -40]}`, then the front one, with `shadow={false}` on all but
- * the back one. They then stand in one space and turn together.
- */
-export const Browser = memo(function Browser({
-  yaw = TURN.yaw,
-  pitch = TURN.pitch,
-  roll = TURN.roll,
-  depth = 0,
-  offset,
-  url = "example.com",
+/** The window drawn at one turn, under the shadow's names `id`. */
+const Drawn = memo(function Drawn({
+  id,
+  yaw,
+  pitch,
+  roll,
+  depth,
+  x,
+  y,
+  url,
   theme,
-  shadow = true,
+  shadow,
   children,
-  label = "Browser window",
-}: BrowserProps) {
-  const id = `browser-${useId().replace(/[^\w-]/g, "")}`;
-  const [x = 0, y = 0] = offset ?? [];
+  label,
+}: Required<Turn> & { id: string; depth: number; x: number; y: number; url: string; theme: BrowserProps["theme"]; shadow: boolean; children: ReactNode; label: string }) {
   const view = useMemo(() => seen({ yaw, pitch, roll }, { depth, offset: [x, y] }), [yaw, pitch, roll, depth, x, y]);
   const hull = view.drawn.hulls.find((part) => part.part === "window");
 
@@ -141,5 +132,45 @@ export const Browser = memo(function Browser({
       <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
       {hull && <path d={hull.d} {...OUTLINE} />}
     </Stage>
+  );
+});
+
+/**
+ * A browser window that floats and turns any way: one SVG drawn from its
+ * parts, with the address and live content laid onto it, hidden while its
+ * face turns away. A drag or the arrow keys turn it from the turn it is
+ * given, and a button shows it full screen.
+ *
+ * To stack windows, lay several over each other in one box, each
+ * `position: absolute; inset: 0`, with the same turn, the back one first and
+ * deepest: say `depth={160} offset={[-120, -80]}`, then `depth={80}
+ * offset={[-60, -40]}`, then the front one, with `shadow={false}` on all but
+ * the back one. They then stand in one space and turn together. Only the
+ * front one hears a drag, so give each `draggable={false}` and
+ * `fullscreen={false}` and turn the stack by its `yaw` and `pitch`.
+ */
+export const Browser = memo(function Browser({
+  yaw = TURN.yaw,
+  pitch = TURN.pitch,
+  roll = TURN.roll,
+  depth = 0,
+  offset,
+  url = "example.com",
+  theme,
+  shadow = true,
+  children,
+  label = "Browser window",
+  ...turning
+}: BrowserProps) {
+  const id = `browser-${useId().replace(/[^\w-]/g, "")}`;
+  const [x = 0, y = 0] = offset ?? [];
+  return (
+    <Turntable mode="camera" label={label} {...turning}>
+      {(turn) => (
+        <Drawn id={id} yaw={yaw + turn.yaw} pitch={pitch + turn.pitch} roll={roll} depth={depth} x={x} y={y} url={url} theme={theme} shadow={shadow} label={label}>
+          {children}
+        </Drawn>
+      )}
+    </Turntable>
   );
 });

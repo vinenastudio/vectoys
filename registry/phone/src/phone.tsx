@@ -1,5 +1,5 @@
 import { fixed } from "@vinena/vectoys";
-import { Faces, Screen, Stage, type Look } from "@vinena/vectoys-react";
+import { Faces, Screen, Stage, Turntable, type Look, type TurnOptions } from "@vinena/vectoys-react";
 import { memo, useId, useMemo, type CSSProperties, type ReactNode } from "react";
 import { DISPLAY, DISPLAY_ROUND, TURN, seen, type Turn, type View } from "./geometry";
 
@@ -91,21 +91,18 @@ const Shadow = ({ id, shadow }: { id: string; shadow: NonNullable<View["shadow"]
   </>
 );
 
-type PhoneProps = Turn & {
-  /** The back's color; by default the page's `--vectoys-finish`, else its surface. */
-  finish?: string;
-  /** The device's name for assistive technology. */
-  label?: string;
-  /** Live content on the display, laid out as on a screen `VIEWPORT` pixels wide. */
-  children?: ReactNode;
-};
+type PhoneProps = Turn &
+  TurnOptions & {
+    /** The back's color; by default the page's `--vectoys-finish`, else its surface. */
+    finish?: string;
+    /** The device's name for assistive technology. */
+    label?: string;
+    /** Live content on the display, laid out as on a screen `VIEWPORT` pixels wide. */
+    children?: ReactNode;
+  };
 
-/**
- * A phone that turns any way: one SVG drawn from its parts, and live content
- * laid onto its display, hidden while the display faces away.
- */
-export const Phone = memo(function Phone({ yaw = TURN.yaw, pitch = TURN.pitch, roll = TURN.roll, finish, children, label = "Phone" }: PhoneProps) {
-  const id = `phone-${useId().replace(/[^\w-]/g, "")}`;
+/** The phone drawn at one turn, under the shadow's names `id`. */
+const Drawn = memo(function Drawn({ id, yaw, pitch, roll, finish, children, label }: Required<Turn> & { id: string; label: string; finish: string | undefined; children: ReactNode }) {
   const view = useMemo(() => seen({ yaw, pitch, roll }), [yaw, pitch, roll]);
   const body = view.drawn.hulls.find((hull) => hull.part === "body");
 
@@ -124,5 +121,24 @@ export const Phone = memo(function Phone({ yaw = TURN.yaw, pitch = TURN.pitch, r
       <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
       {body && <path d={body.d} {...OUTLINE} />}
     </Stage>
+  );
+});
+
+/**
+ * A phone that turns any way: one SVG drawn from its parts, and live content
+ * laid onto its display, hidden while the display faces away. A drag or the
+ * arrow keys turn it from the turn it is given, and a button shows it full
+ * screen.
+ */
+export const Phone = memo(function Phone({ yaw = TURN.yaw, pitch = TURN.pitch, roll = TURN.roll, finish, children, label = "Phone", ...turning }: PhoneProps) {
+  const id = `phone-${useId().replace(/[^\w-]/g, "")}`;
+  return (
+    <Turntable mode="camera" label={label} {...turning}>
+      {(turn) => (
+        <Drawn id={id} yaw={yaw + turn.yaw} pitch={pitch + turn.pitch} roll={roll} finish={finish} label={label}>
+          {children}
+        </Drawn>
+      )}
+    </Turntable>
   );
 });

@@ -67,3 +67,13 @@ test("both faces clip live HTML to their rounded corners", () => {
     expect(style).toContain(`clip-path:inset(0 round ${radius})`);
   }
 });
+
+test("with dragging and full screen off there is no tab stop and no full screen button", () => {
+  const on = renderToString(<Card front="front" back="back" />);
+  expect(on).toContain('tabindex="0"');
+  expect(on).toContain('aria-label="Full screen Flip card"');
+  const off = renderToString(<Card front="front" back="back" draggable={false} fullscreen={false} />);
+  expect(off).not.toContain("tabindex=");
+  expect(off).not.toContain("Full screen");
+  expect(off.match(/<button/g)).toHaveLength(1);
+});

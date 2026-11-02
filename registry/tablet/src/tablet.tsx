@@ -1,5 +1,5 @@
 import { fixed } from "@vinena/vectoys";
-import { Faces, Screen, Stage, type Look } from "@vinena/vectoys-react";
+import { Faces, Screen, Stage, Turntable, type Look, type TurnOptions } from "@vinena/vectoys-react";
 import { memo, useId, useMemo, type CSSProperties, type ReactNode } from "react";
 import { DISPLAY_ROUND, TURN, seen, type Orientation, type Turn, type View } from "./geometry";
 
@@ -74,31 +74,29 @@ const Shadow = ({ id, shadow }: { id: string; shadow: NonNullable<View["shadow"]
   </>
 );
 
-type TabletProps = Turn & {
-  /** Upright, or on its side; the content lays out level either way. */
-  orientation?: Orientation;
-  /** The back's color; by default the page's `--vectoys-finish`, else its surface. */
-  finish?: string;
-  /** The device's name for assistive technology. */
-  label?: string;
-  /** Live content on the display, laid out `VIEWPORT` pixels across its short side. */
-  children?: ReactNode;
-};
+type TabletProps = Turn &
+  TurnOptions & {
+    /** Upright, or on its side; the content lays out level either way. */
+    orientation?: Orientation;
+    /** The back's color; by default the page's `--vectoys-finish`, else its surface. */
+    finish?: string;
+    /** The device's name for assistive technology. */
+    label?: string;
+    /** Live content on the display, laid out `VIEWPORT` pixels across its short side. */
+    children?: ReactNode;
+  };
 
-/**
- * A tablet that turns any way: one SVG drawn from its parts, and live content
- * laid onto its display, hidden while the display faces away.
- */
-export const Tablet = memo(function Tablet({
-  yaw = TURN.yaw,
-  pitch = TURN.pitch,
-  roll = TURN.roll,
-  orientation = "portrait",
+/** The tablet drawn at one turn, under the shadow's names `id`. */
+const Drawn = memo(function Drawn({
+  id,
+  yaw,
+  pitch,
+  roll,
+  orientation,
   finish,
   children,
-  label = "Tablet",
-}: TabletProps) {
-  const id = `tablet-${useId().replace(/[^\w-]/g, "")}`;
+  label,
+}: Required<Turn> & { id: string; orientation: Orientation; finish: string | undefined; label: string; children: ReactNode }) {
   const view = useMemo(() => seen({ yaw, pitch, roll }, orientation), [yaw, pitch, roll, orientation]);
   const body = view.drawn.hulls.find((hull) => hull.part === "body");
   const { pose, rect } = view.display;
@@ -123,5 +121,33 @@ export const Tablet = memo(function Tablet({
       <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
       {body && <path d={body.d} {...OUTLINE} />}
     </Stage>
+  );
+});
+
+/**
+ * A tablet that turns any way: one SVG drawn from its parts, and live content
+ * laid onto its display, hidden while the display faces away. A drag or the
+ * arrow keys turn it from the turn it is given, and a button shows it full
+ * screen.
+ */
+export const Tablet = memo(function Tablet({
+  yaw = TURN.yaw,
+  pitch = TURN.pitch,
+  roll = TURN.roll,
+  orientation = "portrait",
+  finish,
+  children,
+  label = "Tablet",
+  ...turning
+}: TabletProps) {
+  const id = `tablet-${useId().replace(/[^\w-]/g, "")}`;
+  return (
+    <Turntable mode="camera" label={label} {...turning}>
+      {(turn) => (
+        <Drawn id={id} yaw={yaw + turn.yaw} pitch={pitch + turn.pitch} roll={roll} orientation={orientation} finish={finish} label={label}>
+          {children}
+        </Drawn>
+      )}
+    </Turntable>
   );
 });

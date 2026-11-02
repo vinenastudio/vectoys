@@ -1,7 +1,7 @@
 import { fixed, settled, spring, type Spring, type SpringOptions } from "@vinena/vectoys";
-import { Faces, Screen, Stage, useFrames, useReducedMotion, type Look } from "@vinena/vectoys-react";
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode } from "react";
-import { FACE, FACE_ROUND, seen, type View } from "./geometry";
+import { Faces, Screen, Stage, Turntable, useFrames, useReducedMotion, type Look, type TurnOptions } from "@vinena/vectoys-react";
+import { memo, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { FACE, FACE_ROUND, seen, type Turn, type View } from "./geometry";
 
 // The page's colors, as CSS variables, each with a light tone so the card
 // shows as meant before they are set. The back is in the finish.
@@ -94,7 +94,7 @@ const Shadow = ({ id, shadow }: { id: string; shadow: NonNullable<View["shadow"]
   </>
 );
 
-type CardProps = {
+type CardProps = TurnOptions & {
   /** Live content on the front, laid out `VIEWPORT` pixels across. */
   front?: ReactNode;
   /** Live content on the back, laid out the same and reading the right way once flipped. */
@@ -111,6 +111,7 @@ type CardProps = {
   tilt?: boolean;
   /** The flip button's name for assistive technology. */
   label?: string;
+  /** Set on the outer box, which holds the card and its full screen button. */
   className?: string;
   style?: CSSProperties;
 };
@@ -122,10 +123,49 @@ function inside(event: PointerEvent<HTMLElement> | MouseEvent<HTMLElement>) {
   return x >= BOUNDS.left && x <= BOUNDS.left + BOUNDS.width && y >= BOUNDS.top && y <= BOUNDS.top + BOUNDS.height;
 }
 
+type DrawnProps = Required<Turn> & {
+  id: string;
+  front: ReactNode;
+  back: ReactNode;
+  label: string;
+  pressed: boolean;
+  button: RefObject<HTMLButtonElement | null>;
+};
+
+/** The card drawn at one turn, with its flip button and both faces over it. */
+const Drawn = memo(function Drawn({ id, flip, yaw, pitch, front, back, label, pressed, button }: DrawnProps) {
+  const view = useMemo(() => seen({ flip, yaw, pitch }), [flip, yaw, pitch]);
+  const card = view.drawn.hulls.find((hull) => hull.part === "card");
+
+  const overlay = (
+    <>
+      <style>{FOCUS_RING}</style>
+      {/* The button covers the card, so a drag on it still turns the card. */}
+      <button ref={button} type="button" className={BUTTON} aria-label={label} aria-pressed={pressed} style={BUTTON_STYLE} data-vectoys-grab />
+      <Screen camera={view.camera} pose={view.front} rect={FACE} width={VIEWPORT} style={FACE_STYLE}>
+        {front}
+      </Screen>
+      <Screen camera={view.camera} pose={view.back} rect={FACE} width={VIEWPORT} style={FACE_STYLE}>
+        {back}
+      </Screen>
+    </>
+  );
+
+  return (
+    <Stage camera={view.camera} overlay={overlay}>
+      {view.shadow && <Shadow id={id} shadow={view.shadow} />}
+      <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
+      {card && <path d={card.d} {...OUTLINE} />}
+    </Stage>
+  );
+});
+
 /**
  * A card with live content on both faces that flips over on a click, a tap,
  * a key or a pointer resting on it, and leans a little toward the pointer.
  * The back's content is hidden while the front shows, and the other way round.
+ * A drag or the arrow keys turn it, a click after a drag does not flip it,
+ * and a button shows it full screen.
  */
 export function Card({
   front,
@@ -136,8 +176,8 @@ export function Card({
   onFlipChange,
   tilt = true,
   label = "Flip card",
-  className,
-  style,
+  // The class, the style and the turn's options are the outer box's.
+  ...outer
 }: CardProps) {
   const id = `card-${useId().replace(/[^\w-]/g, "")}`;
   const reduced = useReducedMotion();
@@ -193,7 +233,8 @@ export function Card({
     if (event.pointerType === "touch") return;
     const over = inside(event);
     if (trigger === "hover") ask(over);
-    if (!tilt || reduced) return;
+    // A held button drags the card round, so the lean waits until it lets go.
+    if (!tilt || reduced || event.buttons !== 0) return;
     if (!over) return lean(0, 0);
     const box = event.currentTarget.getBoundingClientRect();
     const across = ((event.clientX - box.left) / box.width - BOUNDS.left) / BOUNDS.width;
@@ -218,36 +259,30 @@ export function Card({
     ask(!showsBack);
   };
 
-  const view = useMemo(() => seen(angles), [angles]);
-  const card = view.drawn.hulls.find((hull) => hull.part === "card");
-
-  const overlay = (
-    <>
-      <style>{FOCUS_RING}</style>
-      <button ref={button} type="button" className={BUTTON} aria-label={label} aria-pressed={showsBack} style={BUTTON_STYLE} />
-      <Screen camera={view.camera} pose={view.front} rect={FACE} width={VIEWPORT} style={FACE_STYLE}>
-        {front}
-      </Screen>
-      <Screen camera={view.camera} pose={view.back} rect={FACE} width={VIEWPORT} style={FACE_STYLE}>
-        {back}
-      </Screen>
-    </>
-  );
-
+  // The card's yaw turns it the other way to a camera's, so a drag to the right takes its right edge away.
   return (
-    <div
-      className={className}
-      style={{ position: "relative", touchAction: "manipulation", ...style }}
-      onPointerDown={(event) => (pointer.current = event.pointerType)}
-      onPointerMove={move}
-      onPointerLeave={leave}
-      onClick={click}
-    >
-      <Stage camera={view.camera} overlay={overlay}>
-        {view.shadow && <Shadow id={id} shadow={view.shadow} />}
-        <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />
-        {card && <path d={card.d} {...OUTLINE} />}
-      </Stage>
-    </div>
+    <Turntable mode="camera" label={label} {...outer}>
+      {(turn) => (
+        <div
+          style={{ position: "relative", touchAction: "manipulation" }}
+          onPointerDown={(event) => (pointer.current = event.pointerType)}
+          onPointerMove={move}
+          onPointerLeave={leave}
+          onClick={click}
+        >
+          <Drawn
+            id={id}
+            flip={angles.flip}
+            yaw={angles.yaw - turn.yaw}
+            pitch={angles.pitch + turn.pitch}
+            front={front}
+            back={back}
+            label={label}
+            pressed={showsBack}
+            button={button}
+          />
+        </div>
+      )}
+    </Turntable>
   );
 }
