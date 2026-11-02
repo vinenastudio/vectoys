@@ -112,3 +112,9 @@ test("keys draw from the back row to the front", () => {
   expect(at("Escape")).toBeLessThan(at("KeyQ"));
   expect(at("KeyQ")).toBeLessThan(at("Space"));
 });
+
+test("className and style go on the outer box, which holds the toy and its full screen button", () => {
+  const html = renderToString(<Keyboard className="mine" style={{ width: 200 }} />);
+  expect(html).toMatch(/^(<style[^>]*>[\s\S]*?<\/style>)*<div class="vectoys-turntable vectoys-keyboard-turn mine" style="width:200px"/);
+  expect(html.match(/class="[^"]*\bmine\b/g)).toHaveLength(1);
+});

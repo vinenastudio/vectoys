@@ -220,6 +220,7 @@ export type KeyboardProps = {
   defaultValue?: string;
   /** Called with the new text when it changes in the box or is cleared. */
   onValueChange?: (value: string) => void;
+  /** Set on the outer box, which holds the keyboard and its full screen button. */
   className?: string;
   style?: CSSProperties;
 } & TurnOptions;
@@ -237,12 +238,13 @@ export type KeyboardProps = {
  * button in its corner fills the screen with it (`fullscreen`, true by
  * default).
  */
-export function Keyboard({ label = "Keyboard", draggable, fullscreen, limits, release, ...props }: KeyboardProps) {
+export function Keyboard({ label = "Keyboard", draggable, fullscreen, limits, release, className, style, ...props }: KeyboardProps) {
   return (
     <Turntable
       mode="tilt"
       label={label}
-      className={TURN}
+      className={className ? `${TURN} ${className}` : TURN}
+      {...(style && { style })}
       {...(draggable !== undefined && { draggable })}
       {...(fullscreen !== undefined && { fullscreen })}
       {...(limits && { limits })}
@@ -266,12 +268,10 @@ function Board({
   value,
   defaultValue = "",
   onValueChange,
-  className,
-  style,
   full,
   drag,
   room,
-}: Omit<KeyboardProps, keyof TurnOptions> & { full: boolean; drag: boolean; room: boolean }) {
+}: Omit<KeyboardProps, keyof TurnOptions | "className" | "style"> & { full: boolean; drag: boolean; room: boolean }) {
   const id = `keyboard-${useId().replace(/[^\w-]/g, "")}`;
   const reduced = useReducedMotion();
   const frames = useFrames();
@@ -506,7 +506,7 @@ function Board({
     [id],
   );
 
-  const look: StyleWithVariables = { ...ROOT, ...(finish && { "--vectoys-finish": finish }), ...style, ...(full && FULL) };
+  const look: StyleWithVariables = { ...ROOT, ...(finish && { "--vectoys-finish": finish }), ...(full && FULL) };
   const button = (children: ReactNode, onClick: () => void) => (
     <button type="button" className={BUTTON} onClick={onClick} style={TOGGLE}>
       {children}
@@ -517,7 +517,6 @@ function Board({
       ref={root}
       role="group"
       aria-label={label}
-      className={className}
       style={look}
     >
       <style>{SHEET}</style>

@@ -119,6 +119,7 @@ type GiftProps = {
   ribbon?: string;
   /** The button's name for assistive technology. */
   label?: string;
+  /** Set on the outer box, which holds the gift and its full screen button. */
   className?: string;
   style?: CSSProperties;
 } & TurnOptions;
@@ -132,7 +133,7 @@ const LIMITS = { yaw: [-40, 40], pitch: [-20, 14] } as const;
  * goes back. Under a pointer the lid peeks up a little. A drag turns the
  * eye round it, and a button shows it full screen.
  */
-export function Gift({ children, open, defaultOpen = false, onOpenChange, finish, ribbon, label = "Open the gift", className, style, limits, ...turning }: GiftProps) {
+export function Gift({ children, open, defaultOpen = false, onOpenChange, finish, ribbon, label = "Open the gift", limits, ...turning }: GiftProps) {
   const id = `gift-${useId().replace(/[^\w-]/g, "")}`;
   const reduced = useReducedMotion();
   const frames = useFrames();
@@ -222,7 +223,7 @@ export function Gift({ children, open, defaultOpen = false, onOpenChange, finish
     };
 
     return (
-      <div className={className} style={{ position: "relative", touchAction: "manipulation", ...style }}>
+      <div style={{ position: "relative", touchAction: "manipulation" }}>
         <Stage camera={view.camera} overlay={overlay} style={vars}>
           <Shadow id={id} shadow={view.shadow} />
           <Faces {...layer(onBox)} styles={STYLES} shading />

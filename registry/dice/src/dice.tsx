@@ -95,6 +95,7 @@ type DiceProps = {
   finish?: string;
   /** The button's name for assistive technology. */
   label?: string;
+  /** Set on the outer box, which holds the die and its full screen button. */
   className?: string;
   style?: CSSProperties;
 } & TurnOptions;
@@ -110,7 +111,7 @@ const random = (): Value => VALUES[Math.floor(Math.random() * VALUES.length)] ??
  * following on the ground. The face on top is read out as it lands. A drag
  * turns the eye round it, and a button shows it full screen.
  */
-export function Dice({ value, onRoll, finish, label = "Roll the die", className, style, limits, ...turning }: DiceProps) {
+export function Dice({ value, onRoll, finish, label = "Roll the die", limits, ...turning }: DiceProps) {
   const id = `dice-${useId().replace(/[^\w-]/g, "")}`;
   const reduced = useReducedMotion();
   const frames = useFrames();
@@ -178,7 +179,7 @@ export function Dice({ value, onRoll, finish, label = "Roll the die", className,
         const view = seen(state.rotation, state.hop, turn);
         const die = view.drawn.hulls.find((hull) => hull.part === "die");
         return (
-          <div className={className} style={{ position: "relative", touchAction: "manipulation", ...style }}>
+          <div style={{ position: "relative", touchAction: "manipulation" }}>
             <Stage camera={view.camera} overlay={overlay} style={finish ? { "--vectoys-finish": finish } : {}}>
               <Shadow id={id} shadow={view.shadow} />
               <Faces faces={view.drawn.faces} hulls={view.drawn.hulls} styles={STYLES} shading />

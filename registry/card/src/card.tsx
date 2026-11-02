@@ -50,24 +50,20 @@ type Angles = { flip: number; yaw: number; pitch: number };
 type Springs = Record<keyof Angles, Spring>;
 const KEYS = ["flip", "yaw", "pitch"] as const;
 
-/** The card at rest, and the box it fills in the stage, as shares, for the button over it. */
-const REST = seen();
-const BOUNDS = (() => {
-  const points = REST.drawn.hulls.flatMap((hull) => hull.points);
+/** The box the card fills in the stage, as shares, for the button over it. */
+function boundsOf(view: ReturnType<typeof seen>) {
+  const points = view.drawn.hulls.flatMap((hull) => hull.points);
   const [xs, ys] = [points.map(([x]) => x), points.map(([, y]) => y)];
   const [left, top, right, bottom] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
-  const { width, height } = REST.camera;
+  const { width, height } = view.camera;
   return { left: left / width, top: top / height, width: (right - left) / width, height: (bottom - top) / height };
-})();
+}
+const BOUNDS = boundsOf(seen());
 
 const percent = (share: number) => `${fixed(share * 100)}%`;
 const BUTTON = "vectoys-card-button";
 const BUTTON_STYLE: CSSProperties = {
   position: "absolute",
-  left: percent(BOUNDS.left),
-  top: percent(BOUNDS.top),
-  width: percent(BOUNDS.width),
-  height: percent(BOUNDS.height),
   margin: 0,
   padding: 0,
   border: 0,
@@ -116,11 +112,10 @@ type CardProps = TurnOptions & {
   style?: CSSProperties;
 };
 
-/** Whether a pointer event falls inside the card's box at rest. */
-function inside(event: PointerEvent<HTMLElement> | MouseEvent<HTMLElement>) {
-  const box = event.currentTarget.getBoundingClientRect();
-  const [x, y] = [(event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height];
-  return x >= BOUNDS.left && x <= BOUNDS.left + BOUNDS.width && y >= BOUNDS.top && y <= BOUNDS.top + BOUNDS.height;
+/** Whether a pointer event falls inside the flip button, which covers the card as it is turned. */
+function inside(event: PointerEvent<HTMLElement> | MouseEvent<HTMLElement>, button: HTMLElement | null) {
+  const box = button?.getBoundingClientRect();
+  return !!box && box.width > 0 && event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
 }
 
 type DrawnProps = Required<Turn> & {
@@ -136,12 +131,21 @@ type DrawnProps = Required<Turn> & {
 const Drawn = memo(function Drawn({ id, flip, yaw, pitch, front, back, label, pressed, button }: DrawnProps) {
   const view = useMemo(() => seen({ flip, yaw, pitch }), [flip, yaw, pitch]);
   const card = view.drawn.hulls.find((hull) => hull.part === "card");
+  const box = boundsOf(view);
 
   const overlay = (
     <>
       <style>{FOCUS_RING}</style>
       {/* The button covers the card, so a drag on it still turns the card. */}
-      <button ref={button} type="button" className={BUTTON} aria-label={label} aria-pressed={pressed} style={BUTTON_STYLE} data-vectoys-grab />
+      <button
+        ref={button}
+        type="button"
+        className={BUTTON}
+        aria-label={label}
+        aria-pressed={pressed}
+        style={{ ...BUTTON_STYLE, left: percent(box.left), top: percent(box.top), width: percent(box.width), height: percent(box.height) }}
+        data-vectoys-grab
+      />
       <Screen camera={view.camera} pose={view.front} rect={FACE} width={VIEWPORT} style={FACE_STYLE}>
         {front}
       </Screen>
@@ -231,7 +235,7 @@ export function Card({
   const move = (event: PointerEvent<HTMLDivElement>) => {
     pointer.current = event.pointerType;
     if (event.pointerType === "touch") return;
-    const over = inside(event);
+    const over = inside(event, button.current);
     if (trigger === "hover") ask(over);
     // A held button drags the card round, so the lean waits until it lets go.
     if (!tilt || reduced || event.buttons !== 0) return;
@@ -253,7 +257,7 @@ export function Card({
     const control = event.target instanceof Element ? event.target.closest("a, button, input, select, textarea, label, summary") : null;
     if (control && control !== button.current) return;
     const keyboard = event.detail === 0;
-    if (!keyboard && !inside(event)) return;
+    if (!keyboard && !inside(event, button.current)) return;
     // A mouse already flips a hover card by resting on it.
     if (trigger === "hover" && !keyboard && pointer.current === "mouse") return;
     ask(!showsBack);

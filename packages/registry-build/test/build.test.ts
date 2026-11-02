@@ -84,6 +84,18 @@ test("the index keeps an outside maker's name and credit", async () => {
   }
 });
 
+test("a package.json that cannot be read, other than a missing one, fails the build", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "vectoys-unreadable-"));
+  try {
+    await mkdir(join(repo, "registry"), { recursive: true });
+    // A folder in the file's place reads with an error that is not "missing".
+    await mkdir(join(repo, "packages/engine/package.json"), { recursive: true });
+    await expect(buildRegistry({ root: repo, out: join(repo, "out") })).rejects.toThrow(/EISDIR/);
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
+});
+
 test("author and credit, when given, must be one line of text that cannot end a comment", () => {
   const item = { name: "ball", title: "Ball", description: "A ball.", files: ["src/ball.tsx"], license: "MIT" };
   expect(checkItem({ ...item, author: "Jane (https://jane.example)", credit: "Jane" }, "item.json")).toMatchObject({ author: "Jane (https://jane.example)" });

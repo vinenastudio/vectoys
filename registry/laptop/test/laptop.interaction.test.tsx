@@ -1,6 +1,6 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { act, createRef } from "react";
-import { htmlOf, mount } from "../../../packages/react/test/dom";
+import { fakeFrames, htmlOf, mount } from "../../../packages/react/test/dom";
 import { DESK, FRONT, Laptop, PHONE, type LaptopHandle } from "../src";
 
 afterEach(() => document.body.replaceChildren());
@@ -334,23 +334,29 @@ test.each([
 const pointer = (type: string, x: number, y = 0) => new PointerEvent(type, { clientX: x, clientY: y, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
 
 test("a drag on the display turns the laptop, held to its ranges, and the handle then adds the turn", async () => {
-  const handle = createRef<LaptopHandle>();
-  const { host } = await mount(
-    <Laptop eye={DESK} turning ref={handle}>
-      <Live />
-    </Laptop>,
-  );
-  const before = markup(host);
-  const display = host.querySelector("p");
-  if (!display) throw new Error("no display");
-  await act(async () => void display.dispatchEvent(pointer("pointerdown", 0)));
-  await act(async () => void display.dispatchEvent(pointer("pointermove", 40, 0)));
-  await act(async () => void display.dispatchEvent(pointer("pointerup", 40, 0)));
-  const dragged = markup(host);
-  expect(dragged).not.toBe(before);
-  // The handle's yaw 0 is drawn turned by the drag, so as it was right after the drag.
-  await act(async () => handle.current?.set({ yaw: 0 }));
-  expect(markup(host)).toBe(dragged);
+  // Frames wait for the test, so the glide after the release cannot move the laptop between the checks.
+  const frames = fakeFrames();
+  try {
+    const handle = createRef<LaptopHandle>();
+    const { host } = await mount(
+      <Laptop eye={DESK} turning ref={handle}>
+        <Live />
+      </Laptop>,
+    );
+    const before = markup(host);
+    const display = host.querySelector("p");
+    if (!display) throw new Error("no display");
+    await act(async () => void display.dispatchEvent(pointer("pointerdown", 0)));
+    await act(async () => void display.dispatchEvent(pointer("pointermove", 40, 0)));
+    await act(async () => void display.dispatchEvent(pointer("pointerup", 40, 0)));
+    const dragged = markup(host);
+    expect(dragged).not.toBe(before);
+    // The handle's yaw 0 is drawn turned by the drag, so as it was right after the drag.
+    await act(async () => handle.current?.set({ yaw: 0 }));
+    expect(markup(host)).toBe(dragged);
+  } finally {
+    frames.restore();
+  }
 });
 
 test("FRONT does not turn unless asked, and the switches take away the tab stop and the button", async () => {

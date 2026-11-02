@@ -440,23 +440,28 @@ export type Posed = ReturnType<typeof look>;
 
 /**
  * Beside the words, on a wide page: the eye is near, so the deck comes
- * forward and spreads. The lid opens to 105 degrees.
+ * forward and spreads. The lid opens to 105 degrees. An eye sits
+ * `perspective` away, level with `originY`; the laptop stands `back` behind
+ * its focus at `anchorY` and turns toward it by `pitch` degrees, in a scene
+ * 100 by `height`.
  */
 export const DESK = seen({ id: "desk", height: 70, perspective: 200, pitch: -15, back: 14, originY: 0.22 * 70, anchorY: 0.78 * 70 });
 
 /**
  * Over the words, on a phone: the eye is three times as far and a little
- * lower, so the whole laptop fits a narrow page. The open lid sits where
- * DESK has it, so one glass serves both. The lid opens to 102 degrees.
+ * lower, so the whole laptop fits a narrow page. `back` and `anchorY` put the
+ * open lid where DESK has it, so one glass serves both. The lid opens to 102 degrees.
  */
 export const PHONE = seen({ id: "phone", height: 59, perspective: 600, pitch: -12, back: 88.07, originY: 0.22 * 70, anchorY: 53.43 });
 
 /**
  * The fixed box, in scene units, that holds the laptop and its shadow in
- * every pose an eye can take, the laptop in the middle. A `Laptop` passed
- * `turning` draws in it, so its stage keeps one size. `x` and `y` are where
- * the eye's own scene sits in the box, so an overlay placed on the still
- * laptop can follow it into a turning one.
+ * every pose an eye can take: yaw from -35 to 35, pitch from 5 to 30, the
+ * lid shut to open, the laptop in the middle. A `Laptop` passed `turning`
+ * draws in it, so its stage keeps one size; its aspect ratio is `width /
+ * height`. A point of the eye's own scene lands `x` to the right and `y`
+ * down in the box, so an overlay placed on the still laptop can follow it
+ * into a turning one.
  */
 export const LAPTOP_BOX = {
   get desk() {
@@ -614,12 +619,9 @@ export type View = Perspective | Straight;
 export const FRONT = straight();
 
 // A laptop free to turn any way, as a trick takes it. At `flat` 1 the eye is
-// FRONT's, level with the deck, and sees the shapes FRONT draws: the camera,
-// the base's thickness and round underside, the lid's place and the feet are
-// fitted to FRONT's sizes once, on first use. Toward 0 the camera, those
-// sizes and the lid's face ease into the eye's own, so nothing jumps. The
-// laptop rolls about its long axis and turns about its upright one round
-// the middle of the shut slab, then moves and grows on screen.
+// FRONT's and sees FRONT's shapes, fitted once on first use; toward 0 they
+// ease into the eye's own, so nothing jumps. It rolls and turns round the
+// middle of the shut slab, then moves and grows on screen.
 
 /** A pose of a laptop free to turn: `flat` from the eye's own look (0) to FRONT's (1), a move `x` and `y` and a `scale` on screen, and a `roll` about its long axis. */
 export type TrickPose = LaptopPose & { flat: number; x: number; y: number; scale: number; roll: number };

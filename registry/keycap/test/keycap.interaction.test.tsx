@@ -110,3 +110,16 @@ test("with dragging and full screen off the key has no tab stop of its own and n
   await frames.advance(400);
   await unmount();
 });
+
+test("a key held by Enter stays down when the pointer moves after a plain click", async () => {
+  const { host, unmount } = await mount(<Keycap>Join</Keycap>);
+  const button = host.querySelector("button")!;
+  await fire(button, pointer("pointerdown", 0));
+  await fire(button, pointer("pointerup", 0));
+  await fire(button, new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+  expect(button.getAttribute("data-pressed")).toBe("true");
+  await fire(button, new PointerEvent("pointermove", { clientX: 60, clientY: 0, pointerId: 1, pointerType: "mouse", bubbles: true }));
+  expect(button.getAttribute("data-pressed")).toBe("true");
+  await fire(button, new KeyboardEvent("keyup", { bubbles: true, key: "Enter" }));
+  await unmount();
+});

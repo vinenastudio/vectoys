@@ -11,11 +11,9 @@ const BORDER = "var(--vectoys-border, #d4d4d4)";
 const SURFACE_TONE = "var(--vectoys-surface, #f5f5f5)";
 const SHADOW = "var(--vectoys-shadow, rgba(0, 0, 0, 0.08))";
 
-// Anodized aluminum in close tones, lit from above: the tops are the page's
-// surface, the sides a step darker under the page's shadow, the rim round the
-// glass a step toward the border, and the shut lid an even tone. The glass,
-// the hinge cover and the keyboard are near black, as on the machine, and the
-// hinge's barrels a darker aluminum in the shade of the lid.
+// Aluminum lit from above: tops in the page's surface, sides a step darker,
+// the glass's rim a step toward the border. Glass, hinge cover and keys are
+// near black, the hinge's barrels a darker aluminum.
 const SURFACE: CSSProperties = { fill: SURFACE_TONE };
 const shade = (share: number): CSSProperties => ({ fill: SHADOW, fillOpacity: share });
 const SIDE = 0.45;
@@ -36,9 +34,9 @@ const stroke = {
 } as const;
 
 // Which field of holes shows: the full one where a hole is about a device
-// pixel (a scene 560px wide at two pixels a px), the half one down to half
-// that, the quarter one below. In a wider scene, as `turning` draws, the
-// widths grow with it and the fields go by names of their own.
+// pixel (a scene 560px wide at 2dppx), the half one down to half that, the
+// quarter one below. In a wider `turning` scene the widths grow and the
+// fields take names of their own.
 const HOLES = "vectoys-laptop-holes";
 const holesShown = (name: string, scene: number) => {
   const [fine, coarse] = [fixed((560 * scene) / 100), fixed((280 * scene) / 100)];
@@ -218,9 +216,9 @@ export const Laptop = memo(function Laptop({ draggable, fullscreen = true, limit
   const range: Required<TurnLimits> = free ? { yaw: [-180, 180], pitch: [-35, 35] } : { yaw: [-YAW - at.yaw, YAW - at.yaw], pitch: [at.pitch - PITCH[1], at.pitch - PITCH[0]] };
   return (
     <Turntable mode="camera" label={label} draggable={draggable ?? !front} fullscreen={fullscreen} release={release} limits={{ ...range, ...limits }}>
-      {(turn) => {
-        turned.current = turn;
-        return (
+      {(turn) => (
+        <>
+          <Hold to={turned} turn={turn} />
           <Drawn
             {...props}
             uid={uid}
@@ -228,11 +226,14 @@ export const Laptop = memo(function Laptop({ draggable, fullscreen = true, limit
             {...(turn.yaw !== 0 && { yaw: at.yaw + turn.yaw })}
             {...(turn.pitch !== 0 && { pitch: at.pitch - turn.pitch })}
           />
-        );
-      }}
+        </>
+      )}
     </Turntable>
   );
 });
+
+// After the commit, so a render React drops leaves the handle's turn alone.
+const Hold = ({ to, turn }: { to: { current: object }; turn: object }) => (useLayoutEffect(() => void (to.current = turn)), null);
 
 /** The laptop at one pose, under the ids `uid` makes. */
 function Drawn({ uid, ...props }: Omit<LaptopProps, keyof TurnOptions> & { uid: string }) {

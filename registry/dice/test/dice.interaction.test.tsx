@@ -51,7 +51,7 @@ test("a drag on the die turns it without rolling, and a click still rolls", asyn
   await unmount();
 });
 
-test("with dragging and full screen off the die has no tab stop of its own and no full screen button", () => {
+test("with dragging and full screen off the Turntable round the die is no tab stop and has no full screen button", () => {
   const html = renderToString(<Dice draggable={false} fullscreen={false} />);
   expect(html).not.toContain('tabindex="0"');
   expect(html).not.toContain("Full screen");

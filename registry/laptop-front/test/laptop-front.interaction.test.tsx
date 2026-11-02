@@ -1,8 +1,11 @@
-import { afterEach, expect, spyOn, test } from "bun:test";
+import { afterAll, afterEach, expect, spyOn, test } from "bun:test";
 import { renderToString } from "react-dom/server";
-import { fire, mount } from "../../../packages/react/test/dom";
+import { fakeFrames, fire, mount } from "../../../packages/react/test/dom";
 import { LaptopFront } from "../src";
 
+// Frames wait for the test, so a glide after a release cannot move the laptop between two checks.
+const frames = fakeFrames();
+afterAll(frames.restore);
 afterEach(() => document.body.replaceChildren());
 
 test("renders on the client with no React warnings, its content live in the glass", async () => {
@@ -57,9 +60,10 @@ test("a drag on the laptop's display tilts it as one on its frame does, and the 
   await fire(text, new MouseEvent("click", { bubbles: true, detail: 1 }));
   expect(clicks).toBe(1);
   const frame = host.querySelector("svg path")!;
+  const before = body.style.transform;
   await fire(frame, pointer("pointerdown", 0));
   await fire(frame, pointer("pointermove", -60));
-  expect(body.style.transform).not.toContain("rotateY(0deg)");
+  expect(body.style.transform).not.toBe(before);
   await fire(frame, pointer("pointerup", -60));
   await unmount();
 });

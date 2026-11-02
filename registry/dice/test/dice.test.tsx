@@ -53,3 +53,9 @@ test("rolling changes the drawing, and the shadow fades as the die hops", () => 
   expect(air.shadow.strength).toBeLessThan(rest.shadow.strength);
   expect(JSON.stringify(air)).not.toContain("NaN");
 });
+
+test("className and style go on the outer box, which holds the toy and its full screen button", () => {
+  const html = renderToString(<Dice className="mine" style={{ width: 200 }} />);
+  expect(html).toMatch(/^(<style[^>]*>[\s\S]*?<\/style>)*<div class="vectoys-turntable mine" style="width:200px"/);
+  expect(html.match(/class="[^"]*\bmine\b/g)).toHaveLength(1);
+});

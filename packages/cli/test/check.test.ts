@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { ALLOWED_DEPENDENCIES, accessibleName, brands, bunScript, check, checks, markupSafety, runInBun, safety, sources, usesTurntable } from "../src/check";
+import { ALLOWED_DEPENDENCIES, accessibleName, brands, bunScript, check, checks, markupSafety, rendersTurntable, runInBun, safety, sources, usesTurntable } from "../src/check";
 import type { Context } from "../src/commands";
 import { create } from "../src/create";
 
@@ -145,6 +145,27 @@ test("an item that does not wrap itself in Turntable fails", () => {
   edit("src/bare.tsx", (text) => text.replace(/<Turntable [^>]*>\s*\{\(turn\) => (<Drawn [^>]*\/>)\}\s*<\/Turntable>/, "$1").replaceAll("turn.yaw", "0").replaceAll("turn.pitch", "0"));
   expect(failed(folder)).toEqual(["the toy does not use Turntable from @vinena/vectoys-react"]);
 }, 30_000);
+
+test("an item that draws the Turntable's markup itself, with no Turntable, fails", () => {
+  const { folder, edit } = item("fake");
+  edit("src/fake.tsx", (text) =>
+    text
+      .replace(/<Turntable [^>]*>\s*\{\(turn\) => (<Drawn [^>]*\/>)\}\s*<\/Turntable>/, '<div className="vectoys-turntable">$1</div>')
+      .replace(/\bTurntable, /, "")
+      .replaceAll("turn.yaw", "0")
+      .replaceAll("turn.pitch", "0"),
+  );
+  expect(failed(folder)).toEqual(["the toy does not use Turntable from @vinena/vectoys-react"]);
+}, 30_000);
+
+test("a shipped file must import Turntable from the package and render it", () => {
+  const file = (code: string) => [{ path: "src/toy.tsx", text: code, code, imports: [] }];
+  const used = 'import { Stage, Turntable } from "@vinena/vectoys-react";\nreturn jsxDEV(Turntable, {});';
+  expect(rendersTurntable(file(used), ["src/toy.tsx"])).toBe(true);
+  expect(rendersTurntable(file(used), ["src/other.tsx"])).toBe(false);
+  expect(rendersTurntable(file('import { Turntable } from "@vinena/vectoys-react";'), ["src/toy.tsx"])).toBe(false);
+  expect(rendersTurntable(file('import { Turntable } from "./turntable";\nreturn jsx(Turntable, {});'), ["src/toy.tsx"])).toBe(false);
+});
 
 // The safety lines for a folder with src/toy.tsx holding `code`, and `extra`
 // files, read by bun as `check` reads them. item.json lists every file but

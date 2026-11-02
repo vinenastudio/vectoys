@@ -234,10 +234,12 @@ function usePress(disabled: boolean, caller: PressHandlers, changed: (down: bool
     },
     onPointerUp: (event) => {
       caller.onPointerUp?.(event);
+      from.current = null;
       setHeld(false);
     },
     onPointerCancel: (event) => {
       caller.onPointerCancel?.(event);
+      from.current = null;
       setHeld(false);
     },
     onKeyDown: (event) => {
@@ -369,6 +371,7 @@ export type KeycapRowProps = {
   /** Names the row for assistive technology, such as the word the keys spell. */
   label?: string;
   finish?: string;
+  /** Set on the outer box, which holds the row and its full screen button. */
   className?: string;
   style?: CSSProperties;
 } & SoundProps &
@@ -380,13 +383,13 @@ export type KeycapRowProps = {
  * the row, its keys included, tilts it as one, and a button shows it full
  * screen.
  */
-export function KeycapRow({ keys, onPress, label, finish, className, style, sound, defaultSound, onSoundChange, soundToggle = false, ...turning }: KeycapRowProps) {
+export function KeycapRow({ keys, onPress, label, finish, sound, defaultSound, onSoundChange, soundToggle = false, ...turning }: KeycapRowProps) {
   const { audible, toggle } = useSound(sound, defaultSound, onSoundChange);
   const start = useClicks();
   const grab = turning.draggable !== false;
   const shared = useMemo(() => ({ audible, start, grab }), [audible, start, grab]);
   const row = (
-    <div role="group" aria-label={label} className={className} style={{ display: "flex", ...style }}>
+    <div role="group" aria-label={label} style={{ display: "flex" }}>
       {keys.map((key, index) => (
         <div key={index} style={{ flex: "1 1 0", minWidth: 0, marginInline: "-4%" }}>
           <Keycap {...(finish && { finish })} {...(onPress && { onPress: () => onPress(key, index) })} style={{ fontSize: 48 }}>

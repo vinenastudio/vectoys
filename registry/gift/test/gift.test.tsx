@@ -63,3 +63,9 @@ test("the lid is drawn over the box whatever its state", () => {
     expect(parts.lastIndexOf("box")).toBeLessThan(parts.indexOf("lid"));
   }
 });
+
+test("className and style go on the outer box, which holds the toy and its full screen button", () => {
+  const html = renderToString(<Gift className="mine" style={{ width: 200 }} />);
+  expect(html).toMatch(/^(<style[^>]*>[\s\S]*?<\/style>)*<div class="vectoys-turntable mine" style="width:200px"/);
+  expect(html.match(/class="[^"]*\bmine\b/g)).toHaveLength(1);
+});

@@ -81,7 +81,11 @@ async function packageVersions(root: string): Promise<Map<string, string>> {
   const versions = new Map<string, string>();
   for (const dir of ["engine", "react"]) {
     const path = join(root, "packages", dir, "package.json");
-    const pkg: { name?: unknown; version?: unknown } = await readFile(path, "utf8").then(JSON.parse, () => ({}));
+    const pkg: { name?: unknown; version?: unknown } = await readFile(path, "utf8").then(JSON.parse, (error: NodeJS.ErrnoException) => {
+      // Only a missing file means no package here; any other failure is a real one.
+      if (error.code === "ENOENT") return {};
+      throw error;
+    });
     if (typeof pkg.name === "string" && typeof pkg.version === "string") versions.set(pkg.name, `^${pkg.version}`);
   }
   return versions;

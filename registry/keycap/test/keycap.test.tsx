@@ -39,9 +39,15 @@ test("the cap covers the switch it rides over, and its dish draws over its top",
   expect(parts).toEqual(["deck", "housing", "cap", "dish-0", "dish-1"]);
 });
 
-test("a row is a named group with one button for each key", () => {
+test("a row is a named group with one grab button for each key, so a drag on a key turns the row", () => {
   const html = renderToString(<KeycapRow keys={["v", "e", "c"]} label="vec" />);
   expect(html).toContain('role="group" aria-label="vec"');
-  expect(html.match(/<button type="button" data-vectoys-grab/g)).toHaveLength(3);
+  expect(html.match(/<button\b[^>]*\sdata-vectoys-grab/g)).toHaveLength(3);
   expect(html).toMatch(/>v<\/button>.*>e<\/button>.*>c<\/button>/s);
+});
+
+test("className and style go on the outer box, which holds the toy and its full screen button", () => {
+  const html = renderToString(<KeycapRow keys={["a"]} className="mine" style={{ width: 200 }} />);
+  expect(html).toMatch(/^(<style[^>]*>[\s\S]*?<\/style>)*<div class="vectoys-turntable mine" style="width:200px"/);
+  expect(html.match(/class="[^"]*\bmine\b/g)).toHaveLength(1);
 });
