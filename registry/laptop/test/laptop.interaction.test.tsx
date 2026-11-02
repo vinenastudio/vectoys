@@ -1,6 +1,6 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { act, createRef } from "react";
-import { mount } from "../../../packages/react/test/dom";
+import { htmlOf, mount } from "../../../packages/react/test/dom";
 import { DESK, FRONT, Laptop, PHONE, type LaptopHandle } from "../src";
 
 afterEach(() => document.body.replaceChildren());
@@ -26,7 +26,7 @@ test("FRONT renders on the client with no React warnings", async () => {
  * again goes to the end of its attribute.
  */
 const markup = (host: HTMLElement) =>
-  (host.firstElementChild?.outerHTML ?? "")
+  htmlOf(host.firstElementChild, true)
     .replace(/laptop-(desk|phone)-[\w-]*?-(?=deck|far|near|sheen|lid-|holes)/g, "laptop-$1-X-")
     .replace(/style="([^"]*)"/g, (_, style: string) => `style="${style.split(/;\s*/).filter(Boolean).sort().join(";")}"`);
 
@@ -117,9 +117,9 @@ test("nearly shut, the lid faces away and the handle hides the glass", async () 
 test("seen from the front, the handle does nothing", async () => {
   const handle = createRef<LaptopHandle>();
   const { host } = await mount(<Laptop eye={FRONT} ref={handle} />);
-  const before = host.innerHTML;
+  const before = htmlOf(host);
   await act(async () => handle.current?.set({ lid: 0, yaw: 30 }));
-  expect(host.innerHTML).toBe(before);
+  expect(htmlOf(host)).toBe(before);
 });
 
 test.each([

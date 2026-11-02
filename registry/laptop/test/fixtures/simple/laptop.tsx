@@ -1,3 +1,4 @@
+// @ts-nocheck: copied unchanged from an older version, under looser settings.
 import { clamp, fixed, lerp } from "@vinena/vectoys";
 import { Screen, Stage, placeScreen } from "@vinena/vectoys-react";
 import { memo, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type Ref, type SVGProps } from "react";

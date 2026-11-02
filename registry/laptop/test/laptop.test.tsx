@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { fixed, screenQuad, scrub } from "@vinena/vectoys";
 import { renderToString } from "react-dom/server";
 import { DESK, FRONT, GLASS, KICKFLIP, LAPTOP_BOX, Laptop, PHONE, PITCH, WIDTH, YAW } from "../src";
+import * as simple from "./fixtures/simple";
 
 test.each([
   [DESK, "0 0 100 70"],
@@ -252,15 +253,14 @@ test("the kickflip shuts the lid straight on, flips and turns once round, lands 
 });
 
 // The laptop as it was before the realistic look, copied unchanged from
-// that commit into fixtures/simple and imported by a computed name, as the
-// parity test imports its original. Without `look`, every laptop draws
+// that commit into fixtures/simple. Without `look`, every laptop draws
 // exactly as that code draws it, rendered here on the same machine: the
 // math library's last bits differ between platforms and can tip a hull's
 // point on a straight edge in or out, so a hash taken on one machine does
 // not hold on another (on macOS both give efec156e...).
-const SIMPLE = "./fixtures/simple/index.ts";
 type Drawn = Pick<typeof import("../src"), "Laptop" | "DESK" | "PHONE" | "FRONT" | "KICKFLIP">;
-const before: Drawn = await import(SIMPLE);
+// Its eyes name the lock key's paths as they were then, which only the types see.
+const before = simple as unknown as Drawn;
 
 test("without a look, the markup is what it was before the realistic look", () => {
   const markup = ({ Laptop, DESK, PHONE, FRONT, KICKFLIP }: Drawn) => [

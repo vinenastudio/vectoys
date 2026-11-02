@@ -235,12 +235,19 @@ export function codeFiles(dir: string): string[] {
 }
 
 const STRING = "[\"'`]";
-const GLOBALS = ["fetch", "eval", "Function", "XMLHttpRequest", "WebSocket", "EventSource", "sendBeacon", "importScripts", "localStorage", "sessionStorage", "indexedDB", "cookie", "constructor", "open", "location", "postMessage", "clipboard"];
+const GLOBALS = ["opener", "defaultView", "fetch", "eval", "Function", "XMLHttpRequest", "WebSocket", "EventSource", "sendBeacon", "importScripts", "localStorage", "sessionStorage", "indexedDB", "cookie", "constructor", "open", "location", "postMessage", "clipboard"];
 const ELEMENTS = "script|iframe|frame|object|embed|form";
 
-/** What an item's code may not do, each with the words a failing line uses for it. */
+/**
+ * What an item's code may not do, each with the words a failing line uses for
+ * it. These are a lint on the code as written, not a proof: code built up at
+ * run time gets past them, such as `fn["con" + "structor"]` on a function,
+ * which reaches the Function constructor. A maintainer reads every
+ * submission before it is listed.
+ */
 const UNSAFE: [RegExp, string][] = [
   [/\b(Bun|process|Deno|module|exports|require|__dirname|__filename|globalThis)\b/, "uses the server runtime"],
+  [/\bdefaultView\b|(?<![.\w$])(window|self|opener)(?=\s*[.[(=;,)\]}])/, "reaches the window object"],
   [/<script\b/i, "has a <script> tag"],
   [/<(iframe|frame|object|embed|form)\b/i, "has a frame, object, embed or form tag"],
   [new RegExp(`\\b(jsx\\w*|createElement)\\s*\\(\\s*${STRING}(${ELEMENTS})${STRING}`, "i"), "makes a script, frame, object, embed or form element"],
@@ -264,23 +271,6 @@ const UNSAFE: [RegExp, string][] = [
   [new RegExp(`\\bhttps?://(?!www\\.w3\\.org/)|[${"\"'`"}}]\\s*//[a-z0-9]|${STRING}\\s*data:\\s*text/html`, "i"), "has an outside URL"],
   [/url\(\s*["']?\s*(https?:|\/\/)|@import\b/i, "loads a style from outside"],
 ];
-
-// What tests in registry/ need of the test runner: reading their own files
-// with Bun.file, putting fakes on globalThis, and reading innerHTML or outerHTML.
-const TEST_RUNTIME = /\bBun\.file\(|\bglobalThis\.(AudioContext|IntersectionObserver)\b|\bObject\.assign\(globalThis,|\.(innerHTML|outerHTML)\b(?!\s*=[^=])/g;
-
-/**
- * `code` without the dynamic imports of a constant that names a file in the
- * folder, `const SOURCE = "./fixtures/x.ts"; await import(SOURCE)`, as tests
- * in registry/ load fixtures. The constant may appear nowhere else.
- */
-function withoutFixtureImports(code: string, from: string, files: string[]): string {
-  return code.replace(/\bimport\s*\(\s*([A-Za-z_$][\w$]*)\s*\)/g, (match, name: string) => {
-    const uses = code.match(new RegExp(`(?<![\\w$.])${name.replace(/\$/g, "\\$")}(?![\\w$])`, "g")) ?? [];
-    const value = new RegExp(`\\bconst ${name.replace(/\$/g, "\\$")} = "(\\.[^"]*)";`).exec(code)?.[1];
-    return uses.length === 2 && value !== undefined && names(value, from, files) ? " " : match;
-  });
-}
 
 /** What rendered markup may not have, each with the words a failing line uses for it. */
 const UNSAFE_MARKUP: [RegExp, string][] = [
@@ -311,13 +301,13 @@ function lineOf(text: string, found: string): string {
 }
 
 /**
- * What in an item's folder could run code it does not show or reach outside
- * the page: the server runtime, scripts and frames, eval, network calls,
+ * The common unsafe patterns `check` can see in an item's folder: the server
+ * runtime, the window object, scripts and frames, eval, network calls,
  * windows, browser storage, outside URLs, and imports of anything but the
  * item's own files and the allowed packages. `files` is every code file in
  * the folder; those item.json does not list, its index and tests, may also
- * import the test runner and any file in the folder. One line for each,
- * naming the file; none if the code is safe.
+ * import the test runner, and the tests any file in the folder. One line for
+ * each, naming the file; none if it sees none.
  */
 export function safety(files: Source[], item: Pick<ItemSource, "dependencies" | "files">): string[] {
   const problems = (item.dependencies ?? []).filter((name) => !ALLOWED_DEPENDENCIES.includes(name)).map((name) => `item.json depends on ${name}, which is not ${ALLOWED_DEPENDENCIES.join(" or ")}`);
@@ -329,18 +319,20 @@ export function safety(files: Source[], item: Pick<ItemSource, "dependencies" | 
     }
     const shipped = item.files.includes(file.path);
     const test = !shipped && file.path.startsWith("test/");
+    // Shipped files import each other; the index any file but the tests, so
+    // code under test/ never reaches the site; the tests any file.
+    const reachable = shipped ? item.files : test ? all : all.filter((path) => !path.startsWith("test/"));
+    const packages = shipped ? ALLOWED_IMPORTS : [...ALLOWED_IMPORTS, ...ALLOWED_TEST_IMPORTS];
     for (const entry of file.imports) {
       if (entry.kind !== "import-statement") continue;
-      const fine = entry.path.startsWith(".")
-        ? names(entry.path, file.path, shipped ? item.files : all) || (test && TEST_HELPERS.some((helper) => helper.test(entry.path)))
-        : allowed(entry.path, shipped ? ALLOWED_IMPORTS : [...ALLOWED_IMPORTS, ...ALLOWED_TEST_IMPORTS]);
-      if (!fine) problems.push(`${file.path}${lineOf(file.text, JSON.stringify(entry.path))} imports ${entry.path}, which is not ${shipped ? "one of its files" : "a file in its folder"} or ${(shipped ? ALLOWED_IMPORTS : [...ALLOWED_IMPORTS, ...ALLOWED_TEST_IMPORTS]).join(", ")}`);
+      const fine = entry.path.startsWith(".") ? names(entry.path, file.path, reachable) || (test && TEST_HELPERS.some((helper) => helper.test(entry.path))) : allowed(entry.path, packages);
+      const where = shipped ? "one of its files" : test ? "a file in its folder" : "a file in its folder outside test/";
+      if (!fine) problems.push(`${file.path}${lineOf(file.text, JSON.stringify(entry.path))} imports ${entry.path}, which is not ${where} or ${packages.join(", ")}`);
     }
     const pragma = /@jsx\w*/.exec(file.text);
     if (pragma) problems.push(`${file.path}${lineOf(file.text, pragma[0])} sets the JSX runtime in a comment: ${pragma[0]}`);
-    const code = test ? withoutFixtureImports(file.code.replace(TEST_RUNTIME, " "), file.path, all) : file.code;
     for (const [pattern, what] of UNSAFE) {
-      const found = pattern.exec(code);
+      const found = pattern.exec(file.code);
       if (found) problems.push(`${file.path}${lineOf(file.text, found[0])} ${what}: ${found[0].trim()}`);
     }
   }
@@ -494,7 +486,7 @@ export function checks(dir: string): Result[] {
   const read = sources(dir, [...new Set([...item.files, ...codeFiles(dir)])]);
   const unsafe = typeof read === "string" ? [`bun could not read the files: ${read}`] : safety(read, item);
   if (unsafe.length) return [...results, ...unsafe.map((line) => ({ pass: false, line }))];
-  results.push({ pass: true, line: "the code is safe: no scripts, eval, network calls or outside imports" });
+  results.push({ pass: true, line: "the code uses no scripts, eval, network calls or outside imports that check can see" });
 
   const component = componentFile(item);
   if (!component) return [...results, { pass: false, line: "files lists no .tsx component to render" }];

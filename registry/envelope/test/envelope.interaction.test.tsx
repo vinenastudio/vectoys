@@ -12,20 +12,20 @@ test("a click opens the envelope, and its letter comes alive once out", async ()
       <a href="#join">Join</a>
     </Envelope>,
   );
-  const opener = host.querySelector("button");
+  const button = host.querySelector("button");
   const letter = host.querySelector("a")?.parentElement;
-  if (!opener || !letter) throw new Error("no opener or letter");
-  expect(opener.getAttribute("aria-expanded")).toBe("false");
+  if (!button || !letter) throw new Error("no button or letter");
+  expect(button.getAttribute("aria-expanded")).toBe("false");
   expect(letter.hasAttribute("inert")).toBe(true);
 
-  await fire(opener, new MouseEvent("click", { bubbles: true }));
-  expect(opener.getAttribute("aria-expanded")).toBe("true");
+  await fire(button, new MouseEvent("click", { bubbles: true }));
+  expect(button.getAttribute("aria-expanded")).toBe("true");
   expect(onOpenChange).toHaveBeenCalledWith(true);
   await frames.advance(1500);
   expect(letter.hasAttribute("inert")).toBe(false);
 
-  await fire(opener, new MouseEvent("click", { bubbles: true }));
-  expect(opener.getAttribute("aria-expanded")).toBe("false");
+  await fire(button, new MouseEvent("click", { bubbles: true }));
+  expect(button.getAttribute("aria-expanded")).toBe("false");
   await frames.advance(1500);
   expect(letter.hasAttribute("inert")).toBe(true);
   await unmount();
@@ -33,11 +33,11 @@ test("a click opens the envelope, and its letter comes alive once out", async ()
 
 test("a page that drives the envelope decides how far open it is", async () => {
   const { host, rerender, unmount } = await mount(<Envelope open={0}>Hi</Envelope>);
-  const opener = host.querySelector("button");
-  await fire(opener ?? host, new MouseEvent("click", { bubbles: true }));
-  expect(opener?.getAttribute("aria-expanded")).toBe("false");
+  const button = host.querySelector("button");
+  await fire(button ?? host, new MouseEvent("click", { bubbles: true }));
+  expect(button?.getAttribute("aria-expanded")).toBe("false");
   await rerender(<Envelope open={1}>Hi</Envelope>);
-  expect(opener?.getAttribute("aria-expanded")).toBe("true");
+  expect(button?.getAttribute("aria-expanded")).toBe("true");
   await unmount();
 });
 
@@ -47,12 +47,12 @@ test("a closed envelope clips its letter away, so clicks pass through to the pag
       <a href="#join">Join</a>
     </Envelope>,
   );
-  const opener = host.querySelector("button");
+  const button = host.querySelector("button");
   const screen = host.querySelector("a")?.parentElement?.parentElement;
-  if (!opener || !screen) throw new Error("no opener or screen");
+  if (!button || !screen) throw new Error("no button or screen");
   expect(screen.style.clipPath).toBe("inset(50%)");
 
-  await fire(opener, new MouseEvent("click", { bubbles: true }));
+  await fire(button, new MouseEvent("click", { bubbles: true }));
   await frames.advance(1500);
   expect(screen.style.clipPath).not.toBe("inset(50%)");
   await unmount();

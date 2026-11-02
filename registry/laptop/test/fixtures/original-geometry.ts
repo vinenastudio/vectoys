@@ -1,3 +1,4 @@
+// @ts-nocheck: copied unchanged from an older version, under looser settings.
 // A 14 inch MacBook Pro: 312.6 mm wide, 221.2 mm deep and 15.5 mm thick, of
 // which the lid is about 4.5 mm. Sizes are hundredths of the scene's width,
 // at 66 for the width, in a scene 100 wide. The display is 302.5 by

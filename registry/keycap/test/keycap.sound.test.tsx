@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, expect, test } from "bun:test";
 import { renderToString } from "react-dom/server";
-import { fakeFrames, fire, mount } from "../../../packages/react/test/dom";
+import { fakeFrames, fire, installGlobal, mount, readSibling } from "../../../packages/react/test/dom";
 import { Keycap, KeycapRow } from "../src";
 
 const frames = fakeFrames();
@@ -61,7 +61,7 @@ class FakeAudio {
     closed += 1;
   };
 }
-const real = globalThis.AudioContext;
+const restoreAudio = installGlobal("AudioContext", FakeAudio);
 beforeEach(() => {
   made = 0;
   played = 0;
@@ -70,9 +70,8 @@ beforeEach(() => {
   disconnected = 0;
   state = "running";
   sources.length = 0;
-  Object.assign(globalThis, { AudioContext: FakeAudio });
 });
-afterAll(() => Object.assign(globalThis, { AudioContext: real }));
+afterAll(restoreAudio);
 
 const buttonIn = (host: Element, name: string) => {
   const button = [...host.querySelectorAll("button")].find((item) => item.textContent === name);
@@ -190,8 +189,7 @@ test("a single key's sound switch turns its clicks off and tells the page", asyn
 });
 
 test("the keycap's sound is the same file as the keyboard's", async () => {
-  const read = (path: string) => Bun.file(new URL(path, import.meta.url)).text();
-  expect(await read("../src/sound.ts")).toBe(await read("../../keyboard/src/sound.ts"));
+  expect(await readSibling(import.meta.url, "../src/sound.ts")).toBe(await readSibling(import.meta.url, "../../keyboard/src/sound.ts"));
 });
 
 test("renders the same on the server with the sound switch, and no switch without it", () => {

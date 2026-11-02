@@ -22,6 +22,9 @@ export async function mount(node: ReactNode) {
   };
 }
 
+/** Sends `event` to the window, such as a blur, and lets React finish what it starts. */
+export const fireOnWindow = (event: Event) => act(async () => void window.dispatchEvent(event));
+
 /** Sends `event` to `target` and lets React finish what it starts. */
 export const fire = (target: Element, event: Event) => act(async () => void target.dispatchEvent(event));
 
@@ -67,3 +70,19 @@ export function reducedMotion(reduce: boolean) {
   });
   return { restore: () => spy.mockRestore() };
 }
+
+// Items' tests may not reach globalThis, Bun or HTML strings themselves, as
+// `vectoys check` refuses them, so they do it through these.
+
+/** Puts `value` on the page as the global `name`, such as a stand-in AudioContext; the returned function puts the real one back. */
+export function installGlobal(name: string, value: unknown): () => void {
+  const real: unknown = Reflect.get(globalThis, name);
+  Object.assign(globalThis, { [name]: value });
+  return () => void Object.assign(globalThis, { [name]: real });
+}
+
+/** The text of the file at `path` from the test file at `from`, its `import.meta.url`. */
+export const readSibling = (from: string, path: string) => Bun.file(new URL(path, from)).text();
+
+/** The markup inside `element`, or of `element` itself with `outer`. */
+export const htmlOf = (element: Element | null | undefined, outer = false) => (outer ? element?.outerHTML : element?.innerHTML) ?? "";

@@ -34,7 +34,7 @@ test("a new item passes every check", () => {
     "  pass  item.json has what the registry needs",
     expect.stringMatching(/^ {2}pass {2}the files are \d+\.\d KB, under 96\.0 KB$/),
     "  pass  item.json names no brands",
-    "  pass  the code is safe: no scripts, eval, network calls or outside imports",
+    "  pass  the code uses no scripts, eval, network calls or outside imports that check can see",
     "  pass  Plate renders on the server",
     "  pass  the markup has no NaN or Infinity",
     "  pass  two renders give the same markup",
@@ -230,28 +230,44 @@ test("the index and tests are read too, and may import the test runner, the fold
   const test = `import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { a } from "../src";
-import { render } from "../../../packages/react/test/dom";
+import { htmlOf, installGlobal, readSibling } from "../../../packages/react/test/dom";
 import { Laptop } from "../../laptop/src";
-const real = globalThis.AudioContext;
-Object.assign(globalThis, { AudioContext: real });
-const text = await Bun.file(new URL("../src/toy.tsx", import.meta.url)).text();
-const SOURCE = "./fixtures/old.ts";
-const old = await import(SOURCE);
-test("a", () => expect(document.body.innerHTML).toBe(""));`;
-  const files = { "src/index.ts": 'export * from "./toy";', "test/toy.test.tsx": test, "test/fixtures/old.ts": "export const a = 1;" };
+import { old } from "./fixtures/old";
+const restore = installGlobal("AudioContext", class {});
+const text = await readSibling(import.meta.url, "../src/toy.tsx");
+test("a", () => expect(htmlOf(document.body)).toBe(""));`;
+  const files = { "src/index.ts": 'export * from "./toy";', "test/toy.test.tsx": test, "test/fixtures/old.ts": "export const old = 1;" };
   expect(unsafe("export const a = 1;", files)).toEqual([]);
 
+  const not = "@vinena/vectoys, @vinena/vectoys-react, react, bun:test, react-dom/server";
   expect(unsafe("export const a = 1;", { "src/index.ts": "fetch(url);" })).toEqual(["src/index.ts:1 uses fetch: fetch"]);
-  expect(unsafe("export const a = 1;", { "test/toy.test.ts": 'Bun.spawnSync(["sh"]);' })).toEqual(["test/toy.test.ts:1 uses the server runtime: Bun"]);
-  expect(unsafe("export const a = 1;", { "test/toy.test.ts": 'globalThis["fe" + "tch"](url);' })).toEqual(["test/toy.test.ts:1 uses the server runtime: globalThis"]);
-  expect(unsafe("export const a = 1;", { "test/toy.test.ts": "document.body.innerHTML = x;" })).toEqual(["test/toy.test.ts:1 sets HTML from a string: innerHTML"]);
-  expect(unsafe("export const a = 1;", { "test/toy.test.ts": 'import _ from "lodash";' })).toEqual([
-    "test/toy.test.ts:1 imports lodash, which is not a file in its folder or @vinena/vectoys, @vinena/vectoys-react, react, bun:test, react-dom/server",
+  expect(unsafe("export const a = 1;", { "src/index.ts": 'export * from "../test/setup";', "test/setup.ts": "export const b = 1;" })).toEqual([
+    `src/index.ts:1 imports ../test/setup, which is not a file in its folder outside test/ or ${not}`,
   ]);
-  const far = 'const SOURCE = "https://example.com/x.js"; await import(SOURCE);';
-  expect(unsafe("export const a = 1;", { "test/toy.test.ts": far })).toEqual(expect.arrayContaining(["test/toy.test.ts:1 has a dynamic import: import("]));
-  const reused = 'const SOURCE = "./fixtures/old.ts"; const again = SOURCE; await import(SOURCE);';
-  expect(unsafe("export const a = 1;", { "test/toy.test.ts": reused, "test/fixtures/old.ts": "" })).toEqual(["test/toy.test.ts:1 has a dynamic import: import("]);
+  expect(unsafe("export const a = 1;", { "test/toy.test.ts": 'import _ from "lodash";' })).toEqual([`test/toy.test.ts:1 imports lodash, which is not a file in its folder or ${not}`]);
+});
+
+test("tests get no more room than the item: the runtime, the window and HTML strings fail there too", () => {
+  const cases: [string, string[]][] = [
+    ['Bun.spawnSync(["sh"]);', ["test/x.test.ts:1 uses the server runtime: Bun"]],
+    ['await Bun.file("../../.git/hooks/pre-commit").write("x");', ["test/x.test.ts:1 uses the server runtime: Bun"]],
+    ['const g = Object.assign(globalThis, {}); g["fe" + "tch"]("/x");', ["test/x.test.ts:1 uses the server runtime: globalThis"]],
+    ["const real = globalThis.AudioContext;", ["test/x.test.ts:1 uses the server runtime: globalThis"]],
+    ['window["fe" + "tch"]("/x");', ["test/x.test.ts:1 reaches the window object: window"]],
+    ['self["ev" + "al"]("1");', ["test/x.test.ts:1 reaches the window object: self"]],
+    ["const view = document.defaultView;", ["test/x.test.ts:1 reaches the window object: defaultView"]],
+    ['opener.postMessage("x", "*");', ["test/x.test.ts:1 reaches the window object: opener", "test/x.test.ts:1 talks to a worker or another window: postMessage"]],
+    ["const html = document.body.innerHTML;", ["test/x.test.ts:1 sets HTML from a string: innerHTML"]],
+    ['export const f = (el: Element) => { el.innerHTML += "<img>"; };', ["test/x.test.ts:1 sets HTML from a string: innerHTML"]],
+    ['export const f = (el: Element) => { el.outerHTML ||= "<img>"; };', ["test/x.test.ts:1 sets HTML from a string: outerHTML"]],
+    ['const SOURCE = "./fixtures/old.ts"; const old = await import(SOURCE);', ["test/x.test.ts:1 has a dynamic import: import("]],
+    ['{ const SOURCE = "./x.test.ts"; }\nawait import(SOURCE);', ["test/x.test.ts:2 has a dynamic import: import("]],
+  ];
+  for (const [code, lines] of cases) expect({ code, lines: unsafe("export const a = 1;", { "test/x.test.ts": code }) }).toEqual({ code, lines });
+});
+
+test("words that only look like the window pass: a property, a key, a string, a local name", () => {
+  expect(unsafe('const view = { window: 1, self: 2 }; export const a = [view.window, view.self, "Browser window", "self-made"];')).toEqual([]);
 });
 
 test("dependencies outside the allowed packages fail, and so does code that does not parse", () => {

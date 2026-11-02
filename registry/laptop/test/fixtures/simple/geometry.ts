@@ -1,3 +1,4 @@
+// @ts-nocheck: copied unchanged from an older version, under looser settings.
 import {
   IDENTITY,
   add,

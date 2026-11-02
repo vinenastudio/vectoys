@@ -1,3 +1,4 @@
+// @ts-nocheck: copied unchanged from an older version, under looser settings.
 export {
   BEZEL,
   CHIN,

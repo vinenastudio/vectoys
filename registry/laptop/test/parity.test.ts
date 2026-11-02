@@ -1,14 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { DESK, PHONE, type Perspective } from "../src/geometry";
+import { DESK as OLD_DESK, PHONE as OLD_PHONE } from "./fixtures/original-geometry";
 
 type Original = { DESK: Pick<Perspective, "DECK" | "lidArt">; PHONE: Pick<Perspective, "DECK" | "lidArt"> };
 
 // The Agent Caffeine laptop this item was ported from, copied unchanged but
-// for the lock key's names, renamed as the item's are. It is imported by a
-// computed name so the type checker, under this repo's stricter settings,
-// leaves it as it was.
-const SOURCE = "./fixtures/original-geometry.ts";
-const original = (await import(SOURCE)) as Original;
+// for the lock key's names, renamed as the item's are.
+const original: Original = { DESK: OLD_DESK, PHONE: OLD_PHONE };
 
 const CLOSED = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1];
 

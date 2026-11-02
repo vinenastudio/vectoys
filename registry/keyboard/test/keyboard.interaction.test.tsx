@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, expect, mock, test } from "bun:test";
 import { act } from "react";
-import { fakeFrames, fire, mount, reducedMotion } from "../../../packages/react/test/dom";
+import { fakeFrames, fire, fireOnWindow, installGlobal, mount, reducedMotion } from "../../../packages/react/test/dom";
 import { Keyboard } from "../src";
 
 const frames = fakeFrames();
@@ -34,14 +34,13 @@ class FakeAudio {
     closed += 1;
   };
 }
-const real = globalThis.AudioContext;
+const restoreAudio = installGlobal("AudioContext", FakeAudio);
 beforeEach(() => {
   made = 0;
   played = 0;
   closed = 0;
-  Object.assign(globalThis, { AudioContext: FakeAudio });
 });
-afterAll(() => Object.assign(globalThis, { AudioContext: real }));
+afterAll(restoreAudio);
 
 const key = (host: Element, id: string) => host.querySelector(`[data-key="${id}"]`)!;
 const isDown = (host: Element, id: string) => key(host, id).hasAttribute("data-down");
@@ -128,7 +127,7 @@ test("leaving the window lets every held key go", async () => {
   await press("keydown", "MetaLeft");
   await fire(key(host, "KeyL"), new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerId: 3 }));
   expect(host.querySelectorAll("[data-down]")).toHaveLength(3);
-  await act(async () => void window.dispatchEvent(new Event("blur")));
+  await fireOnWindow(new Event("blur"));
   expect(host.querySelectorAll("[data-down]")).toHaveLength(0);
   await unmount();
 });
@@ -326,7 +325,6 @@ test("unmounting closes the audio once a press started it", async () => {
 
 /** Puts a stand-in IntersectionObserver in place until `restore`; `view` tells every observed board whether it is on screen. */
 function fakeObserver() {
-  const real = globalThis.IntersectionObserver;
   const instances: FakeObserver[] = [];
   class FakeObserver implements IntersectionObserver {
     root = null;
@@ -346,7 +344,7 @@ function fakeObserver() {
     disconnect() {}
     unobserve() {}
   }
-  Object.assign(globalThis, { IntersectionObserver: FakeObserver });
+  const restore = installGlobal("IntersectionObserver", FakeObserver);
   const view = (isIntersecting: boolean) =>
     act(async () => {
       for (const observer of instances) {
@@ -359,7 +357,7 @@ function fakeObserver() {
         );
       }
     });
-  return { view, restore: () => Object.assign(globalThis, { IntersectionObserver: real }) };
+  return { view, restore };
 }
 
 test("the real keyboard moves the keys only while the board is on screen", async () => {
@@ -422,7 +420,7 @@ test("with listen={false} a key held by a pointer still comes up when the window
   const { host, unmount } = await mount(<Keyboard listen={false} />);
   await fire(key(host, "KeyL"), new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerId: 4 }));
   expect(isDown(host, "KeyL")).toBe(true);
-  await act(async () => void window.dispatchEvent(new Event("blur")));
+  await fireOnWindow(new Event("blur"));
   expect(isDown(host, "KeyL")).toBe(false);
   await unmount();
 });
