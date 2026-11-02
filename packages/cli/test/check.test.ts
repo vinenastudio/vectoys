@@ -1,8 +1,8 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { ALLOWED_DEPENDENCIES, accessibleName, brands, check, checks, markupSafety, safety, sources } from "../src/check";
+import { ALLOWED_DEPENDENCIES, accessibleName, brands, bunScript, check, checks, markupSafety, runInBun, safety, sources } from "../src/check";
 import type { Context } from "../src/commands";
 import { create } from "../src/create";
 
@@ -197,3 +197,23 @@ test("markup with a script or an outside link fails", () => {
   expect(markupSafety('<a href="javascript:go()">a</a>')).toEqual(['the markup links outside: href="javascript:']);
   expect(markupSafety('<div style="background:url(&quot;//example.com/a.png&quot;)"></div>')).toEqual(["the markup loads a style from outside: url(&quot;//"]);
 });
+
+test("bun never reads a bunfig.toml the item brings, so its preload never runs", () => {
+  const { folder } = item("preloaded");
+  const marker = join(folder, "marker");
+  writeFileSync(join(folder, "pre.js"), `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "ran");`);
+  writeFileSync(join(folder, "bunfig.toml"), 'preload = ["./pre.js"]\n');
+  expect(sources(folder, ["src/preloaded.tsx"])).not.toBeString();
+  expect(runInBun(bunScript("done({ name });"), join(folder, "src/preloaded.tsx"), folder, "Preloaded")).toEqual({ value: { name: "Preloaded" } });
+  expect(failed(folder)).toEqual(["the folder has bunfig.toml, which items may not have"]);
+  expect(existsSync(marker)).toBe(false);
+}, 30_000);
+
+test("config files and dot files in the folder fail, but .gitignore and node_modules are fine", () => {
+  const { folder } = item("configured");
+  writeFileSync(join(folder, ".gitignore"), "node_modules\n");
+  expect(failed(folder)).toEqual([]);
+  writeFileSync(join(folder, ".npmrc"), "registry=https://example.com\n");
+  writeFileSync(join(folder, "src/.env"), "A=1\n");
+  expect(failed(folder)).toEqual(["the folder has .npmrc, which items may not have", "the folder has src/.env, which items may not have"]);
+}, 30_000);

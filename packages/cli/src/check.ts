@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, extname, join, posix, relative, resolve, sep } from "node:path";
 import { checkItem, type ItemSource } from "@vectoys/registry-build";
@@ -86,9 +86,10 @@ function isRendered(value: unknown): value is Rendered {
 export function runInBun(script: string, entry: string, dir: string, wanted: string): { value: unknown } | { error: string } {
   const work = mkdtempSync(join(tmpdir(), "vectoys-check-"));
   try {
+    // Bun runs in the empty work folder, so it never reads a bunfig.toml the item brings.
     const runner = join(work, "render.mjs");
     writeFileSync(runner, script);
-    const result = spawnSync("bun", [runner, entry, dir, wanted], { cwd: dir, encoding: "utf8", timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
+    const result = spawnSync("bun", [runner, entry, dir, wanted], { cwd: work, encoding: "utf8", timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
     if (result.error) {
       const missing = "code" in result.error && result.error.code === "ENOENT";
       return { error: missing ? "it needs bun to load the item's TSX: https://bun.sh" : result.error.message };
@@ -275,6 +276,15 @@ export function markupSafety(html: string): string[] {
   });
 }
 
+/** The files and folders in `dir` that could set up bun or a package manager: bunfig.toml and any name starting with a dot but .gitignore. */
+export function configFiles(dir: string, under = ""): string[] {
+  return readdirSync(join(dir, under), { withFileTypes: true }).flatMap((entry) => {
+    const path = under ? `${under}/${entry.name}` : entry.name;
+    if (entry.name === "bunfig.toml" || (entry.name.startsWith(".") && entry.name !== ".gitignore")) return [path];
+    return entry.isDirectory() && entry.name !== "node_modules" ? configFiles(dir, path) : [];
+  });
+}
+
 /** Reads and checks item.json; the item, or the reason it fails. */
 export function readItem(dir: string): ItemSource | string {
   const path = join(dir, "item.json");
@@ -304,6 +314,9 @@ export function checks(dir: string): Result[] {
   const item = readItem(dir);
   if (typeof item === "string") return [{ pass: false, line: item }];
   const results: Result[] = [{ pass: true, line: "item.json has what the registry needs" }];
+
+  const config = configFiles(dir);
+  if (config.length) return [...results, ...config.map((file) => ({ pass: false, line: `the folder has ${file}, which items may not have` }))];
 
   const size = item.files.reduce((sum, file) => sum + lstatSync(resolve(dir, file)).size, 0);
   const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
