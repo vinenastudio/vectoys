@@ -1,3 +1,5 @@
+import { AUTHOR } from "@vectoys/registry-build/names";
+
 /** One item as `/r/index.json` lists it; `author` is its maker as "Name (url)". */
 export type Entry = { name: string; title: string; description: string; license: string; author?: string; credit?: string };
 
@@ -13,9 +15,6 @@ export const REPO = "https://github.com/vinenastudio/vectoys";
 export const REPO_PUBLIC = true;
 
 export const addCommand = (name: string) => `npx @vinena/vectoys-cli add ${name}`;
-
-/** The author the registry gives our own items, which the gallery does not credit. */
-export const OWN_AUTHOR = "vectoys (https://vectoys.com)";
 
 export type Maker = { name: string; url?: string };
 
@@ -40,5 +39,5 @@ function isWebUrl(value: string) {
 /** The maker a gallery card credits: none for our own items, or when the index holds no text for one. */
 export function makerOf(entry: Entry): Maker | null {
   const author: unknown = entry.author;
-  return typeof author === "string" && author !== OWN_AUTHOR ? parseAuthor(author) : null;
+  return typeof author === "string" && author !== AUTHOR ? parseAuthor(author) : null;
 }

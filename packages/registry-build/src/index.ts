@@ -1,12 +1,12 @@
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 
-export { componentName } from "./names";
+import { AUTHOR } from "./names";
+
+export { AUTHOR, componentName } from "./names";
 
 export const SCHEMA = "https://ui.shadcn.com/schema/registry-item.json";
 export const BASE_URL = "https://vectoys.com/r";
-/** Who made an item, and who to credit, when its item.json does not say. */
-export const AUTHOR = "vectoys (https://vectoys.com)";
 
 /** The items the index lists first, in this order; the rest follow in name order. */
 export const FIRST = ["keyboard", "keycap"];
@@ -77,7 +77,10 @@ function byPlace(a: string, b: string) {
 }
 
 async function readItem(root: string, dir: string, baseUrl: string): Promise<RegistryItem> {
-  const source = checkItem(JSON.parse(await readFile(join(root, "registry", dir, "item.json"), "utf8")), `registry/${dir}/item.json`);
+  const file = `registry/${dir}/item.json`;
+  const source = checkItem(JSON.parse(await readFile(join(root, file), "utf8")), file);
+  // The site finds an item's code by its folder, so the two names must match.
+  if (source.name !== dir) throw new Error(`${file} "name" must be "${dir}", the name of its folder`);
   const url = `${baseUrl}/${source.name}.json`;
   const credit = source.credit ?? AUTHOR;
   const files = await Promise.all(
@@ -112,12 +115,13 @@ export function checkItem(value: unknown, file: string): ItemSource {
     if (typeof item[key] !== "string" || item[key] === "") throw new Error(`${file} needs a "${key}"`);
   }
   if (!Array.isArray(item.files) || item.files.length === 0) throw new Error(`${file} needs "files"`);
-  if (item.author !== undefined && (typeof item.author !== "string" || item.author.trim() === "")) {
-    throw new Error(`${file} "author" must be text like "Name (https://site)"`);
-  }
-  if (item.credit !== undefined && (typeof item.credit !== "string" || item.credit.trim() === "")) throw new Error(`${file} "credit" must be text`);
+  if (item.author !== undefined && !isOneLine(item.author)) throw new Error(`${file} "author" must be one line of text like "Name (https://site)"`);
+  if (item.credit !== undefined && !isOneLine(item.credit)) throw new Error(`${file} "credit" must be one line of text`);
   return item as ItemSource;
 }
+
+/** Text that fits in one line of a file's header comment: not blank, no line breaks, no end of a comment. */
+const isOneLine = (value: unknown) => typeof value === "string" && value.trim() !== "" && !/[\r\n\u2028\u2029]/.test(value) && !value.includes("*/");
 
 /** A comment to put on top of a copied file, in the file's own syntax; none for JSON. */
 export function header(file: string, lines: string[]): string {

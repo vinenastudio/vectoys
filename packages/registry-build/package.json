@@ -5,7 +5,8 @@
   "description": "Turns registry/*/item.json into the static JSON the site serves at /r.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./names": "./src/names.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

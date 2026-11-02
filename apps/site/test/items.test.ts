@@ -16,6 +16,7 @@ test("a hand-made preview wins, a registry item gets one from its exports, anyth
   expect(ball).not.toBe(Placeholder);
   expect(previewFor("ball")).toBe(ball);
   expect(previewFor("nothing-here")).toBe(Placeholder);
+  for (const inherited of ["constructor", "toString", "__proto__"]) expect(previewFor(inherited)).toBe(Placeholder);
 });
 
 test("the sources leave out exactly the items with hand-made previews", () => {

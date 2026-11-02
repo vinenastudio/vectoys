@@ -1,5 +1,5 @@
+import { componentName } from "@vectoys/registry-build/names";
 import { Component, Suspense, lazy, type ComponentType, type ReactNode } from "react";
-import { componentName } from "../../../packages/registry-build/src/names";
 import { Placeholder } from "./previews/placeholder";
 
 /** Loads an item's `src/index.ts`. */
@@ -30,12 +30,17 @@ class PreviewBoundary extends Component<{ children: ReactNode }, { failed: boole
 
 const made = new Map<string, ComponentType>();
 
-/** A preview that loads the item's module only when drawn, then shows what `pickPreview` finds there. */
+/** A preview that loads the item's module only when drawn, then shows what `pickPreview` finds there; the placeholder until then. */
 export function autoPreview(name: string, load: Loader): ComponentType {
   const known = made.get(name);
   if (known) return known;
   const Loaded = lazy(async () => {
-    const Item = pickPreview(await load(), name);
+    const module = await load().catch((error: unknown) => {
+      // Forget this preview, so the card's next draw tries the import again.
+      made.delete(name);
+      throw error;
+    });
+    const Item = pickPreview(module, name);
     if (!Item) return { default: Placeholder };
     return {
       default: () => (
@@ -47,7 +52,7 @@ export function autoPreview(name: string, load: Loader): ComponentType {
   });
   const Preview = () => (
     <PreviewBoundary>
-      <Suspense fallback={null}>
+      <Suspense fallback={<Placeholder />}>
         <Loaded />
       </Suspense>
     </PreviewBoundary>

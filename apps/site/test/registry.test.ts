@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { OWN_AUTHOR, makerOf, parseAuthor } from "../src/registry";
+import { AUTHOR } from "@vectoys/registry-build/names";
+import { makerOf, parseAuthor } from "../src/registry";
 
 test("an author reads as a name and an optional web link", () => {
   expect(parseAuthor("Jane Doe (https://jane.example)")).toEqual({ name: "Jane Doe", url: "https://jane.example" });
@@ -15,7 +16,7 @@ test("an author reads as a name and an optional web link", () => {
 test("cards credit outside makers only", () => {
   const item = { name: "ball", title: "Ball", description: "A ball.", license: "MIT" };
   expect(makerOf(item)).toBeNull();
-  expect(makerOf({ ...item, author: OWN_AUTHOR })).toBeNull();
+  expect(makerOf({ ...item, author: AUTHOR })).toBeNull();
   expect(makerOf({ ...item, ...JSON.parse('{ "author": 42 }') })).toBeNull();
   expect(makerOf({ ...item, author: "Jane Doe (https://jane.example)" })).toEqual({ name: "Jane Doe", url: "https://jane.example" });
 });

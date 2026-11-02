@@ -55,3 +55,32 @@ test("an item that fails to load or draw shows the placeholder, not an error", a
     quiet.mockRestore();
   }
 });
+
+test("shows the placeholder while the item loads", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  const Preview = autoPreview("slow", () => new Promise(() => {}));
+  await act(async () => root?.render(<Preview />));
+  expect(host.textContent).toBe("Preview on its way");
+});
+
+test("after a failed load, the next draw tries the import again", async () => {
+  const quiet = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    let tries = 0;
+    const load: Loader = async () => {
+      tries += 1;
+      if (tries === 1) throw new Error("offline");
+      return { Demo };
+    };
+    const failed = await draw("flaky", load);
+    expect(failed.textContent).toBe("Preview on its way");
+    act(() => root?.unmount());
+    const host = await draw("flaky", load);
+    expect(tries).toBe(2);
+    expect(host.innerHTML).toBe('<div class="preview-toy"><p>demo</p></div>');
+  } finally {
+    quiet.mockRestore();
+  }
+});

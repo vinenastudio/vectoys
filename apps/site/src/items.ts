@@ -43,6 +43,9 @@ export const PREVIEWS: Readonly<Record<string, ComponentType>> = {
 
 /** The preview a gallery card draws for an item: its hand-made one, else one from its own exports, else a placeholder. */
 export function previewFor(name: string): ComponentType {
-  const load = SOURCES[`../../../registry/${name}/src/index.ts`];
-  return PREVIEWS[name] ?? (load ? autoPreview(name, load) : Placeholder);
+  // Own keys only, so an item named "constructor" does not find Object's.
+  const path = `../../../registry/${name}/src/index.ts`;
+  const made = Object.hasOwn(PREVIEWS, name) ? PREVIEWS[name] : undefined;
+  const load = Object.hasOwn(SOURCES, path) ? SOURCES[path] : undefined;
+  return made ?? (load ? autoPreview(name, load) : Placeholder);
 }

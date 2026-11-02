@@ -65,15 +65,32 @@ test("the index keeps an outside maker's name and credit", async () => {
   }
 });
 
-test("author and credit, when given, must be text", () => {
+test("author and credit, when given, must be one line of text that cannot end a comment", () => {
   const item = { name: "ball", title: "Ball", description: "A ball.", files: ["src/ball.tsx"], license: "MIT" };
   expect(checkItem({ ...item, author: "Jane (https://jane.example)", credit: "Jane" }, "item.json")).toMatchObject({ author: "Jane (https://jane.example)" });
-  expect(() => checkItem({ ...item, author: 42 }, "item.json")).toThrow('item.json "author" must be text like "Name (https://site)"');
-  expect(() => checkItem({ ...item, author: " " }, "item.json")).toThrow('item.json "author" must be text like "Name (https://site)"');
-  expect(() => checkItem({ ...item, credit: ["Jane"] }, "item.json")).toThrow('item.json "credit" must be text');
+  const author = 'item.json "author" must be one line of text like "Name (https://site)"';
+  for (const bad of [42, " ", "Jane\nconsole.log(1)", "Jane\r(https://jane.example)", "Jane */ (https://jane.example)"]) {
+    expect(() => checkItem({ ...item, author: bad }, "item.json")).toThrow(author);
+  }
+  for (const bad of [["Jane"], "", "Jane\nalert(1)", "Jane\u2028alert(1)", "Jane */ alert(1) /*"]) {
+    expect(() => checkItem({ ...item, credit: bad }, "item.json")).toThrow('item.json "credit" must be one line of text');
+  }
 });
 
 test("component names start with a letter", () => {
   expect(componentName("laptop-front")).toBe("LaptopFront");
   expect(componentName("3d-box")).toBe("Item3dBox");
+});
+
+test("an item's name must match its folder, so the site finds its code", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "vectoys-folder-"));
+  try {
+    await mkdir(join(repo, "registry/ball/src"), { recursive: true });
+    await writeFile(join(repo, "registry/ball/src/ball.tsx"), "export const Ball = () => null;\n");
+    const item = { name: "round-ball", title: "Ball", description: "A ball.", files: ["src/ball.tsx"], license: "MIT" };
+    await writeFile(join(repo, "registry/ball/item.json"), JSON.stringify(item));
+    await expect(buildRegistry({ root: repo, out: join(repo, "out") })).rejects.toThrow('registry/ball/item.json "name" must be "ball", the name of its folder');
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
 });
