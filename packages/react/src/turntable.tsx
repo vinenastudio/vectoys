@@ -1,5 +1,5 @@
 import { clamp, type Spring } from "@vinena/vectoys";
-import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { useFrames, useReducedMotion } from "./motion.ts";
 import { glide, nearest, rubber, unrubber, type Range } from "./turn.ts";
 
@@ -61,14 +61,14 @@ const BUTTON = `${ROOT}-full`;
 const HINT = `${ROOT}-hint`;
 const FOCUS = "outline:var(--vectoys-focus-width,1px) solid var(--vectoys-focus,currentColor);outline-offset:4px";
 const CSS = `.${ROOT}{position:relative}
-.${ROOT}[tabindex]{cursor:grab;touch-action:pan-y}
+.${ROOT}[tabindex]{cursor:grab;touch-action:pan-y pinch-zoom}
 .${ROOT}[data-dragging]{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .${ROOT}:focus-visible{${FOCUS}}
-.${ROOT}[data-full]{display:grid;place-items:center;background:var(--vectoys-backdrop,Canvas);touch-action:none}
-.${ROOT}[data-full=overlay]{position:fixed;inset:0;z-index:2147483000}
-.${BUTTON}{position:absolute;top:8px;right:8px;z-index:1;display:grid;place-items:center;width:32px;height:32px;padding:0;border:1px solid var(--vectoys-hairline,#8a8a8a);border-radius:8px;background:var(--vectoys-surface,Canvas);color:inherit;cursor:pointer;opacity:0;transition:opacity .15s}
-.${ROOT}:hover>.${BUTTON},.${ROOT}:focus-within>.${BUTTON},.${ROOT}[data-full]>.${BUTTON}{opacity:1}
-@media (hover:none){.${BUTTON}{opacity:1}}
+.${ROOT}[data-full]{display:grid!important;place-items:center!important;background:var(--vectoys-backdrop,Canvas);touch-action:none}
+.${ROOT}[data-full=overlay]{position:fixed!important;inset:0!important;z-index:2147483000;width:auto!important;height:auto!important;max-width:none!important;max-height:none!important;margin:0!important}
+.${BUTTON}{position:absolute;top:8px;right:8px;z-index:1;display:grid;place-items:center;width:32px;height:32px;padding:0;border:1px solid var(--vectoys-hairline,#8a8a8a);border-radius:8px;background:var(--vectoys-surface,Canvas);color:inherit;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .15s}
+.${ROOT}:hover>.${BUTTON},.${ROOT}:focus-within>.${BUTTON},.${ROOT}[data-full]>.${BUTTON}{opacity:1;pointer-events:auto}
+@media (hover:none){.${BUTTON}{opacity:1;pointer-events:auto}}
 .${BUTTON}:focus-visible{${FOCUS}}
 .${HINT}{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}`;
 
@@ -90,8 +90,9 @@ function fullElement(): Element | null {
   return "webkitFullscreenElement" in document && document.webkitFullscreenElement instanceof Element ? document.webkitFullscreenElement : null;
 }
 
-function enterFull(element: HTMLElement) {
-  if (typeof element.requestFullscreen === "function") return void element.requestFullscreen().catch(() => {});
+/** Asks for full screen, and calls `refused` if the browser says no. */
+function enterFull(element: HTMLElement, refused: () => void) {
+  if (typeof element.requestFullscreen === "function") return void element.requestFullscreen().catch(refused);
   if ("webkitRequestFullscreen" in element && typeof element.webkitRequestFullscreen === "function") element.webkitRequestFullscreen();
 }
 
@@ -112,6 +113,17 @@ type Drag = { id: number; touch: boolean; x: number; y: number; yaw: number; pit
 const span = ([lo, hi]: Range) => hi - lo;
 const perPixel = (degrees: number, pixels: number) => (pixels > 0 && Number.isFinite(degrees / pixels) ? degrees / pixels : PER_PIXEL);
 
+/** Whether a press on `target` is on a control inside the toy, which never turns it, rather than on the toy or on a control that is the toy. */
+function onControl(target: EventTarget | null) {
+  const element = target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+  const control = element?.closest(NODRAG);
+  return control != null && !control.matches(GRAB);
+}
+
+// Overlays open on the page, so its scroll is held while any is open and given back when the last one closes.
+let overlays = 0;
+let pageOverflow = "";
+
 /**
  * Lets a toy be turned with a mouse, a finger or the arrow keys, and shown
  * full screen. The server and the first render draw the rest pose, and the
@@ -120,7 +132,9 @@ const perPixel = (degrees: number, pixels: number) => (pixels > 0 && Number.isFi
  * spin and no spring.
  *
  * A press on a control inside the toy (a link, a button, a text box, or
- * anything marked `data-vectoys-nodrag`) never turns it. A toy that is one
+ * anything marked `data-vectoys-nodrag`) never turns it. A device's display
+ * is part of the toy: a drag on it turns the toy, and only the controls on
+ * it do not. A toy that is one
  * big control marks it `data-vectoys-grab`: a drag on it then turns the toy
  * and the click that ends the drag is swallowed, while a plain click still
  * presses it.
@@ -180,7 +194,8 @@ export function Turntable({ mode, label, children, className, style, draggable =
     const element = root.current;
     if (!draggable || !element) return;
     const click = (event: globalThis.MouseEvent) => {
-      if (!swallow.current) return;
+      // A click from the keyboard (Enter or Space) never ends a drag.
+      if (!swallow.current || event.detail === 0) return;
       swallow.current = false;
       event.stopPropagation();
       event.preventDefault();
@@ -205,14 +220,16 @@ export function Turntable({ mode, label, children, className, style, draggable =
   // The stand-in for full screen covers the page: the page stays still under it and esc closes it.
   useEffect(() => {
     if (full !== "overlay") return;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (overlays++ === 0) {
+      pageOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
     const key = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") setFull(false);
     };
     document.addEventListener("keydown", key);
     return () => {
-      document.body.style.overflow = overflow;
+      if (--overlays === 0) document.body.style.overflow = pageOverflow;
       document.removeEventListener("keydown", key);
     };
   }, [full]);
@@ -222,16 +239,18 @@ export function Turntable({ mode, label, children, className, style, draggable =
     if (!element) return;
     if (full === "screen") return exitFull();
     if (full === "overlay") return setFull(false);
-    const box = body.current?.getBoundingClientRect();
-    setRatio(box && box.height > 0 ? box.width / box.height : 1);
-    if (canFill(element)) enterFull(element);
+    // The unturned size, as a tilt's transform would change the box on the page.
+    const box = body.current;
+    setRatio(box && box.offsetHeight > 0 ? box.offsetWidth / box.offsetHeight : 1);
+    if (canFill(element)) enterFull(element, () => setFull("overlay"));
     else setFull("overlay");
   };
 
   const down = (event: PointerEvent<HTMLDivElement>) => {
+    // A second finger while the first turns the toy is left alone.
+    if (drag.current?.active) return;
     swallow.current = false;
-    const control = (event.target as Element).closest(NODRAG);
-    if (event.button !== 0 || (control && !control.matches(GRAB))) return;
+    if (event.button !== 0 || onControl(event.target)) return;
     const { yaw, pitch } = pose.current;
     drag.current = {
       id: event.pointerId,
@@ -250,6 +269,8 @@ export function Turntable({ mode, label, children, className, style, draggable =
   const move = (event: PointerEvent<HTMLDivElement>) => {
     const current = drag.current;
     if (!current || current.id !== event.pointerId) return;
+    // A mouse let go where the toy could not hear it moves with no button down: the drag is over.
+    if (event.pointerType !== "touch" && event.buttons === 0) return up(event);
     const dx = event.clientX - current.x;
     const dy = event.clientY - current.y;
     if (!current.active) {
@@ -263,7 +284,8 @@ export function Turntable({ mode, label, children, className, style, draggable =
       // Holds the pointer so a release outside the toy still ends the drag.
       event.currentTarget.setPointerCapture?.(event.pointerId);
       // A drag across the toy is half a turn in camera mode, and the whole range in tilt mode.
-      const { width, height } = body.current?.getBoundingClientRect() ?? { width: 0, height: 0 };
+      const width = body.current?.offsetWidth ?? 0;
+      const height = body.current?.offsetHeight ?? 0;
       current.perYaw = perPixel(mode === "camera" ? 180 : span(yawRange), width);
       current.perPitch = mode === "camera" ? current.perYaw : perPixel(span(pitchRange), height);
       stop();
@@ -284,13 +306,16 @@ export function Turntable({ mode, label, children, className, style, draggable =
     if (!current.active) {
       // A second tap soon after the first resets the toy, as a double click does.
       if (current.touch && event.type === "pointerup") {
-        if (event.timeStamp - lastTap.current < DOUBLE_TAP_MS) settle(true);
-        lastTap.current = event.timeStamp;
+        const double = event.timeStamp - lastTap.current < DOUBLE_TAP_MS;
+        if (double) settle(true);
+        // A third tap starts over, so it never resets again.
+        lastTap.current = double ? -Infinity : event.timeStamp;
       }
       return;
     }
     setDragging(false);
-    swallow.current = event.type === "pointerup";
+    // A finger that drags gives no click to swallow.
+    swallow.current = event.type === "pointerup" && !current.touch;
     // A pointer that stopped before it let go gives no spin.
     if (event.timeStamp - current.time > 80) {
       const { yaw, pitch } = pose.current;
@@ -300,8 +325,9 @@ export function Turntable({ mode, label, children, className, style, draggable =
   };
 
   const key = (event: KeyboardEvent<HTMLDivElement>) => {
-    // Keys inside the toy type and move focus there; only keys on the turntable itself turn it.
-    if (event.target !== event.currentTarget) return;
+    // Keys inside the toy type and move focus there; only keys on the turntable itself turn it, while it still has focus.
+    // Keys with a modifier are the browser's, such as zoom or back.
+    if (event.target !== event.currentTarget || document.activeElement !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key === "Home" || event.key === "0") {
       event.preventDefault();
       return settle(true);
@@ -318,7 +344,12 @@ export function Turntable({ mode, label, children, className, style, draggable =
   };
 
   const reset = (event: MouseEvent<HTMLDivElement>) => {
-    if (!(event.target as Element).closest(NODRAG)) settle(true);
+    if (!onControl(event.target)) settle(true);
+  };
+
+  // A drag on a link or an image turns the toy, never carries it off; a text box keeps its own.
+  const native = (event: DragEvent<HTMLDivElement>) => {
+    if (!onControl(event.target)) event.preventDefault();
   };
 
   const state: Turn = { ...turn, full: full !== false };
@@ -343,6 +374,7 @@ export function Turntable({ mode, label, children, className, style, draggable =
         onPointerCancel: up,
         onKeyDown: key,
         onDoubleClick: reset,
+        onDragStart: native,
       })}
     >
       <style href={ROOT} precedence="default">
