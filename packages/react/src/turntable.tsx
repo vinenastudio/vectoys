@@ -350,7 +350,7 @@ export function Turntable({ mode, label, children, className, style, draggable =
     if (!onControl(event.target)) settle(true);
   };
 
-  // A drag on a link or an image turns the toy, never carries it off; a text box keeps its own.
+  // A drag on the toy, an image in it or a link that is the toy turns it and never carries it off; a control inside, such as a link or a text box, keeps its own.
   const native = (event: DragEvent<HTMLDivElement>) => {
     if (!onControl(event.target)) event.preventDefault();
   };
