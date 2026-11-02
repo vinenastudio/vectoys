@@ -82,6 +82,21 @@ test("files must be regular files, not folders or symlinks", () => {
   expect(failed(folder)).toEqual(['files lists "src/link.ts", which is a symlink, not a regular file']);
 });
 
+test("the component must be src/<name>.tsx exporting the item's component name", () => {
+  const { folder, edit } = item("shaped");
+  const wrong = ["the component must be src/shaped.tsx exporting Shaped"];
+  edit("src/shaped.tsx", (text) => text.replace("export function Shaped(", "export function Other(").replace("<Shaped />", "<Other />"));
+  edit("src/index.ts", (text) => text.replace("Shaped,", "Other,"));
+  expect(failed(folder)).toEqual(wrong);
+  edit("src/shaped.tsx", (text) => text.replace("export function Other(", "export function Shaped(").replace("<Other />", "<Shaped />"));
+  edit("src/index.ts", (text) => text.replace("Other,", "Shaped,"));
+  expect(failed(folder)).toEqual([]);
+  writeFileSync(join(folder, "src/drawn.tsx"), readFileSync(join(folder, "src/shaped.tsx"), "utf8"));
+  edit("item.json", (text) => text.replace('"src/shaped.tsx"', '"src/drawn.tsx"'));
+  edit("src/index.ts", (text) => text.replace('"./shaped"', '"./drawn"'));
+  expect(failed(folder)).toEqual(wrong);
+}, 30_000);
+
 test("brand names match whole words in any case, and plain words only inside a product's name", () => {
   expect(brands("An iPhone, an XBOX and a Surface  Pro, not an imacs")).toEqual(["iphone", "xbox", "surface pro"]);
   expect(brands("browser windows on the main surface of a galaxy of pixels")).toEqual([]);

@@ -163,8 +163,14 @@ const USES: Record<string, { imports: string[]; jsx: string }> = {
 
 const indexNames = (): string[] => JSON.parse(readFileSync(join(out, "index.json"), "utf8")).items.map((item: { name: string }) => item.name);
 
-/** How the page uses `name`: as USES says, else its component with no props, as a submitted item renders in check. */
-const use = (name: string) => USES[name] ?? { imports: [`import { ${componentName(name)} } from "./components/vectoys/${name}/${name}";`], jsx: `<${componentName(name)} />` };
+/** How the page uses `name`: as USES says, else the `Demo` its src/<name>.tsx exports, else its component with no props; check makes every item have that file and component. */
+function use(name: string) {
+  if (USES[name]) return USES[name];
+  const from = `./components/vectoys/${name}/${name}`;
+  const demo = /export\s+(const|function)\s+Demo\b/.test(readFileSync(target(name, `${name}.tsx`), "utf8"));
+  const local = demo ? `${componentName(name)}Demo` : componentName(name);
+  return { imports: [`import { ${demo ? `Demo as ${local}` : local} } from "${from}";`], jsx: `<${local} />` };
+}
 
 test("every item in the index adds, and the page uses each one", async () => {
   const names = indexNames();

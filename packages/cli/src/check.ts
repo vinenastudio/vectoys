@@ -496,10 +496,14 @@ export function checks(dir: string): Result[] {
   if (unsafe.length) return [...results, ...unsafe.map((line) => ({ pass: false, line }))];
   results.push({ pass: true, line: "the code uses no scripts, eval, network calls or outside imports that check can see" });
 
-  const component = componentFile(item);
-  if (!component) return [...results, { pass: false, line: "files lists no .tsx component to render" }];
-  const rendered = render(resolve(dir, component), dir, componentName(item.name));
+  // One component file per item, named after it, so the gallery and the tests can find it.
+  const component = `src/${item.name}.tsx`;
+  const wanted = componentName(item.name);
+  const shape = { pass: false, line: `the component must be ${component} exporting ${wanted}` };
+  if (!item.files.includes(component)) return [...results, shape];
+  const rendered = render(resolve(dir, component), dir, wanted);
   if ("error" in rendered) return [...results, { pass: false, line: `${component} does not render on the server: ${rendered.error}` }];
+  if (rendered.name !== wanted) return [...results, shape];
   const [html, again] = rendered.html;
   results.push({ pass: true, line: `${rendered.name} renders on the server` });
 

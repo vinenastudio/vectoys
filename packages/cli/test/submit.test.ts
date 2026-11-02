@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Context } from "../src/commands";
 import { create } from "../src/create";
-import { CLOSED, listed, readIndex, registryUrls, submit, type Ran, type Run } from "../src/submit";
+import { CI_BUN, CLOSED, atLeast, listed, readIndex, registryUrls, submit, type Ran, type Run } from "../src/submit";
 
 const repo = resolve(import.meta.dir, "../../..");
 const work = mkdtempSync(join(tmpdir(), "vectoys-submit-test-"));
@@ -32,14 +32,19 @@ function context() {
   return { context: given, lines };
 }
 
-/** A fake gh and git: records each call, clones into an empty folder and keeps what the commit holds; `open` is a pull request already open from the branch. */
-function fake(existing?: string, open?: string) {
+/**
+ * A fake gh, git and bun: records each call, clones into an empty folder and keeps what the commit holds; `open` is a pull request
+ * already open from the branch, `bun` the version bun says and `numstat` what git diff --numstat says of bun.lock.
+ */
+function fake(existing?: string, open?: string, { bun = CI_BUN, numstat = "19\t0\tbun.lock" } = {}) {
   const calls: string[] = [];
   const committed: Record<string, string> = {};
   const runner: Run = (command, args, cwd): Ran => {
     calls.push([command, ...args].join(" "));
     const ok = (stdout = "") => ({ status: 0, stdout, stderr: "" });
     if (command === "git" && args[0] === "config") return ok("Ada Lovelace\n");
+    if (command === "bun" && args[0] === "--version") return ok(`${bun}\n`);
+    if (command === "git" && args[0] === "diff") return ok(`${numstat}\n`);
     if (command === "gh" && args[0] === "api") return ok("octo\n");
     if (command === "gh" && args[1] === "clone") {
       const clone = args[3] ?? "";
@@ -67,23 +72,25 @@ test("submit opens a pull request that adds the item's files to the registry", a
   const { runner, calls, committed } = fake();
   const url = await submit(here, "plate", { registry: undefined, dryRun: false, submissionsOpen: true, run: runner });
   expect(url).toBe("https://github.com/vinenastudio/vectoys/pull/7");
-  expect(calls[0]).toBe("gh api user --jq .login");
-  expect(calls[1]).toBe("gh repo fork vinenastudio/vectoys --clone=false");
-  expect(calls[2]).toBe("gh repo sync octo/vectoys --branch main");
-  expect(calls[3]).toMatch(/^gh repo clone octo\/vectoys \S+ -- --depth 1$/);
-  expect(calls.slice(4, 11)).toEqual([
+  expect(calls[0]).toBe("bun --version");
+  expect(calls[1]).toBe("gh api user --jq .login");
+  expect(calls[2]).toBe("gh repo fork vinenastudio/vectoys --clone=false");
+  expect(calls[3]).toBe("gh repo sync octo/vectoys --branch main");
+  expect(calls[4]).toMatch(/^gh repo clone octo\/vectoys \S+ -- --depth 1$/);
+  expect(calls.slice(5, 13)).toEqual([
     "git checkout -b item/plate",
     "bun install --lockfile-only --ignore-scripts",
+    "git diff --numstat bun.lock",
     "git add --all",
     "git commit -m Add the plate item",
     "git ls-remote origin refs/heads/item/plate",
     "git push --force-with-lease=refs/heads/item/plate: --set-upstream origin item/plate",
     "gh pr list --repo vinenastudio/vectoys --head octo:item/plate --state open --json url",
   ]);
-  expect(calls[11]).toStartWith("gh pr create --repo vinenastudio/vectoys --base main --head octo:item/plate --title Add the plate item --body Adds `registry/plate`");
-  expect(calls[11]).toContain("- pass: Plate renders on the server");
-  expect(calls[11]).toContain("I agree to license it under the MIT license.");
-  expect(calls).toHaveLength(12);
+  expect(calls[13]).toStartWith("gh pr create --repo vinenastudio/vectoys --base main --head octo:item/plate --title Add the plate item --body Adds `registry/plate`");
+  expect(calls[13]).toContain("- pass: Plate renders on the server");
+  expect(calls[13]).toContain("I agree to license it under the MIT license.");
+  expect(calls).toHaveLength(14);
   expect(Object.keys(committed).sort()).toEqual([
     "registry/plate/item.json",
     "registry/plate/package.json",
@@ -115,6 +122,28 @@ test("a second submit pushes the branch again and updates the pull request alrea
   expect(calls.some((call) => call.startsWith("gh pr create"))).toBe(false);
   expect(lines.at(-1)).toBe("Updated https://github.com/vinenastudio/vectoys/pull/7");
 }, 30_000);
+
+test("a bun older than 1.3.2 stops submit before the fork", async () => {
+  const { runner, calls } = fake(undefined, undefined, { bun: "1.3.1" });
+  await expect(submit(context().context, "plate", { registry: undefined, dryRun: false, submissionsOpen: true, run: runner })).rejects.toThrow(
+    `bun 1.3.1 is older than 1.3.2 and rewrites bun.lock beyond the item's lines. Update bun to ${CI_BUN}, the version CI uses, and submit again.`,
+  );
+  expect(calls).toEqual(["bun --version"]);
+}, 30_000);
+
+test("submit stops before the commit when bun deleted lines from bun.lock", async () => {
+  const { runner, calls } = fake(undefined, undefined, { numstat: "18\t1\tbun.lock" });
+  await expect(submit(context().context, "plate", { registry: undefined, dryRun: false, submissionsOpen: true, run: runner })).rejects.toThrow(
+    `bun ${CI_BUN} rewrote bun.lock beyond the item's lines. Update bun to ${CI_BUN}, the version CI uses, and submit again.`,
+  );
+  expect(calls.at(-2)).toBe("git diff --numstat bun.lock");
+  expect(calls.some((call) => call.startsWith("git commit") || call.startsWith("git push"))).toBe(false);
+}, 30_000);
+
+test("bun versions compare by number, and CI_BUN is the bun CI uses", () => {
+  expect([atLeast("1.3.14", "1.3.2"), atLeast("1.3.2", "1.3.2"), atLeast("1.3.1", "1.3.2"), atLeast("1.2.20", "1.3.2"), atLeast("2.0.0", "1.3.2"), atLeast("", "1.3.2")]).toEqual([true, true, false, false, true, false]);
+  expect(readFileSync(join(repo, ".github/workflows/ci.yml"), "utf8")).toContain(`bun-version: ${CI_BUN}`);
+});
 
 test("while submissions are closed, submit checks the item, says what it would do and calls no gh", async () => {
   create(context().context, "closed", undefined);
