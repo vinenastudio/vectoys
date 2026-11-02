@@ -13,12 +13,19 @@ for (const { name } of items) {
     // Only the local site: web fonts and anything else from outside fall back the same way every run.
     await page.route(/^https?:\/\/(?!127\.0\.0\.1[:/])/, (route) => route.abort());
     // Time stands still, so a toy that plays on its own, as the keyboard types, draws its first frame every run.
-    await page.clock.install({ time: FROZEN });
+    // Installed a minute early, so pausing never asks the clock to go back, however long setup takes.
+    await page.clock.install({ time: FROZEN.getTime() - 60_000 });
     await page.clock.pauseAt(FROZEN);
     await page.goto("/toys");
     const preview = page.locator(`[id="${name}"] .toy-preview`);
     await preview.scrollIntoViewIfNeeded();
     await expect(preview.locator(":scope > *").first()).toBeVisible();
+    // An item drawn from its own exports shows the placeholder while its module loads, which waits on the stopped clock.
+    const placeholder = preview.locator(".preview-placeholder");
+    await expect(async () => {
+      if ((await placeholder.count()) > 0) await page.clock.runFor(100);
+      expect(await placeholder.count()).toBe(0);
+    }).toPass();
     await page.evaluate(() => document.fonts.ready);
     await expect(preview).toHaveScreenshot(`${name}.png`);
   });

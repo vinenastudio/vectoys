@@ -4,7 +4,7 @@
 # linux/amd64, as CI does, so the snapshots match. Extra arguments go to
 # `playwright test`, such as --update-snapshots or a grep for one item.
 set -eu
-IMAGE=mcr.microsoft.com/playwright:v1.63.0-noble
+IMAGE=mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
 root=$(cd "$(dirname "$0")/../../.." && pwd)
 
 if [ "${VECTOYS_VISUAL_IN_CONTAINER:-}" = 1 ]; then

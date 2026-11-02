@@ -1,6 +1,8 @@
 name: CI
 on:
   pull_request:
+permissions:
+  contents: read
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -15,7 +17,7 @@ jobs:
   visual:
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host
     env:
       VECTOYS_VISUAL_IN_CONTAINER: "1"
@@ -25,7 +27,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run test:visual
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: visual-report
           path: apps/site/visual/report
