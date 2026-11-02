@@ -12,7 +12,16 @@ npx @vinena/vectoys-cli create spinning-top
 
 `create` writes `spinning-top/` with an `item.json`, a working component, a `package.json`, a `tsconfig.json` and a test. Pass `--dir <dir>` to put the folder somewhere else. It does not write over a folder that is already there unless you pass `--overwrite`.
 
-In a clone of this repository, make it in `registry/` and run `bun install` so its packages link:
+Then install its packages with your package manager, in the new folder, before you preview or check it:
+
+```sh
+cd spinning-top
+npm install
+```
+
+The commands below then take `.` as the folder, or leave it out.
+
+In a clone of this repository, make it in `registry/` and run `bun install` so its packages link. `create` writes `registry/spinning-top/`, so use that path in the commands below:
 
 ```sh
 npx @vinena/vectoys-cli create spinning-top --dir registry
@@ -23,8 +32,10 @@ bun install
 
 ## Preview it
 
+The examples use the clone path `registry/spinning-top`. Outside the repository, use your own folder.
+
 ```sh
-npx @vinena/vectoys-cli preview spinning-top --open
+npx @vinena/vectoys-cli preview registry/spinning-top --open
 ```
 
 `preview` renders the toy into `preview.html` in its folder, in light and dark side by side. `--open` opens the file. It needs [bun](https://bun.sh).
@@ -32,7 +43,7 @@ npx @vinena/vectoys-cli preview spinning-top --open
 ## Check it
 
 ```sh
-npx @vinena/vectoys-cli check spinning-top
+npx @vinena/vectoys-cli check registry/spinning-top
 ```
 
 `check` prints a pass or fail line for each check and exits with 1 if any fails. It needs bun and the toy's packages installed. It checks that:
@@ -43,7 +54,7 @@ npx @vinena/vectoys-cli check spinning-top
 - The component renders on the server.
 - Two renders give the same markup.
 - The markup has no `NaN` or `Infinity`.
-- The toy has an accessible name: its root is `role="img"` with an `aria-label`, or its controls are labeled.
+- The toy has an accessible name: its root is `role="img"` with an `aria-label`, or its controls are labeled. An interactive toy, or one with links inside, can use a root with `role="group"` and an `aria-label` instead.
 
 ### Safety
 
@@ -70,18 +81,18 @@ Imports are limited too. The component files import only each other, `react`, `@
 
 ### Tests
 
-Tests may not use `globalThis`, `window` or `Bun`. Use the shared helpers in `packages/react/test/dom.tsx` instead: `installGlobal` to put a fake on the page, `readSibling` to read a file, `htmlOf` to read the markup of an element and `fireOnWindow` to send a window event.
+Tests may not use `globalThis`, `window` or `Bun`. Outside the repository, keep tests to `bun:test` and `react-dom/server`, as the test `create` writes does. In a clone of this repository, tests may also use the shared helpers in `packages/react/test/dom.tsx`: `installGlobal` to put a fake on the page, `readSibling` to read a file, `htmlOf` to read the markup of an element and `fireOnWindow` to send a window event.
 
 ### Visual tests
 
-This part lands with the visual tests. Every toy's gallery preview has snapshot images in light, dark and reduced motion, and CI fails when one changes. A new toy needs its own snapshots. Run `bun run test:visual:update` (it needs Docker) and commit the new images with the toy. Look at each image before you commit it. Without Docker, take the images from the report of the failed `visual` job in CI.
+This applies once pull request #24 (visual tests) merges. Every toy's gallery preview has snapshot images in light, dark and reduced motion, and CI fails when one changes. A new toy needs its own snapshots. Run `bun run test:visual:update` (it needs Docker) and commit the new images with the toy. Look at each image before you commit it. Without Docker, take the images from the report of the failed `visual` job in CI.
 
 ## Submit it
 
 Submissions open at launch.
 
 ```sh
-npx @vinena/vectoys-cli submit spinning-top
+npx @vinena/vectoys-cli submit registry/spinning-top
 ```
 
 `submit` runs `check` first and stops if any check fails. Then it uses the [GitHub CLI](https://cli.github.com) (`gh`) to fork this repository, copy your toy to `registry/<name>/` on a branch `item/<name>`, and open a pull request with the check results. Until launch, it checks and shows what it would send, and sends nothing.
@@ -89,18 +100,20 @@ npx @vinena/vectoys-cli submit spinning-top
 To see what it would do without sending anything:
 
 ```sh
-npx @vinena/vectoys-cli submit spinning-top --dry-run
+npx @vinena/vectoys-cli submit registry/spinning-top --dry-run
 ```
 
 ## Credit
 
-Put your name in `item.json`, on one line:
+Put your name in `item.json`, on one line. `create` fills it in from your git name:
 
 ```json
 "author": "Your Name (https://your.site)"
 ```
 
-The gallery card shows it as "by Your Name", linked to your site. Keep it to one line of text, with no line breaks and no `*/`. Put a `credit` line in the header comment of each file too.
+The gallery card shows it as "by Your Name", linked to your site. Keep it to one line of text, with no line breaks and no `*/`.
+
+The registry build adds a license and credit header to each file for you, so do not add one yourself. The credit in that header is your `author` by default. To credit someone else too, set the optional `credit` field in `item.json`, also one line of text.
 
 ## Gallery preview
 
