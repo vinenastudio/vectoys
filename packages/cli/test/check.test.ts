@@ -195,7 +195,7 @@ test("each unsafe thing in the code fails, naming the file, the line and what it
     ['parent.open("/x");', "src/toy.tsx:1 opens a window: open("],
     ['frames.open("/x");', "src/toy.tsx:1 opens a window: open("],
     ['const a = <a href="/\\evil.example">x</a>;', 'src/toy.tsx has an outside URL: "/\\\\'],
-    ['const a = "\\\\\\\\evil.example";', 'src/toy.tsx has an outside URL: "\\\\\\'],
+    ['const a = "\\\\\\\\evil.example";', 'src/toy.tsx:1 has an outside URL: "\\\\\\'],
     ['open("/x");', "src/toy.tsx:1 opens a window: open("],
     ['location.href = "/logout";', "src/toy.tsx:1 moves the page: location.href"],
     ['location.assign("/logout");', "src/toy.tsx:1 moves the page: location.assign"],
@@ -414,3 +414,33 @@ test("bun runs with no environment but PATH, so an item sees no tokens", () => {
   expect(keys).not.toContain("VECTOYS_TEST_TOKEN");
   expect(keys).not.toContain("HOME");
 }, 30_000);
+
+test("a shipped file that imports a vectoys package needs item.json's dependencies to list it", () => {
+  expect(unsafe('import { draw } from "@vinena/vectoys";\nimport { Stage } from "@vinena/vectoys-react/stage";', {}, [])).toEqual([
+    "src/toy.tsx:1 imports @vinena/vectoys, but item.json's dependencies do not list @vinena/vectoys",
+    "src/toy.tsx:2 imports @vinena/vectoys-react/stage, but item.json's dependencies do not list @vinena/vectoys-react",
+  ]);
+  expect(unsafe('import { draw } from "@vinena/vectoys";', {}, ["@vinena/vectoys"])).toEqual([]);
+  expect(unsafe("export const a = 1;", { "test/x.test.ts": 'import { draw } from "@vinena/vectoys";' }, [])).toEqual([]);
+});
+
+test("relative imports resolve under every extension the scan reads", () => {
+  const files = { "src/helper.js": "export const a = 1;", "src/more.mjs": "export const b = 1;", "src/parts/index.jsx": "export const c = 1;", "src/shape.ts": "export const d = 1;" };
+  const code = 'import { a } from "./helper.js";\nimport { b } from "./more.mjs";\nimport { c } from "./parts";\nimport { d } from "./shape.js";';
+  expect(unsafe(code, files)).toEqual([]);
+  expect(unsafe('import { a } from "./helper.ts";', { "src/helper.css": "" })).toEqual([
+    "src/toy.tsx:1 imports ./helper.ts, which is not one of its files or @vinena/vectoys, @vinena/vectoys-react, react",
+  ]);
+});
+
+test("an item folder with no package.json fails", () => {
+  const { folder } = item("unpackaged");
+  rmSync(join(folder, "package.json"));
+  expect(failed(folder)).toEqual(["there is no package.json; vectoys create writes one"]);
+});
+
+test("folder problems come in name order, whatever order the system lists files in", () => {
+  const { folder } = item("ordered");
+  for (const name of [".zeta", ".alpha", "src/.mid", ".npmrc"]) writeFileSync(join(folder, name), "");
+  expect(failed(folder)).toEqual([".alpha", ".npmrc", ".zeta", "src/.mid"].map((file) => `the folder has ${file}, which items may not have`));
+});

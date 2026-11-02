@@ -218,9 +218,12 @@ export function sources(dir: string, files: string[]): Source[] | string {
   return Array.isArray(ran.value) && ran.value.every(isSource) ? ran.value : "bun gave back something other than the files";
 }
 
+/** The entries of the folder `under` in `dir`, by name, so every system lists them in the same order. */
+const entries = (dir: string, under: string) => readdirSync(join(dir, under), { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
 /** Every regular file in `dir` outside node_modules, as paths from `dir`. */
 function walk(dir: string, under = ""): string[] {
-  return readdirSync(join(dir, under), { withFileTypes: true }).flatMap((entry) => {
+  return entries(dir, under).flatMap((entry) => {
     const path = under ? `${under}/${entry.name}` : entry.name;
     if (entry.isDirectory()) return entry.name === "node_modules" ? [] : walk(dir, path);
     return entry.isFile() ? [path] : [];
@@ -286,16 +289,17 @@ const UNSAFE_MARKUP: [RegExp, string][] = [
 
 const allowed = (name: string, list: string[]) => list.some((pkg) => name === pkg || name.startsWith(`${pkg}/`));
 
-/** Whether the relative import `specifier` in `from` names one of `files`. */
+/** Whether the relative import `specifier` in `from` names one of `files`: the file itself, or a code file or folder index under any extension `CODE` takes. */
 function names(specifier: string, from: string, files: string[]): boolean {
-  const base = posix.join(posix.dirname(from), specifier).replace(/\.js$/, "");
-  return ["", ".ts", ".tsx", "/index.ts", "/index.tsx"].some((suffix) => files.includes(base + suffix));
+  const path = posix.join(posix.dirname(from), specifier);
+  const base = path.replace(CODE, "");
+  return files.some((file) => file === path || (CODE.test(file) && [base, `${base}/index`].includes(file.replace(CODE, ""))));
 }
 
-/** The line in `text` where `found` is, from the longest of its words the text has, as ":12"; empty if it cannot tell. */
+/** The line in `text` where `found` is, or else the longest of its words the text has, as ":12"; empty if it cannot tell. */
 function lineOf(text: string, found: string): string {
   const lines = text.split("\n");
-  for (const word of (found.match(/[@A-Za-z_$][\w$]*|\/\/|<\w+/g) ?? []).sort((a, b) => b.length - a.length)) {
+  for (const word of [found, ...(found.match(/[@A-Za-z_$][\w$]*|\/\/|<\w+/g) ?? []).sort((a, b) => b.length - a.length)]) {
     const at = lines.findIndex((line) => line.includes(word));
     if (at !== -1) return `:${at + 1}`;
   }
@@ -327,6 +331,8 @@ export function safety(files: Source[], item: Pick<ItemSource, "dependencies" | 
     const packages = shipped ? ALLOWED_IMPORTS : [...ALLOWED_IMPORTS, ...ALLOWED_TEST_IMPORTS];
     for (const entry of file.imports) {
       if (entry.kind !== "import-statement") continue;
+      const needed = ALLOWED_DEPENDENCIES.find((pkg) => entry.path === pkg || entry.path.startsWith(`${pkg}/`));
+      if (shipped && needed && !(item.dependencies ?? []).includes(needed)) problems.push(`${file.path}${lineOf(file.text, JSON.stringify(entry.path))} imports ${entry.path}, but item.json's dependencies do not list ${needed}`);
       const fine = entry.path.startsWith(".") ? names(entry.path, file.path, reachable) || (test && TEST_HELPERS.some((helper) => helper.test(entry.path))) : allowed(entry.path, packages);
       const where = shipped ? "one of its files" : test ? "a file in its folder" : "a file in its folder outside test/";
       if (!fine) problems.push(`${file.path}${lineOf(file.text, JSON.stringify(entry.path))} imports ${entry.path}, which is not ${where} or ${packages.join(", ")}`);
@@ -351,7 +357,7 @@ export function markupSafety(html: string): string[] {
 
 /** The files and folders in `dir` that could set up bun or a package manager, or point outside it: bunfig.toml, any name starting with a dot but .gitignore, and symlinks. */
 export function configFiles(dir: string, under = ""): string[] {
-  return readdirSync(join(dir, under), { withFileTypes: true }).flatMap((entry) => {
+  return entries(dir, under).flatMap((entry) => {
     const path = under ? `${under}/${entry.name}` : entry.name;
     if (entry.name === "node_modules") return [];
     if (entry.name === "bunfig.toml" || entry.isSymbolicLink() || (entry.name.startsWith(".") && entry.name !== ".gitignore")) return [path];
@@ -426,7 +432,7 @@ function versionsFit(value: unknown, inRepo: unknown, outside: unknown): boolean
  */
 export function packageProblems(dir: string, item: Pick<ItemSource, "name">): string[] {
   const path = join(dir, "package.json");
-  if (!existsSync(path)) return [];
+  if (!existsSync(path)) return ["there is no package.json; vectoys create writes one"];
   let pkg: unknown;
   try {
     pkg = JSON.parse(readFileSync(path, "utf8"));
