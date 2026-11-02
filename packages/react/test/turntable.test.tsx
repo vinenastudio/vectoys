@@ -390,6 +390,21 @@ test("a double click on a toy that is one big button resets it, and a double cli
   expect(read(other).yaw).toBe(turned);
 });
 
+test("a reset whose first frame comes with no time passed still springs home", async () => {
+  const frames = fakeFrames();
+  cleanup.push(frames.restore);
+  const { host } = await place(<Turntable mode="camera">{toy}</Turntable>);
+  const root = rootOf(host);
+  await dragOn(root, 50);
+  await fire(root, pointer("pointerup", 50));
+  await frames.advance(2000);
+  expect(read(host).yaw).toBeGreaterThan(0);
+  await fire(root, new MouseEvent("dblclick", { bubbles: true }));
+  await frames.still();
+  await frames.advance(2000);
+  expect(read(host).yaw).toBe(0);
+});
+
 test("a third quick tap does not reset the toy again", async () => {
   const frames = fakeFrames();
   cleanup.push(frames.restore);
@@ -501,4 +516,12 @@ test("the hidden full screen button takes no clicks until it shows, and pinch zo
   expect(html).toContain("{opacity:1;pointer-events:auto}");
   expect(html).toContain("@media (hover:none){.vectoys-turntable-full{opacity:1;pointer-events:auto}}");
   expect(html).toContain("touch-action:pan-y pinch-zoom");
+});
+
+test("a press on the toy never selects its text, while a text box inside still does", async () => {
+  const { host } = await place(<Turntable mode="tilt">{toy}</Turntable>);
+  expect(getComputedStyle(rootOf(host)).userSelect).toBe("none");
+  expect(getComputedStyle(host.querySelector("input")!).userSelect).toBe("text");
+  const { host: still } = await place(<Turntable mode="tilt" draggable={false}>{toy}</Turntable>);
+  expect(getComputedStyle(rootOf(still)).userSelect).not.toBe("none");
 });

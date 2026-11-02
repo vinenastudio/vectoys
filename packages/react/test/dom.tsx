@@ -55,6 +55,13 @@ export function fakeFrames() {
         });
       }
     },
+    /** Runs the frames due with no time passed, as a browser's first frame can. */
+    still: () =>
+      act(async () => {
+        const due = [...queue.values()];
+        queue.clear();
+        for (const callback of due) callback(clock);
+      }),
     pending: () => queue.size,
     restore: () => spies.forEach((spy) => spy.mockRestore()),
   };

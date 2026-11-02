@@ -1,7 +1,7 @@
 import { clamp, type Spring } from "@vinena/vectoys";
 import { useEffect, useId, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { useFrames, useReducedMotion } from "./motion.ts";
-import { glide, nearest, rubber, unrubber, type Range } from "./turn.ts";
+import { glide, nearest, rubber, unrubber, type Glide, type Range } from "./turn.ts";
 
 /** How far a toy may turn from its rest pose, in degrees each way. */
 export type TurnLimits = { yaw?: readonly [number, number]; pitch?: readonly [number, number] };
@@ -61,8 +61,9 @@ const BUTTON = `${ROOT}-full`;
 const HINT = `${ROOT}-hint`;
 const FOCUS = "outline:var(--vectoys-focus-width,1px) solid var(--vectoys-focus,currentColor);outline-offset:4px";
 const CSS = `.${ROOT}{position:relative}
-.${ROOT}[tabindex]{cursor:grab;touch-action:pan-y pinch-zoom}
-.${ROOT}[data-dragging]{cursor:grabbing;user-select:none;-webkit-user-select:none}
+.${ROOT}[tabindex]{cursor:grab;touch-action:pan-y pinch-zoom;user-select:none;-webkit-user-select:none}
+.${ROOT}[tabindex] :is(input,textarea,[contenteditable]){user-select:text;-webkit-user-select:text}
+.${ROOT}[data-dragging]{cursor:grabbing}
 .${ROOT}:focus-visible{${FOCUS}}
 .${ROOT}[data-full]{display:grid!important;place-items:center!important;background:var(--vectoys-backdrop,Canvas);touch-action:none}
 .${ROOT}[data-full=overlay]{position:fixed!important;inset:0!important;z-index:2147483000;width:auto!important;height:auto!important;max-width:none!important;max-height:none!important;margin:0!important}
@@ -179,11 +180,13 @@ export function Turntable({ mode, label, children, className, style, draggable =
     }
     let yawGlide = { axis: yaw, home: home ? 0 : null };
     let pitchGlide = { axis: pitch, home: home ? 0 : null };
+    // A first frame can come with no time passed, so an axis at rest away from its home is still on its way.
+    const moving = ({ axis, home }: Glide) => axis.velocity !== 0 || (home !== null && axis.value !== home);
     frames((elapsed) => {
       yawGlide = glide(yawGlide, yawRange, elapsed / 1000);
       pitchGlide = glide(pitchGlide, pitchRange, elapsed / 1000);
       show(yawGlide.axis, pitchGlide.axis);
-      return yawGlide.axis.velocity !== 0 || pitchGlide.axis.velocity !== 0;
+      return moving(yawGlide) || moving(pitchGlide);
     });
   };
 
