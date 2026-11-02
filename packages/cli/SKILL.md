@@ -11,7 +11,7 @@ vectoys draws 3D objects as plain SVG paths. An item is a small React component 
 
 1. `npx @vinena/vectoys-cli create <name>` writes `./<name>/` (or under `--dir <dir>`): `item.json`, `src/geometry.ts`, `src/<name>.tsx`, `src/index.ts`, a test, `package.json` and `tsconfig.json`. It renders a shaded, tilted slab. Under `registry/` of a vectoys checkout it uses the workspace's packages, which `bun install` links. Anywhere else it asks for `@vinena/vectoys` and `@vinena/vectoys-react` from npm by version: install them with `npm install` (or your package manager) in the item folder before you check it.
 2. Edit `src/geometry.ts` (parts, camera, poses) and `src/<name>.tsx` (looks, motion, interaction). Write a real `title` and `description` in `item.json`. List every source file in `files`.
-3. `npx @vinena/vectoys-cli check <dir>` runs 8 checks: item.json is valid, the files are under 96 KB together, item.json names no brand, the component renders on the server with no props, the markup has no `NaN` or `Infinity`, two renders give the same markup, the rendered text names no brand, and the root has an accessible name. It needs bun. Fix every FAIL line.
+3. `npx @vinena/vectoys-cli check <dir>` runs 10 checks: item.json is valid, the files are under 96 KB together, item.json names no brand, the code is safe, the component renders on the server with no props, the markup has no `NaN` or `Infinity`, two renders give the same markup, the markup has no scripts or outside links, the rendered text names no brand, and the root has an accessible name. The code is safe when it has no `<script>`, `dangerouslySetInnerHTML`, `eval`, `new Function`, string timers, network calls (`fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `sendBeacon`), dynamic `import()` or `require`, browser storage or cookies, or outside URLs, and imports only its own files, `react`, `@vinena/vectoys` and `@vinena/vectoys-react`, which are also the only dependencies item.json may list. It needs bun. Fix every FAIL line.
 4. `npx @vinena/vectoys-cli preview <dir>` writes `<dir>/preview.html` (`--open` opens it): the item rendered on the server in light and dark, and at a row of yaws when the component takes a `yaw` prop. Look at it. Faces drawn in the wrong order, gaps, and parts that float show here, not in the checks.
 5. Iterate on 2 to 4 until it looks right in both themes and at every yaw.
 6. `npx @vinena/vectoys-cli submit <dir>` runs the checks, then opens a pull request (it needs the GitHub CLI, `gh`) that adds the item to vinenastudio/vectoys. If you host your own registry, `npx @vinena/vectoys-cli submit --registry <url>` opens a pull request that lists it. Until submissions open at launch, submit prints what it would send and sends nothing. `--dry-run` does the same at any time.
@@ -89,7 +89,7 @@ The same props must give the same markup on the server and the client, every tim
 
 ## Example
 
-A badge that lifts toward the mouse and shows live HTML on its face. It passes all 8 checks.
+A badge that lifts toward the mouse and shows live HTML on its face. It passes all 10 checks.
 
 `src/geometry.ts`:
 
@@ -165,7 +165,7 @@ export function Badge({ children, label = "Badge" }: { children?: ReactNode; lab
 
 ## Before you submit
 
-- `npx @vinena/vectoys-cli check <dir>` passes all 8 checks.
+- `npx @vinena/vectoys-cli check <dir>` passes all 10 checks.
 - The preview looks right in light and dark and at every yaw.
 - Pointer, touch and keyboard all work, and reduced motion keeps the state changes.
 - `item.json` has a plain title and a description that says what the item is and what it does.

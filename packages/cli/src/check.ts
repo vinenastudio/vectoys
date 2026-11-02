@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, extname, join, relative, resolve, sep } from "node:path";
+import { basename, extname, join, posix, relative, resolve, sep } from "node:path";
 import { checkItem, type ItemSource } from "@vectoys/registry-build";
 import { ITEM_NAME, type Context } from "./commands";
 import { componentName } from "./create";
@@ -155,6 +155,126 @@ function itemProblem(item: ItemSource, dir: string): string | undefined {
   return undefined;
 }
 
+/** The only packages an item may list in item.json's dependencies. */
+export const ALLOWED_DEPENDENCIES = ["@vinena/vectoys", "@vinena/vectoys-react"];
+
+/** The packages an item's files may import, with their subpaths, besides each other. */
+export const ALLOWED_IMPORTS = [...ALLOWED_DEPENDENCIES, "react"];
+
+/** One of an item's files, as bun reads it: its code without comments, types or JSX, and what it imports. */
+export type Source = { path: string; code: string; imports: { path: string; kind: string }[] } | { path: string; error: string };
+
+// Run by bun: reads each file the item lists and hands back its code as plain
+// JavaScript, with comments gone and JSX turned into calls, and its imports.
+// Bun's transpiler only parses, so nothing in the files runs.
+const SCANNER = `
+const [, dir, list] = process.argv.slice(2);
+const { join } = await import("node:path");
+const code = (path) => /\\.[cm]?[jt]sx?$/.test(path);
+const sources = [];
+for (const path of JSON.parse(list)) {
+  const text = await Bun.file(join(dir, path)).text();
+  if (!code(path)) { sources.push({ path, code: text, imports: [] }); continue; }
+  try {
+    const transpiler = new Bun.Transpiler({ loader: path.endsWith("x") ? "tsx" : "ts", deadCodeElimination: false });
+    sources.push({ path, code: transpiler.transformSync(text), imports: transpiler.scan(text).imports });
+  } catch (error) {
+    sources.push({ path, error: error instanceof Error ? error.message : String(error) });
+  }
+}
+process.stdout.write("\\n${MARK}" + JSON.stringify(sources));
+`;
+
+function isSource(value: unknown): value is Source {
+  if (typeof value !== "object" || value === null || !("path" in value) || typeof value.path !== "string") return false;
+  if ("error" in value) return typeof value.error === "string";
+  return (
+    "code" in value &&
+    typeof value.code === "string" &&
+    "imports" in value &&
+    Array.isArray(value.imports) &&
+    value.imports.every((entry: unknown) => typeof entry === "object" && entry !== null && "path" in entry && typeof entry.path === "string" && "kind" in entry && typeof entry.kind === "string")
+  );
+}
+
+/** Reads `files` in the folder `dir` with bun, without running them; the sources, or why bun could not read them. */
+export function sources(dir: string, files: string[]): Source[] | string {
+  const ran = runInBun(SCANNER, dir, dir, JSON.stringify(files));
+  if ("error" in ran) return ran.error;
+  return Array.isArray(ran.value) && ran.value.every(isSource) ? ran.value : "bun gave back something other than the files";
+}
+
+const STRING = "[\"'`]";
+const GLOBALS = ["fetch", "eval", "Function", "XMLHttpRequest", "WebSocket", "EventSource", "sendBeacon", "importScripts", "localStorage", "sessionStorage", "indexedDB", "cookie", "constructor"];
+
+/** What an item's code may not do, each with the words a failing line uses for it. */
+const UNSAFE: [RegExp, string][] = [
+  [/<script\b/i, "has a <script> tag"],
+  [new RegExp(`${STRING}script${STRING}`, "i"), "makes a script element"],
+  [/\b(dangerouslySetInnerHTML|innerHTML|outerHTML|insertAdjacentHTML)\b/, "sets HTML from a string"],
+  [/\bdocument\s*\.\s*write/, "writes into the document"],
+  [/\beval\s*\(/, "calls eval"],
+  [/\bFunction\s*\(|\.\s*constructor\b/, "makes a function from a string"],
+  [new RegExp(`\\bset(Timeout|Interval)\\s*\\(\\s*${STRING}`), "passes a string to setTimeout or setInterval"],
+  [/\bfetch\s*\(/, "calls fetch"],
+  [/\b(XMLHttpRequest|WebSocket|EventSource|sendBeacon|importScripts)\b/, "makes a network call"],
+  [/\bimport\s*\(/, "has a dynamic import"],
+  [/\brequire\s*\(/, "calls require"],
+  [/\b(localStorage|sessionStorage|indexedDB)\b|\bdocument\s*\.\s*cookie\b/, "uses browser storage or cookies"],
+  [new RegExp(`${STRING}(${GLOBALS.join("|")})${STRING}`), "names a blocked browser feature in a string"],
+  [new RegExp(`${STRING}\\s*(?!https?://www\\.w3\\.org/)(https?:|//|javascript:|data:\\s*text/html)`, "i"), "has an outside URL"],
+  [/url\(\s*["']?\s*(https?:|\/\/)|@import\b/i, "loads a style from outside"],
+];
+
+/** What rendered markup may not have, each with the words a failing line uses for it. */
+const UNSAFE_MARKUP: [RegExp, string][] = [
+  [/<script\b/i, "has a <script> tag"],
+  [/\s(href|xlink:href|src|srcset|action|formaction)="\s*(https?:|\/\/|javascript:|data:\s*text\/html)/i, "links outside"],
+  [/url\(\s*(&quot;|&#x27;|["'])?\s*(https?:|\/\/)/i, "loads a style from outside"],
+];
+
+const allowed = (name: string) => ALLOWED_IMPORTS.some((pkg) => name === pkg || name.startsWith(`${pkg}/`));
+
+/** Whether the relative import `specifier` in `from` names another of the item's `files`. */
+function listed(specifier: string, from: string, files: string[]): boolean {
+  const base = posix.join(posix.dirname(from), specifier).replace(/\.js$/, "");
+  return ["", ".ts", ".tsx", "/index.ts", "/index.tsx"].some((suffix) => files.includes(base + suffix));
+}
+
+/**
+ * What in an item's files could run code it does not show or reach outside
+ * the page: scripts, eval, network calls, browser storage, outside URLs, and
+ * imports of anything but its own files and the allowed packages. One line
+ * for each, naming the file; none if the code is safe.
+ */
+export function safety(files: Source[], item: Pick<ItemSource, "dependencies">): string[] {
+  const problems = (item.dependencies ?? []).filter((name) => !ALLOWED_DEPENDENCIES.includes(name)).map((name) => `item.json depends on ${name}, which is not ${ALLOWED_DEPENDENCIES.join(" or ")}`);
+  const paths = files.map((file) => file.path);
+  for (const file of files) {
+    if ("error" in file) {
+      problems.push(`${file.path} does not parse: ${file.error}`);
+      continue;
+    }
+    for (const entry of file.imports) {
+      if (entry.kind !== "import-statement") continue;
+      if (entry.path.startsWith(".") ? !listed(entry.path, file.path, paths) : !allowed(entry.path)) problems.push(`${file.path} imports ${entry.path}, which is not one of its files or ${ALLOWED_IMPORTS.join(", ")}`);
+    }
+    for (const [pattern, what] of UNSAFE) {
+      const found = pattern.exec(file.code);
+      if (found) problems.push(`${file.path} ${what}: ${found[0].trim()}`);
+    }
+  }
+  return problems;
+}
+
+/** What in rendered markup could run a script or load something from outside; none if it is safe. */
+export function markupSafety(html: string): string[] {
+  return UNSAFE_MARKUP.flatMap(([pattern, what]) => {
+    const found = pattern.exec(html);
+    return found ? [`the markup ${what}: ${found[0].trim()}`] : [];
+  });
+}
+
 /** Reads and checks item.json; the item, or the reason it fails. */
 export function readItem(dir: string): ItemSource | string {
   const path = join(dir, "item.json");
@@ -192,6 +312,12 @@ export function checks(dir: string): Result[] {
   const named = brands([item.name, item.title, item.description].join(" "));
   results.push({ pass: named.length === 0, line: named.length ? `item.json names brands: ${named.join(", ")}` : "item.json names no brands" });
 
+  // Before anything renders, so code that fails runs nowhere.
+  const read = sources(dir, item.files);
+  const unsafe = typeof read === "string" ? [`bun could not read the files: ${read}`] : safety(read, item);
+  if (unsafe.length) return [...results, ...unsafe.map((line) => ({ pass: false, line }))];
+  results.push({ pass: true, line: "the code is safe: no scripts, eval, network calls or outside imports" });
+
   const component = componentFile(item);
   if (!component) return [...results, { pass: false, line: "files lists no .tsx component to render" }];
   const rendered = render(resolve(dir, component), dir, componentName(item.name));
@@ -202,6 +328,10 @@ export function checks(dir: string): Result[] {
   const broken = ["NaN", "Infinity"].filter((word) => html.includes(word));
   results.push({ pass: broken.length === 0, line: broken.length ? `the markup has ${broken.join(" and ")} in it` : "the markup has no NaN or Infinity" });
   results.push({ pass: html === again, line: html === again ? "two renders give the same markup" : "two renders give different markup" });
+
+  const outside = markupSafety(html);
+  if (outside.length) results.push(...outside.map((line) => ({ pass: false, line })));
+  else results.push({ pass: true, line: "the markup has no scripts or outside links" });
 
   const shown = brands(textOf(html));
   results.push({ pass: shown.length === 0, line: shown.length ? `the rendered text names brands: ${shown.join(", ")}` : "the rendered text names no brands" });
