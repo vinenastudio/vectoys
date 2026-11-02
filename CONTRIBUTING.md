@@ -45,14 +45,36 @@ npx @vinena/vectoys-cli check spinning-top
 - The markup has no `NaN` or `Infinity`.
 - The toy has an accessible name: its root is `role="img"` with an `aria-label`, or its controls are labeled.
 
-It also checks that the code is safe to copy into other people's projects:
+### Safety
 
-- No `<script>` elements.
-- No `dangerouslySetInnerHTML`.
-- No `eval` or `new Function`.
-- No network calls: no `fetch`, `XMLHttpRequest`, `WebSocket`, `sendBeacon` or `import()` of a URL.
-- Only the allowed runtime dependencies: `@vinena/vectoys`, `@vinena/vectoys-react` and `react`.
-- No external `http` or `https` URLs in SVG `href` or `xlink:href`.
+`check` catches common unsafe patterns; a maintainer reviews every submission before it is listed. It reads every code file in the folder, tests included, before it renders anything, so code that fails never runs. A file fails if it uses:
+
+- The server runtime (`Bun`, `process`, `require`, `globalThis`) or the window object (`window`, `self`, `opener`, `defaultView`).
+- Scripts, frames, objects, embeds or forms.
+- `innerHTML` or `dangerouslySetInnerHTML`.
+- `eval` or `Function`.
+- Network calls, workers, `postMessage` or the clipboard.
+- `window.open` or `location`.
+- Dynamic imports or browser storage.
+- Outside URLs or `javascript:` URLs, in the source or in the rendered markup.
+
+Imports are limited too. The component files import only each other, `react`, `@vinena/vectoys` and `@vinena/vectoys-react`. Those two vectoys packages are the only dependencies `item.json` may list.
+
+### Folder rules
+
+- No files whose name starts with a dot, except `.gitignore`.
+- No `bunfig.toml`.
+- No symlinks.
+- `package.json` must stay as `vectoys create` writes it. Only the name and description may change.
+- `tsconfig.json` may set only the options `vectoys create` writes.
+
+### Tests
+
+Tests may not use `globalThis`, `window` or `Bun`. Use the shared helpers in `packages/react/test/dom.tsx` instead: `installGlobal` to put a fake on the page, `readSibling` to read a file, `htmlOf` to read the markup of an element and `fireOnWindow` to send a window event.
+
+### Visual tests
+
+This part lands with the visual tests. Every toy's gallery preview has snapshot images in light, dark and reduced motion, and CI fails when one changes. A new toy needs its own snapshots. Run `bun run test:visual:update` (it needs Docker) and commit the new images with the toy. Look at each image before you commit it. Without Docker, take the images from the report of the failed `visual` job in CI.
 
 ## Submit it
 
@@ -72,13 +94,17 @@ npx @vinena/vectoys-cli submit spinning-top --dry-run
 
 ## Credit
 
-Put your name in `item.json`:
+Put your name in `item.json`, on one line:
 
 ```json
 "author": "Your Name (https://your.site)"
 ```
 
-The gallery shows it as "by Your Name". Put a `credit` line in the header comment of each file too.
+The gallery card shows it as "by Your Name", linked to your site. Keep it to one line of text, with no line breaks and no `*/`. Put a `credit` line in the header comment of each file too.
+
+## Gallery preview
+
+The gallery preview is made for you. It shows the component your toy exports as `Demo`, else its main component, else its default export. You do not need to change the site.
 
 ## The quality bar
 
