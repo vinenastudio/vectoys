@@ -1,7 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
 import { startAnalytics } from "./analytics";
-import { App, pageFor } from "./app";
+import { App } from "./app";
+import { pageFor } from "./pages";
 import { INDEX_DATA, type RegistryIndex } from "./registry";
 import "./style.css";
 

@@ -1,5 +1,6 @@
 import { Footer } from "./components/footer";
 import { Header } from "./components/header";
+import type { Page } from "./pages";
 import type { RegistryIndex } from "./registry";
 import { Faq } from "./sections/faq";
 import { Hero } from "./sections/hero";
@@ -12,13 +13,6 @@ import { Trick } from "./sections/trick";
 import { Typing } from "./sections/typing";
 import { Uses } from "./sections/uses";
 
-/** The site's pages, by path. */
-export type Page = "home" | "toys" | "submit";
-
-export function pageFor(pathname: string): Page {
-  const path = pathname.replace(/\/+$/, "");
-  return path === "/toys" ? "toys" : path === "/submit" ? "submit" : "home";
-}
 
 export function App({ index, page }: { index: RegistryIndex | null; page: Page }) {
   return (

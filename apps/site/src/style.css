@@ -1607,6 +1607,11 @@ code.inline {
   letter-spacing: -0.035em;
 }
 
+/* The hero's prompt rules give it the page color; here it keeps to the lede's width. */
+.toys-intro .prompt {
+  max-width: 520px;
+}
+
 .toys-submit {
   display: flex;
   flex-wrap: wrap;

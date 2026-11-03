@@ -1,4 +1,4 @@
-import type { Page } from "../app";
+import type { Page } from "../pages";
 import { REPO, REPO_PUBLIC } from "../registry";
 import { GitHubMark } from "./icons";
 
