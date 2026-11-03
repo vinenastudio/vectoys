@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { Header } from "../src/components/header";
@@ -51,11 +53,12 @@ describe("Submit", () => {
       "npx @vinena/vectoys-cli preview . --open",
       "npx @vinena/vectoys-cli submit .",
     ];
-    const prompt = agent?.querySelector(".prompt p")?.textContent ?? "";
-    expect(prompt).toStartWith("Run npx @vinena/vectoys-cli skill and follow it.");
+    expect(agent?.querySelector(".prompt p")?.textContent).toBe("Read https://vectoys.com/submit-prompt.txt and follow it to make and submit a toy: a spinning top.");
+    expect(linksTo(agent as HTMLElement, "/submit-prompt.txt")[0]?.textContent).toBe("Read the full prompt");
+    const full = readFileSync(resolve(import.meta.dir, "../public/submit-prompt.txt"), "utf8");
     let from = 0;
-    for (const command of expected) {
-      const at = prompt.indexOf(command, from);
+    for (const command of ["npx @vinena/vectoys-cli skill", ...expected.map((command) => command.replaceAll("spinning-top", "<name>"))]) {
+      const at = full.indexOf(command, from);
       expect(at).toBeGreaterThanOrEqual(from);
       from = at + command.length;
     }
@@ -87,8 +90,9 @@ describe("Submit a toy links", () => {
     expect(link?.dataset).toMatchObject({ track: "submit_click", placement: "toys" });
   });
 
-  test("the gallery leads with the hero's agent prompt", () => {
+  test("the gallery leads with the hero's agent prompt and the link to its full text", () => {
     const host = draw(<Toys index={{ name: "vectoys", homepage: "https://vectoys.com", items: [] }} />);
     expect(host.querySelector(".toys-intro .prompt p")?.textContent).toBe(PROMPT);
+    expect(linksTo(host, "/prompt.txt")[0]?.textContent).toBe("Read the full prompt");
   });
 });

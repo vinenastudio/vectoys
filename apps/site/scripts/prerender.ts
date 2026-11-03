@@ -60,7 +60,11 @@ for (const info of PAGES) {
   texts.push({ info, markdown });
   console.log(`Drew ${page} with ${index.items.length} items into ${file} and its text into ${slug}.md`);
 }
-const [prompt, skill] = await Promise.all([readFile(join(dist, "prompt.txt"), "utf8"), readFile(join(dist, "skill.md"), "utf8")]);
-await writeFile(join(dist, "llms-full.txt"), llmsFullText(index, texts, prompt, skill));
+const [prompt, submitPrompt, skill] = await Promise.all([
+  readFile(join(dist, "prompt.txt"), "utf8"),
+  readFile(join(dist, "submit-prompt.txt"), "utf8"),
+  readFile(join(dist, "skill.md"), "utf8"),
+]);
+await writeFile(join(dist, "llms-full.txt"), llmsFullText(index, texts, prompt, submitPrompt, skill));
 console.log(`Wrote llms-full.txt with ${texts.length} pages`);
 await rm(server, { recursive: true, force: true });

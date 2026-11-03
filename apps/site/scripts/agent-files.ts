@@ -28,11 +28,12 @@ export function llmsText(index: RegistryIndex): string {
       `- [${info.name}](${pageUrl(site, info)}): ${info.description(index.items.length)}`,
       `- [${info.name} in markdown](${markdownUrl(site, info)}): the text of ${pageUrl(site, info)} as markdown`,
     ]),
-    `- [Full text](${site}/llms-full.txt): every page, the prompt and the skill in one markdown file`,
+    `- [Full text](${site}/llms-full.txt): every page, the prompts and the skill in one markdown file`,
     "",
     "## Docs",
     "",
     `- [Prompt for your agent](${site}/prompt.txt): give it to a coding agent to make 2 or 3 versions of your landing page with vectoys toys`,
+    `- [Prompt to submit a toy](${site}/submit-prompt.txt): give it to a coding agent to make, check, preview and submit a new toy`,
     `- [Agent skill](${site}/skill.md): how a coding agent makes, checks, previews and submits a new item`,
     `- [Registry index](${site}/r/index.json): every item, in the shadcn registry format`,
     `- [Source and README](${REPO}): the engine, the React pieces, the CLI and the items`,
@@ -60,14 +61,15 @@ export function pageMarkdown(info: PageInfo, html: string, index: RegistryIndex)
   ].join("\n");
 }
 
-/** llms-full.txt: every page's markdown, then the prompt and the skill, each under the address it came from. */
-export function llmsFullText(index: RegistryIndex, pages: { info: PageInfo; markdown: string }[], prompt: string, skill: string): string {
+/** llms-full.txt: every page's markdown, then the prompt, the submit prompt and the skill, each under the address it came from. */
+export function llmsFullText(index: RegistryIndex, pages: { info: PageInfo; markdown: string }[], prompt: string, submitPrompt: string, skill: string): string {
   const site = index.homepage;
   const part = (url: string, text: string) => `---\n\nSource: ${url}\n\n${text.trim()}\n`;
   return [
-    `# vectoys\n\n${SUMMARY}\n\nThe full text of every page on ${site}, then the prompt for your agent and the agent skill. The short index is ${site}/llms.txt.\n`,
+    `# vectoys\n\n${SUMMARY}\n\nThe full text of every page on ${site}, then the prompt for your agent, the prompt to submit a toy and the agent skill. The short index is ${site}/llms.txt.\n`,
     ...pages.map(({ info, markdown }) => part(pageUrl(site, info), markdown)),
     part(`${site}/prompt.txt`, prompt),
+    part(`${site}/submit-prompt.txt`, submitPrompt),
     part(`${site}/skill.md`, skill.replace(/^---\n[\s\S]*?\n---\n+/, "")),
   ].join("\n");
 }

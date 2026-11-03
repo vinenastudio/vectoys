@@ -450,13 +450,18 @@ code.inline {
   max-width: 100%;
 }
 
-.hero .prompt {
+.hero-prompt .prompt {
   max-width: 100%;
   background: var(--page);
 }
 
-.hero .prompt p {
+.hero-prompt .prompt p {
   overflow-wrap: anywhere;
+}
+
+/* /submit has no tinted hero, so the prompt needs the card fill */
+.submit .hero-prompt .prompt {
+  background: var(--card);
 }
 
 .hero-link {
@@ -1607,7 +1612,7 @@ code.inline {
   letter-spacing: -0.035em;
 }
 
-/* The hero's prompt rules give it the page color; here it keeps to the lede's width. */
+/* The agent prompt rules give it the page color; here it keeps to the lede's width. */
 .toys-intro .prompt {
   max-width: 520px;
 }

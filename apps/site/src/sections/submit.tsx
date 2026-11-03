@@ -1,11 +1,10 @@
-import { CopyCommand, CopyPrompt } from "../components/copy-command";
+import { AgentPrompt, CopyCommand } from "../components/copy-command";
 import { REPO, addCommand } from "../registry";
 
 const CONTRIBUTING = `${REPO}/blob/main/CONTRIBUTING.md`;
 
-/** The prompt that has a coding agent make, check, preview and send in a toy. */
-export const SUBMIT_PROMPT =
-  "Run npx @vinena/vectoys-cli skill and follow it. Make a new vectoys toy: a spinning top. Create it with npx @vinena/vectoys-cli create spinning-top, then run cd spinning-top && npm install. Then, in its folder, run npx @vinena/vectoys-cli check . until every check passes, run npx @vinena/vectoys-cli preview . --open and look at it in light and dark mode and at every angle, and send it in with npx @vinena/vectoys-cli submit .";
+/** The prompt that has a coding agent make, check, preview and send in a toy. The full steps are in public/submit-prompt.txt. */
+export const SUBMIT_PROMPT = "Read https://vectoys.com/submit-prompt.txt and follow it to make and submit a toy: a spinning top.";
 
 /** The commands the agent runs, in order. */
 export const SUBMIT_COMMANDS = [
@@ -39,8 +38,8 @@ export function Submit() {
       <div className="sections submit">
         <section className="submit-part" aria-labelledby="submit-agent">
           <h2 id="submit-agent">Let your agent do it</h2>
-          <p className="submit-note">Give this prompt to Claude Code, Codex or Cursor. Change "a spinning top" and "spinning-top" to your own idea.</p>
-          <CopyPrompt prompt={SUBMIT_PROMPT} caption="Prompt to submit a toy" placement="submit" />
+          <p className="submit-note">Give this prompt to Claude Code, Codex or Cursor. Change "a spinning top" to your own idea.</p>
+          <AgentPrompt prompt={SUBMIT_PROMPT} caption="Prompt to submit a toy" placement="submit" href="/submit-prompt.txt" />
           <p className="submit-note">
             These are the commands it runs. Check, preview and submit take <code className="inline">.</code>, the folder you are in.
           </p>
