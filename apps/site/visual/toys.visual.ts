@@ -25,6 +25,8 @@ for (const { name } of items) {
     await page.clock.install({ time: FROZEN.getTime() - 60_000 });
     await page.clock.pauseAt(FROZEN);
     await page.goto("/toys");
+    // Only this toy's card, in the first cell of the grid, so a toy added before it never moves it by a fraction of a pixel.
+    await page.addStyleTag({ content: `.toys > .toy:not([id="${name}"]) { display: none; }` });
     const preview = page.locator(`[id="${name}"] .toy-preview`);
     await preview.scrollIntoViewIfNeeded();
     await expect(preview.locator(":scope > *").first()).toBeVisible();
