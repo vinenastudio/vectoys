@@ -134,7 +134,7 @@ bun run test:visual
 bun run test:visual:update
 ```
 
-`test:visual` checks the previews and writes a report to `apps/site/visual/report/`. `test:visual:update` writes new snapshots for every preview that changed or has none. A new item needs no setup: its snapshots are made the first time you run `test:visual:update`. Commit them in the same pull request as the item, and look at each new or changed PNG before you commit it. If the `visual` job fails, download its `visual-report` artifact to see what changed.
+`test:visual` checks the previews and writes a report to `apps/site/visual/report/`. `test:visual:update` writes new snapshots for every preview that changed or has none. A new item needs no setup: its snapshots are made the first time you run `test:visual:update`. Commit them in the same pull request as the item, and look at each new or changed PNG before you commit it. If the `visual` job fails, download its `visual-report` artifact to see what changed. In CI, an item that the pull request adds with no snapshots is skipped, not failed: a neutral check named `visual: needs maintainer baseline` and a comment on the pull request ask a maintainer to run `test:visual:update` and commit the snapshots. Every item already on the base branch is checked, so deleting its snapshots fails the job.
 
 ### Host your own registry
 

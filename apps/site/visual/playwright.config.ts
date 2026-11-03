@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { PROJECTS } from "./projects";
 
 // Text and edges draw a little differently on each OS, so the snapshots are
 // made and checked on Linux only, in the Playwright image `run.sh` names.
@@ -24,10 +25,6 @@ export default defineConfig({
   // antialiased edges; the smallest real change, a recolored gift, moves
   // thousands. 50 pixels absorbs the first and catches far less than the second.
   expect: { timeout: 15_000, toHaveScreenshot: { maxDiffPixels: 50 } },
-  projects: [
-    { name: "light", use: { colorScheme: "light", contextOptions: { reducedMotion: "no-preference" } } },
-    { name: "dark", use: { colorScheme: "dark", contextOptions: { reducedMotion: "no-preference" } } },
-    { name: "reduced-motion", use: { colorScheme: "light", contextOptions: { reducedMotion: "reduce" } } },
-  ],
+  projects: PROJECTS.map(({ name, colorScheme, reducedMotion }) => ({ name, use: { colorScheme, contextOptions: { reducedMotion } } })),
   webServer: { command: `bun serve.ts ${PORT}`, url: `http://127.0.0.1:${PORT}/toys`, reuseExistingServer: false },
 });

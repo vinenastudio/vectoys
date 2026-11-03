@@ -1,0 +1,35 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { ITEM_NAME } from "@vectoys/registry-build/names";
+import { PROJECTS } from "./projects";
+
+const SNAPSHOTS = join(import.meta.dirname, "snapshots");
+
+function valid(name: string) {
+  if (!ITEM_NAME.test(name)) throw new Error(`Not an item name: ${JSON.stringify(name)}`);
+  return name;
+}
+
+/** The items in `head` that `base` does not have, from `git ls-tree -d --name-only <ref> registry/` lines. */
+export function newItems(base: readonly string[], head: readonly string[]): string[] {
+  const names = (lines: readonly string[]) => lines.filter(Boolean).map((line) => line.replace(/^registry\//, ""));
+  const old = new Set(names(base));
+  return names(head)
+    .filter((name) => !old.has(name))
+    .map(valid)
+    .sort();
+}
+
+/** The item names in a comma list such as VECTOYS_NEW_ITEMS. Unset or empty is none. */
+export function parseItems(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map(valid);
+}
+
+/** The items that miss a snapshot in at least one project. */
+export function missingBaselines(items: readonly string[], dir = SNAPSHOTS): string[] {
+  return items.filter((name) => PROJECTS.some(({ name: project }) => !existsSync(join(dir, project, `${name}.png`))));
+}
