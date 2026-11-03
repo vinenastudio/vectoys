@@ -68,10 +68,18 @@ jobs:
 
             // Fork pull requests leave workflow_run.pull_requests empty, so the number comes from the artifact and is checked here.
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: note.pr });
+            if (pr.head.repo?.full_name !== run.head_repository?.full_name || pr.head.ref !== run.head_branch) throw new Error(`Pull request #${note.pr} is not the one CI ran on.`);
             if (pr.head.sha !== run.head_sha) return core.info(`Pull request #${note.pr} has moved past the commit CI ran on; the newer run notes it.`);
 
-            // Only an item the base branch does not have may go without snapshots.
+            // Only an item the pull request adds, a folder at its head that the base branch does not have, may go without snapshots.
             for (const name of items) {
+              let head;
+              try {
+                ({ data: head } = await github.rest.repos.getContent({ owner, repo, path: `registry/${name}`, ref: run.head_sha }));
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+              if (!Array.isArray(head)) throw new Error(`registry/${name} is not a folder in the pull request.`);
               try {
                 await github.rest.repos.getContent({ owner, repo, path: `registry/${name}`, ref: pr.base.ref });
                 throw new Error(`registry/${name} is already on ${pr.base.ref}, so it needs its snapshots.`);

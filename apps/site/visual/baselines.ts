@@ -1,9 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { ITEM_NAME } from "@vectoys/registry-build/names";
-
-// One folder of snapshots for each project in playwright.config.ts.
-export const PROJECTS = ["light", "dark", "reduced-motion"] as const;
+import { PROJECTS } from "./projects";
 
 const SNAPSHOTS = join(import.meta.dirname, "snapshots");
 
@@ -33,5 +31,5 @@ export function parseItems(value: string | undefined): string[] {
 
 /** The items that miss a snapshot in at least one project. */
 export function missingBaselines(items: readonly string[], dir = SNAPSHOTS): string[] {
-  return items.filter((name) => PROJECTS.some((project) => !existsSync(join(dir, project, `${name}.png`))));
+  return items.filter((name) => PROJECTS.some(({ name: project }) => !existsSync(join(dir, project, `${name}.png`))));
 }
