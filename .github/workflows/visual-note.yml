@@ -1,0 +1,97 @@
+# After CI on a pull request, says on the pull request which new items have no
+# snapshots yet. It runs from the default branch with a token that can write
+# checks and comments, so it never checks out or runs the pull request's code,
+# and it treats the artifact CI uploaded as untrusted input.
+name: Visual note
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+permissions:
+  actions: read
+  checks: write
+  pull-requests: write
+jobs:
+  note:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          WORK_DIR: ${{ runner.temp }}/visual-note
+        with:
+          script: |
+            const fs = require("node:fs");
+            const path = require("node:path");
+            const run = context.payload.workflow_run;
+            const { owner, repo } = context.repo;
+            const MARKER = "<!-- vectoys-visual-baseline -->";
+            const ITEM_NAME = /^[a-z0-9][a-z0-9-]*$/;
+            const CHECK = "visual: needs maintainer baseline";
+
+            const { data: { artifacts } } = await github.rest.actions.listWorkflowRunArtifacts({ owner, repo, run_id: run.id, name: "visual-baselines-needed" });
+            const artifact = artifacts.find((a) => a.name === "visual-baselines-needed" && !a.expired);
+
+            async function findComment(issue_number) {
+              const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+              return comments.find((c) => c.user?.login === "github-actions[bot]" && c.body?.includes(MARKER));
+            }
+
+            if (!artifact) {
+              // CI passed with no item skipped, so every new item has its snapshots now: an earlier note says so.
+              if (run.conclusion !== "success" || !run.head_repository) return;
+              const pulls = await github.paginate(github.rest.pulls.list, { owner, repo, state: "open", head: `${run.head_repository.owner.login}:${run.head_branch}`, per_page: 100 });
+              const pr = pulls.find((p) => p.head.sha === run.head_sha);
+              const comment = pr && (await findComment(pr.number));
+              if (comment) await github.rest.issues.updateComment({ owner, repo, comment_id: comment.id, body: `${MARKER}\nEvery new toy in this pull request has its reference screenshots now, and the visual check covers them.` });
+              return;
+            }
+            if (artifact.size_in_bytes > 64 * 1024) throw new Error("The artifact is too large to be the list of items.");
+
+            const dir = process.env.WORK_DIR;
+            fs.mkdirSync(dir, { recursive: true });
+            const zip = path.join(dir, "artifact.zip");
+            const { data } = await github.rest.actions.downloadArtifact({ owner, repo, artifact_id: artifact.id, archive_format: "zip" });
+            fs.writeFileSync(zip, Buffer.from(data));
+            await exec.exec("unzip", ["-o", "-q", zip, "visual-baselines-needed.json", "-d", dir]);
+            const file = path.join(dir, "visual-baselines-needed.json");
+            const stat = fs.lstatSync(file);
+            if (!stat.isFile() || stat.size > 64 * 1024) throw new Error("The list of items is not a small, plain file.");
+
+            const note = JSON.parse(fs.readFileSync(file, "utf8"));
+            if (!Number.isSafeInteger(note?.pr) || note.pr <= 0) throw new Error("The pull request number is not a positive integer.");
+            if (typeof note.sha !== "string" || !/^[0-9a-f]{40}$/.test(note.sha) || note.sha !== run.head_sha) throw new Error("The commit is not the one CI ran on.");
+            if (!Array.isArray(note.items) || note.items.length === 0 || note.items.length > 50) throw new Error("The list of items is empty or too long.");
+            for (const name of note.items) if (typeof name !== "string" || !ITEM_NAME.test(name)) throw new Error(`Not an item name: ${JSON.stringify(name)}`);
+            const items = [...new Set(note.items)].sort();
+
+            // Fork pull requests leave workflow_run.pull_requests empty, so the number comes from the artifact and is checked here.
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: note.pr });
+            if (pr.head.sha !== run.head_sha) return core.info(`Pull request #${note.pr} has moved past the commit CI ran on; the newer run notes it.`);
+
+            // Only an item the base branch does not have may go without snapshots.
+            for (const name of items) {
+              try {
+                await github.rest.repos.getContent({ owner, repo, path: `registry/${name}`, ref: pr.base.ref });
+                throw new Error(`registry/${name} is already on ${pr.base.ref}, so it needs its snapshots.`);
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            }
+
+            const list = items.map((name) => `\`${name}\``).join(", ");
+            const files = items.map((name) => `apps/site/visual/snapshots/*/${name}.png`).join("`, `");
+            const body = [
+              MARKER,
+              `These new toys have no reference screenshots yet: ${list}. The visual check skipped them.`,
+              "",
+              `A maintainer runs \`bun run test:visual:update\` (it needs Docker), looks at each new image, and commits \`${files}\`.`,
+            ].join("\n");
+
+            await github.rest.checks.create({
+              owner, repo, name: CHECK, head_sha: run.head_sha, status: "completed", conclusion: "neutral",
+              output: { title: `${items.length} new toy${items.length === 1 ? "" : "s"} need${items.length === 1 ? "s" : ""} reference screenshots`, summary: body.replace(MARKER, "").trim() },
+            });
+            const comment = await findComment(pr.number);
+            if (comment) await github.rest.issues.updateComment({ owner, repo, comment_id: comment.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
