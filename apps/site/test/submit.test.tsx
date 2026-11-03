@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { act, type ReactNode } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 import { Header } from "../src/components/header";
 import { Submit } from "../src/sections/submit";
 
@@ -9,7 +9,10 @@ mock.module("../src/sources", () => ({ SOURCES: {} }));
 const { pageFor } = await import("../src/app");
 const { Toys } = await import("../src/sections/toys");
 
+const roots: Root[] = [];
+
 afterEach(() => {
+  act(() => roots.splice(0).forEach((root) => root.unmount()));
   document.body.innerHTML = "";
 });
 
@@ -17,7 +20,9 @@ afterEach(() => {
 function draw(node: ReactNode) {
   const host = document.createElement("div");
   document.body.append(host);
-  act(() => createRoot(host).render(node));
+  const root = createRoot(host);
+  roots.push(root);
+  act(() => root.render(node));
   return host;
 }
 
