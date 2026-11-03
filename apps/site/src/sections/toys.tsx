@@ -46,6 +46,12 @@ export function Toys({ index }: { index: RegistryIndex | null }) {
             {items && items.length > 0 ? `${items.length} devices and toys` : "Every device and toy"}, each one live. Copy one into your React
             project with its command, then change it as you like.
           </p>
+          <p className="toys-submit">
+            Made a toy? Send it in.{" "}
+            <a href="/submit" className="button-filled" data-track="submit_click" data-placement="toys">
+              Submit a toy
+            </a>
+          </p>
         </div>
       </section>
       <div className="sections">

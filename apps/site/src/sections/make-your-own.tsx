@@ -1,6 +1,6 @@
 import { CopyPrompt } from "../components/copy-command";
 
-const PROMPT = "Run npx @vinena/vectoys-cli skill and follow it. Make me a spinning top for my landing page, check it, preview it, then submit it.";
+export const PROMPT = "Run npx @vinena/vectoys-cli skill and follow it. Make me a spinning top for my landing page, check it, preview it, then submit it.";
 
 export function MakeYourOwn() {
   return (

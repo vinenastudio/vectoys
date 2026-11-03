@@ -37,5 +37,5 @@ test("the JSON-LD graph names the publisher, the website and the source code", (
 test("robots.txt points to a sitemap of every public page", () => {
   expect(readFileSync(resolve(site, "public/robots.txt"), "utf8")).toContain("Sitemap: https://vectoys.com/sitemap.xml");
   const sitemap = readFileSync(resolve(site, "public/sitemap.xml"), "utf8");
-  for (const url of ["https://vectoys.com/", "https://vectoys.com/toys"]) expect(sitemap).toContain(`<loc>${url}</loc>`);
+  for (const url of ["https://vectoys.com/", "https://vectoys.com/toys", "https://vectoys.com/submit"]) expect(sitemap).toContain(`<loc>${url}</loc>`);
 });
