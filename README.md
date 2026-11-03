@@ -6,6 +6,28 @@ An SVG 3D engine for device mockups (laptops, phones, tablets) and small playful
 
 Status: early.
 
+## Use it with your agent
+
+Give this prompt to Claude Code, Codex or Cursor. Your agent reads your landing page and makes 2 or 3 new versions with vectoys toys:
+
+```text
+Read https://vectoys.com/prompt.txt and follow it on my landing page.
+```
+
+Or add one item yourself:
+
+```sh
+npx @vinena/vectoys-cli add phone
+```
+
+To make your own toy, run `npx @vinena/vectoys-cli skill` and follow it, or give your agent this prompt:
+
+```text
+Run npx @vinena/vectoys-cli skill and follow it. Make me a spinning top for my landing page, check it, preview it, then submit it.
+```
+
+The prompt to send a toy in, step by step, is on [vectoys.com/submit](https://vectoys.com/submit). For agents, [llms.txt](https://vectoys.com/llms.txt) is the index that links to each page as Markdown, and [llms-full.txt](https://vectoys.com/llms-full.txt) holds the full text of every page in one file.
+
 ## Packages
 
 - `packages/engine` (`@vinena/vectoys`): a perspective camera, 3D rotations and poses, 2D outline helpers and compact SVG path output. Zero runtime dependencies.

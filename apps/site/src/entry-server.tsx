@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { renderToString } from "react-dom/server";
-import { App, type Page } from "./app";
+import { App } from "./app";
+import type { Page } from "./pages";
 import type { RegistryIndex } from "./registry";
 
 /** A page's markup, drawn at build time from the registry index. */

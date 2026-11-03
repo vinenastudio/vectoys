@@ -1,8 +1,20 @@
 import { CopyCommand, CopyPrompt } from "../components/copy-command";
 import { REPO, addCommand } from "../registry";
-import { PROMPT } from "./make-your-own";
 
 const CONTRIBUTING = `${REPO}/blob/main/CONTRIBUTING.md`;
+
+/** The prompt that has a coding agent make, check, preview and send in a toy. */
+export const SUBMIT_PROMPT =
+  "Run npx @vinena/vectoys-cli skill and follow it. Make a new vectoys toy: a spinning top. Create it with npx @vinena/vectoys-cli create spinning-top, then run cd spinning-top && npm install. Then, in its folder, run npx @vinena/vectoys-cli check . until every check passes, run npx @vinena/vectoys-cli preview . --open and look at it in light and dark mode and at every angle, and send it in with npx @vinena/vectoys-cli submit .";
+
+/** The commands the agent runs, in order. */
+export const SUBMIT_COMMANDS = [
+  "npx @vinena/vectoys-cli create spinning-top",
+  "cd spinning-top && npm install",
+  "npx @vinena/vectoys-cli check .",
+  "npx @vinena/vectoys-cli preview . --open",
+  "npx @vinena/vectoys-cli submit .",
+];
 
 const QUALITY = [
   "It is a generic object, with no product, logo or brand name.",
@@ -14,7 +26,7 @@ const QUALITY = [
   "It turns when dragged and fills the screen. The create command sets this up.",
 ];
 
-/** The /submit page: what a good toy is, the three commands that send one in, and what happens after. */
+/** The /submit page: the prompt and commands for an agent first, then the same steps by hand, what a good toy is, and what happens after. */
 export function Submit() {
   return (
     <>
@@ -25,16 +37,19 @@ export function Submit() {
         </div>
       </section>
       <div className="sections submit">
-        <section className="submit-part" aria-labelledby="submit-quality">
-          <h2 id="submit-quality">What makes a good toy</h2>
-          <ul className="submit-list">
-            {QUALITY.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
+        <section className="submit-part" aria-labelledby="submit-agent">
+          <h2 id="submit-agent">Let your agent do it</h2>
+          <p className="submit-note">Give this prompt to Claude Code, Codex or Cursor. Change "a spinning top" and "spinning-top" to your own idea.</p>
+          <CopyPrompt prompt={SUBMIT_PROMPT} caption="Prompt to submit a toy" placement="submit" />
+          <p className="submit-note">
+            These are the commands it runs. Check, preview and submit take <code className="inline">.</code>, the folder you are in.
+          </p>
+          {SUBMIT_COMMANDS.map((command) => (
+            <CopyCommand key={command} command={command} />
+          ))}
         </section>
         <section className="submit-part" aria-labelledby="submit-steps">
-          <h2 id="submit-steps">Make, check and submit</h2>
+          <h2 id="submit-steps">By hand</h2>
           <ol className="submit-steps">
             <li>
               <p>
@@ -53,8 +68,14 @@ export function Submit() {
               <CopyCommand command="npx @vinena/vectoys-cli submit ." />
             </li>
           </ol>
-          <p className="submit-note">Or give this prompt to your coding agent and it does all three steps for you.</p>
-          <CopyPrompt prompt={PROMPT} caption="Prompt to make your own toy" placement="submit" />
+        </section>
+        <section className="submit-part" aria-labelledby="submit-quality">
+          <h2 id="submit-quality">What makes a good toy</h2>
+          <ul className="submit-list">
+            {QUALITY.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
         </section>
         <section className="submit-part" aria-labelledby="submit-next">
           <h2 id="submit-next">What happens next</h2>

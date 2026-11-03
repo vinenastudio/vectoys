@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { sitemapXml } from "../scripts/agent-files";
+import { PAGES } from "../src/pages";
 
 const site = resolve(import.meta.dir, "..");
 const html = readFileSync(resolve(site, "index.html"), "utf8");
@@ -15,6 +17,9 @@ test("the home head has a 50 to 60 character title, a 120 to 160 character descr
   expect(html).toContain('<link rel="canonical" href="https://vectoys.com/" />');
   expect(html).toContain(`<meta property="og:title" content="${title}" />`);
   expect(html).toContain(`<meta name="twitter:title" content="${title}" />`);
+  // The prerender swaps these for each other page's, so the page list must name them as they are.
+  expect(title).toBe(PAGES[0].title);
+  expect(description).toBe(PAGES[0].description());
 });
 
 test("og:image comes before its size, type and alt, with no share tag twice", () => {
@@ -36,6 +41,11 @@ test("the JSON-LD graph names the publisher, the website and the source code", (
 
 test("robots.txt points to a sitemap of every public page", () => {
   expect(readFileSync(resolve(site, "public/robots.txt"), "utf8")).toContain("Sitemap: https://vectoys.com/sitemap.xml");
-  const sitemap = readFileSync(resolve(site, "public/sitemap.xml"), "utf8");
+  const sitemap = sitemapXml("https://vectoys.com");
   for (const url of ["https://vectoys.com/", "https://vectoys.com/toys", "https://vectoys.com/submit"]) expect(sitemap).toContain(`<loc>${url}</loc>`);
+});
+
+// The build writes public/sitemap.xml (it is not checked in). CI builds before it tests.
+test.skipIf(!existsSync(resolve(site, "public/sitemap.xml")))("public/sitemap.xml is the generated sitemap", () => {
+  expect(readFileSync(resolve(site, "public/sitemap.xml"), "utf8")).toBe(sitemapXml("https://vectoys.com"));
 });

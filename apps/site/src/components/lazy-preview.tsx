@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 /**
  * A preview well that draws its preview only once it comes near the screen,
  * so the page's HTML stays small. The previews are interactive and animate,
- * so session replays leave them out.
+ * so session replays and the text in llms-full.txt leave them out.
  */
 export function LazyPreview({ className, children }: { className: string; children: () => ReactNode }) {
   const well = useRef<HTMLDivElement>(null);
@@ -21,7 +21,7 @@ export function LazyPreview({ className, children }: { className: string; childr
     return () => observer.disconnect();
   }, [shown]);
   return (
-    <div className={className} ref={well} data-replay-block="">
+    <div className={className} ref={well} data-replay-block="" data-llms="skip">
       {shown && children()}
     </div>
   );

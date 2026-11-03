@@ -111,7 +111,7 @@ export function JustSvg() {
         <p>
           Every device is projected to flat SVG paths. Drag the phone to turn it: the numbers are read back from this page as it redraws.
         </p>
-        <dl className="stats">
+        <dl className="stats" data-llms="skip">
           <div>
             <dt>Paths</dt>
             <dd>{measure ? measure.paths.length : " "}</dd>
@@ -130,7 +130,7 @@ export function JustSvg() {
           <li>Sharp at any zoom, because there are no pixels to stretch.</li>
         </ul>
       </div>
-      <div className="xray-wrap">
+      <div className="xray-wrap" data-llms="skip">
         <div
           className="xray-frame grab"
           data-replay-block=""

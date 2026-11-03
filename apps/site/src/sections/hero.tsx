@@ -4,7 +4,7 @@ import { CopyPrompt } from "../components/copy-command";
 import { clamp, useInFocus, useReducedMotion } from "../motion";
 import { START, TodoApp, todosReducer } from "./todo";
 
-const PROMPT = "Read https://vectoys.com/prompt.txt and follow it on my landing page.";
+export const PROMPT = "Read https://vectoys.com/prompt.txt and follow it on my landing page.";
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 /** How far along `from` to `to` the time `t` is, eased, from 0 to 1. */
@@ -345,7 +345,7 @@ function HeroPhone() {
   };
 
   return (
-    <div ref={stage} className="hero-stage">
+    <div ref={stage} className="hero-stage" data-llms="skip">
       <div
         className={`hero-phone${dragging ? " hero-phone-dragging" : ""}`}
         data-replay-block=""
@@ -392,7 +392,7 @@ export function Hero() {
               Read the full prompt
             </a>
           </div>
-          <p className="hero-note">That phone is live HTML. Add a to-do.</p>
+          <p className="hero-note" data-llms="skip">That phone is live HTML. Add a to-do.</p>
         </div>
         <HeroPhone />
       </div>

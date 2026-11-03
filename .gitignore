@@ -5,6 +5,7 @@ dist/
 apps/site/public/r/
 apps/site/public/llms.txt
 apps/site/public/skill.md
+apps/site/public/sitemap.xml
 .wrangler/
 apps/site/visual/report/
 apps/site/visual/results/
