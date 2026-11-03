@@ -283,6 +283,23 @@
         "react": ">=19",
       },
     },
+    "registry/spin_top": {
+      "name": "@vectoys/spin_top",
+      "version": "0.0.0",
+      "dependencies": {
+        "@vinena/vectoys": "workspace:*",
+        "@vinena/vectoys-react": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/react": "19.0.0",
+        "@types/react-dom": "19.0.0",
+        "react": "19.0.0",
+        "react-dom": "19.0.0",
+      },
+      "peerDependencies": {
+        "react": ">=19",
+      },
+    },
     "registry/tablet": {
       "name": "@vectoys/tablet",
       "version": "0.0.0",
@@ -574,6 +591,8 @@
     "@vectoys/phone": ["@vectoys/phone@workspace:registry/phone"],
 
     "@vectoys/registry-build": ["@vectoys/registry-build@workspace:packages/registry-build"],
+
+    "@vectoys/spin_top": ["@vectoys/spin_top@workspace:registry/spin_top"],
 
     "@vectoys/tablet": ["@vectoys/tablet@workspace:registry/tablet"],
 

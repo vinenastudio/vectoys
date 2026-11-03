@@ -1,0 +1,15 @@
+{
+  "name": "spin_top",
+  "title": "Spin top",
+  "description": "Spin top: a tilted slab drawn as SVG paths. Say what it is and what it does.",
+  "files": [
+    "src/geometry.ts",
+    "src/spin_top.tsx"
+  ],
+  "dependencies": [
+    "@vinena/vectoys",
+    "@vinena/vectoys-react"
+  ],
+  "license": "MIT",
+  "author": "Mert Duzgun"
+}
