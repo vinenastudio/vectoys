@@ -26,7 +26,8 @@ jobs:
             const run = context.payload.workflow_run;
             const { owner, repo } = context.repo;
             const MARKER = "<!-- vectoys-visual-baseline -->";
-            const ITEM_NAME = /^[a-z0-9][a-z0-9-]*$/;
+            // The same rule as ITEM_NAME in packages/registry-build/src/names.ts.
+            const ITEM_NAME = /^(?!\.{1,2}$)[\w.-]+$/;
             const CHECK = "visual: needs maintainer baseline";
 
             const { data: { artifacts } } = await github.rest.actions.listWorkflowRunArtifacts({ owner, repo, run_id: run.id, name: "visual-baselines-needed" });

@@ -2,13 +2,13 @@ import { writeFileSync } from "node:fs";
 import { missingBaselines, newItems, parseItems } from "./baselines";
 
 // For the `visual` job in CI.
-//   bun baselines-ci.ts new <base-ref>   prints the items HEAD adds over <base-ref>, as a comma list
+//   bun baselines-ci.ts new <base-ref>   prints the item folders HEAD adds over <base-ref>, as a comma list
 //   bun baselines-ci.ts needed <file>    of VECTOYS_NEW_ITEMS, prints the ones with no snapshots and writes
 //                                        them, with PR_NUMBER and HEAD_SHA, to <file> as JSON
 const [command, arg] = process.argv.slice(2);
 
 function registry(ref: string) {
-  const run = Bun.spawnSync(["git", "ls-tree", "--name-only", ref, "registry/"], { stderr: "inherit" });
+  const run = Bun.spawnSync(["git", "ls-tree", "-d", "--name-only", ref, "registry/"], { stderr: "inherit" });
   if (!run.success) throw new Error(`git ls-tree ${ref} failed`);
   return run.stdout.toString().split("\n");
 }

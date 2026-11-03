@@ -1,8 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-
-// The names `registry/` may hold, so a name is safe in a path, a check and a comment.
-export const ITEM_NAME = /^[a-z0-9][a-z0-9-]*$/;
+import { ITEM_NAME } from "@vectoys/registry-build/names";
 
 // One folder of snapshots for each project in playwright.config.ts.
 export const PROJECTS = ["light", "dark", "reduced-motion"] as const;
@@ -14,7 +12,7 @@ function valid(name: string) {
   return name;
 }
 
-/** The items in `head` that `base` does not have, from `git ls-tree --name-only <ref> registry/` lines. */
+/** The items in `head` that `base` does not have, from `git ls-tree -d --name-only <ref> registry/` lines. */
 export function newItems(base: readonly string[], head: readonly string[]): string[] {
   const names = (lines: readonly string[]) => lines.filter(Boolean).map((line) => line.replace(/^registry\//, ""));
   const old = new Set(names(base));
