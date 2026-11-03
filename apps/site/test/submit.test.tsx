@@ -56,7 +56,12 @@ describe("Submit", () => {
     expect(agent?.querySelector(".prompt p")?.textContent).toBe("Read https://vectoys.com/submit-prompt.txt and follow it to make and submit a toy: a spinning top.");
     expect(linksTo(agent as HTMLElement, "/submit-prompt.txt")[0]?.textContent).toBe("Read the full prompt");
     const full = readFileSync(resolve(import.meta.dir, "../public/submit-prompt.txt"), "utf8");
-    for (const command of ["npx @vinena/vectoys-cli skill", ...expected.map((command) => command.replaceAll("spinning-top", "<name>"))]) expect(full).toContain(command);
+    let from = 0;
+    for (const command of ["npx @vinena/vectoys-cli skill", ...expected.map((command) => command.replaceAll("spinning-top", "<name>"))]) {
+      const at = full.indexOf(command, from);
+      expect(at).toBeGreaterThanOrEqual(from);
+      from = at + command.length;
+    }
     const commands = (part: Element | undefined) => [...(part?.querySelectorAll(".command code") ?? [])].map((code) => code.textContent?.replace(/^\$\s*/, ""));
     expect(commands(agent)).toEqual(expected);
     expect(commands(host.querySelectorAll(".submit-part")[1])).toEqual(["npx @vinena/vectoys-cli create spinning-top", "npx @vinena/vectoys-cli check .", "npx @vinena/vectoys-cli submit ."]);
