@@ -1,4 +1,4 @@
-import { CopyCommand, CopyPrompt } from "../components/copy-command";
+import { AgentPrompt, CopyCommand } from "../components/copy-command";
 import { LazyPreview } from "../components/lazy-preview";
 import { previewFor } from "../items";
 import { REPO, addCommand, makerOf, type Entry, type RegistryIndex } from "../registry";
@@ -47,7 +47,7 @@ export function Toys({ index }: { index: RegistryIndex | null }) {
             {items && items.length > 0 ? `${items.length} devices and toys` : "Every device and toy"}, each one live. Copy one into your React
             project with its command, then change it as you like.
           </p>
-          <CopyPrompt prompt={PROMPT} caption="Prompt for your agent" placement="toys" />
+          <AgentPrompt prompt={PROMPT} caption="Prompt for your agent" placement="toys" href="/prompt.txt" />
           <p className="toys-submit">
             Made a toy? Send it in.{" "}
             <a href="/submit" className="button-filled" data-track="submit_click" data-placement="toys">

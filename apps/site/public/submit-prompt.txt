@@ -1,0 +1,51 @@
+# Make a new vectoys toy and submit it
+
+You are a coding agent. Make a new vectoys toy, check it, preview it and send it in as a pull request to https://github.com/vinenastudio/vectoys. We review every toy and list it in the gallery at https://vectoys.com/toys with the author's name.
+
+vectoys: https://vectoys.com. Items are 3D devices and toys drawn as plain SVG in React 19. The CLI is `npx @vinena/vectoys-cli`.
+
+## 1. Read the skill
+
+Run `npx @vinena/vectoys-cli skill` and follow it. It tells you how a toy is built, what its files are and what the checks look for.
+
+## 2. Pick the toy
+
+- The toy is the idea I gave you in my message. If I did not give one, make a spinning top.
+- Pick a short name in kebab case (lowercase words with dashes), for example `spinning-top`. Below, `<name>` is that name.
+
+## 3. Make it
+
+Check and preview need bun. Submit needs bun 1.3.2 or newer and the GitHub CLI (`gh`, signed in). If one is missing, tell me how to install it and stop.
+
+Run these in order:
+
+    npx @vinena/vectoys-cli create <name>   # writes a full package in a new folder
+    cd <name> && npm install
+
+The next commands run in that folder. Check, preview and submit take `.`, the folder you are in.
+
+- Draw the toy in its `src/` folder, as the skill says.
+- Run `npx @vinena/vectoys-cli check .` and fix what it reports. Run it again until every check passes.
+- Run `npx @vinena/vectoys-cli preview . --open`. Look at the toy in light and dark mode, and turn it to every angle. Fix what looks wrong, then check again.
+
+## 4. Make it good
+
+A good toy:
+
+- Is a generic object, with no product, logo or brand name.
+- Looks right in light and dark mode.
+- Respects reduced motion.
+- Works with a keyboard and a screen reader.
+- Renders on the server.
+- Stays small, under 96 kilobytes.
+- Turns when dragged and fills the screen. The create command sets this up.
+
+## 5. Submit it
+
+Run `npx @vinena/vectoys-cli submit .`. It runs the check again, then opens a pull request.
+
+## 6. Tell me
+
+- Give me the pull request URL.
+- In one line, say what the toy is and how it moves.
+- Last, tell me: "Once it is merged, it shows in the gallery at https://vectoys.com/toys with the author name from its item.json. Anyone can add it with `npx @vinena/vectoys-cli add <name>`."

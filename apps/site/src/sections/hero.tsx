@@ -1,6 +1,6 @@
 import { Phone, TURN } from "@vectoys/phone";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
-import { CopyPrompt } from "../components/copy-command";
+import { AgentPrompt } from "../components/copy-command";
 import { clamp, useInFocus, useReducedMotion } from "../motion";
 import { START, TodoApp, todosReducer } from "./todo";
 
@@ -386,12 +386,7 @@ export function Hero() {
             Phones, laptops and small toys for your React landing page. The screen is live HTML you can tap and type into. No WebGL, no images,
             MIT.
           </p>
-          <div className="hero-prompt">
-            <CopyPrompt prompt={PROMPT} caption="Prompt for your agent" placement="hero" />
-            <a href="/prompt.txt" className="hero-link">
-              Read the full prompt
-            </a>
-          </div>
+          <AgentPrompt prompt={PROMPT} caption="Prompt for your agent" placement="hero" href="/prompt.txt" />
           <p className="hero-note" data-llms="skip">That phone is live HTML. Add a to-do.</p>
         </div>
         <HeroPhone />

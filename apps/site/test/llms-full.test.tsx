@@ -27,9 +27,11 @@ test("every page's text starts with its h1 and carries no demo content, markup o
   }
 });
 
-test("the submit page's text has the agent prompt before the steps by hand", () => {
+test("the submit page's text has the agent prompt and the link to its full text before the steps by hand", () => {
   const submit = text("submit");
   expect(submit).toContain(`\`\`\`\n${SUBMIT_PROMPT}\n\`\`\``);
+  expect(submit).toContain("[Read the full prompt](https://vectoys.com/submit-prompt.txt)");
+  expect(submit.indexOf("submit-prompt.txt)")).toBeLessThan(submit.indexOf("## By hand"));
   expect(submit.indexOf(SUBMIT_PROMPT)).toBeLessThan(submit.indexOf("## By hand"));
 });
 
@@ -45,12 +47,13 @@ test("the toys page's text has every item's title, description, install command,
   }
 });
 
-test("llms-full.txt holds every page under its address, then the prompt and the skill", () => {
-  const full = llmsFullText(index, pages, "PROMPT TEXT", "---\nname: vectoys\n---\n\nSKILL TEXT");
+test("llms-full.txt holds every page under its address, then the prompt, the submit prompt and the skill", () => {
+  const full = llmsFullText(index, pages, "PROMPT TEXT", "SUBMIT PROMPT TEXT", "---\nname: vectoys\n---\n\nSKILL TEXT");
   expect(full).toStartWith("# vectoys\n\n> ");
   const parts = [
     ...pages.map(({ info, markdown }) => `Source: https://vectoys.com${info.path}\n\n${markdown.trim()}`),
     "Source: https://vectoys.com/prompt.txt\n\nPROMPT TEXT",
+    "Source: https://vectoys.com/submit-prompt.txt\n\nSUBMIT PROMPT TEXT",
     "Source: https://vectoys.com/skill.md\n\nSKILL TEXT",
   ];
   let from = 0;

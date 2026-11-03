@@ -69,3 +69,15 @@ export function CopyPrompt({ prompt, caption, placement }: { prompt: string; cap
     </figure>
   );
 }
+
+/** A short prompt for a coding agent with a link under it to the full text it points at. */
+export function AgentPrompt({ prompt, caption, placement, href }: { prompt: string; caption: string; placement: string; href: string }) {
+  return (
+    <div className="hero-prompt">
+      <CopyPrompt prompt={prompt} caption={caption} placement={placement} />
+      <a href={href} className="hero-link">
+        Read the full prompt
+      </a>
+    </div>
+  );
+}
