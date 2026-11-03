@@ -129,6 +129,23 @@
         "react": ">=19",
       },
     },
+    "registry/e2e-top": {
+      "name": "@vectoys/e2e-top",
+      "version": "0.0.0",
+      "dependencies": {
+        "@vinena/vectoys": "workspace:*",
+        "@vinena/vectoys-react": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/react": "19.0.0",
+        "@types/react-dom": "19.0.0",
+        "react": "19.0.0",
+        "react-dom": "19.0.0",
+      },
+      "peerDependencies": {
+        "react": ">=19",
+      },
+    },
     "registry/envelope": {
       "name": "@vectoys/envelope",
       "version": "0.0.0",
@@ -554,6 +571,8 @@
     "@vectoys/card": ["@vectoys/card@workspace:registry/card"],
 
     "@vectoys/dice": ["@vectoys/dice@workspace:registry/dice"],
+
+    "@vectoys/e2e-top": ["@vectoys/e2e-top@workspace:registry/e2e-top"],
 
     "@vectoys/envelope": ["@vectoys/envelope@workspace:registry/envelope"],
 

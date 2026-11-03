@@ -1,0 +1,15 @@
+{
+  "name": "e2e-top",
+  "title": "E2e top",
+  "description": "E2e top: a tilted slab drawn as SVG paths. Say what it is and what it does.",
+  "files": [
+    "src/geometry.ts",
+    "src/e2e-top.tsx"
+  ],
+  "dependencies": [
+    "@vinena/vectoys",
+    "@vinena/vectoys-react"
+  ],
+  "license": "MIT",
+  "author": "Mert Duzgun"
+}
