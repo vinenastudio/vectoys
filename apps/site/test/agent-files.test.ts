@@ -18,6 +18,7 @@ test("llms.txt links every item in registry/, the prompt, the skill and the inde
   expect(text).not.toContain("npx vectoys ");
   expect(text).toContain("(https://vectoys.com/r/index.json)");
   expect(text).toContain("(https://vectoys.com/toys)");
+  expect(text).toContain("(https://vectoys.com/submit)");
   expect(text).toContain("(https://github.com/vinenastudio/vectoys)");
   for (const item of items) expect(text).toContain(`- [${item.title}](https://vectoys.com/r/${item.name}.json): ${item.description}`);
 });

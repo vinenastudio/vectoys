@@ -17,6 +17,7 @@ export function llmsText(index: RegistryIndex): string {
     `- [Prompt for your agent](${site}/prompt.txt): give it to a coding agent to make 2 or 3 versions of your landing page with vectoys toys`,
     `- [Agent skill](${site}/skill.md): how a coding agent makes, checks, previews and submits a new item`,
     `- [All toys](${site}/toys): every item, live, with its install command and its source`,
+    `- [Submit a toy](${site}/submit): how to make, check and send in a new item`,
     `- [Registry index](${site}/r/index.json): every item, in the shadcn registry format`,
     `- [Source and README](${REPO}): the engine, the React pieces, the CLI and the items`,
     "",

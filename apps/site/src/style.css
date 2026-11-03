@@ -328,9 +328,37 @@ code.inline {
   background: var(--well);
 }
 
-/* On phones the header keeps Gallery and Showcase, and GitHub shows only its mark. */
-@media (max-width: 479px) {
+/* Submit a toy: the filled button, at the header's height. */
+.site-header .header-submit {
+  display: inline-block;
+  flex-shrink: 0;
+  height: 36px;
+  line-height: 36px;
+  margin-top: 0;
+  padding: 0 14px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* On small tablets the header drops Registry and Submit says only "Submit", so it stays on one row. */
+@media (max-width: 599px) {
   .nav-registry {
+    display: none;
+  }
+
+  .submit-label-end {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* On phones the header keeps Gallery and Submit, and GitHub shows only its mark. */
+@media (max-width: 479px) {
+  .nav-showcase {
     display: none;
   }
 
@@ -348,13 +376,13 @@ code.inline {
   }
 }
 
-/* At the narrowest widths the header keeps the wordmark and GitHub. */
+/* At the narrowest widths the header keeps the wordmark, Submit and GitHub. */
 @media (max-width: 359px) {
   .site-nav {
     display: none;
   }
 
-  .github-button {
+  .site-header .header-submit {
     margin-left: auto;
   }
 }
@@ -1577,6 +1605,59 @@ code.inline {
   font-size: clamp(42px, 6.4vw, 76px);
   line-height: 1.02;
   letter-spacing: -0.035em;
+}
+
+.toys-submit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  color: var(--muted);
+}
+
+.toys-submit .button-filled {
+  margin-top: 0;
+}
+
+/* Submit a toy: three short parts under the band. */
+.submit-part {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 640px;
+  padding-top: 48px;
+}
+
+.submit-part h2 {
+  font-size: clamp(26px, 3.4vw, 34px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.submit-list,
+.submit-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.4em;
+  color: var(--muted);
+}
+
+.submit-steps {
+  gap: 20px;
+}
+
+.submit-steps li > * + * {
+  margin-top: 10px;
+}
+
+.submit-steps .command {
+  color: var(--ink);
+}
+
+.submit-note {
+  color: var(--muted);
 }
 
 .toys {

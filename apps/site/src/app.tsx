@@ -6,23 +6,29 @@ import { Hero } from "./sections/hero";
 import { JustSvg } from "./sections/just-svg";
 import { MakeYourOwn } from "./sections/make-your-own";
 import { Showcase } from "./sections/showcase";
+import { Submit } from "./sections/submit";
 import { Toys } from "./sections/toys";
 import { Trick } from "./sections/trick";
 import { Typing } from "./sections/typing";
 import { Uses } from "./sections/uses";
 
 /** The site's pages, by path. */
-export type Page = "home" | "toys";
+export type Page = "home" | "toys" | "submit";
 
-export const pageFor = (pathname: string): Page => (pathname.replace(/\/+$/, "") === "/toys" ? "toys" : "home");
+export function pageFor(pathname: string): Page {
+  const path = pathname.replace(/\/+$/, "");
+  return path === "/toys" ? "toys" : path === "/submit" ? "submit" : "home";
+}
 
 export function App({ index, page }: { index: RegistryIndex | null; page: Page }) {
   return (
     <>
-      <Header />
+      <Header page={page} />
       <main>
         {page === "toys" ? (
           <Toys index={index} />
+        ) : page === "submit" ? (
+          <Submit />
         ) : (
           <>
             <Hero />
