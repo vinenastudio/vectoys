@@ -48,8 +48,16 @@ test("the toys page's text has every item's title, description, install command,
 test("llms-full.txt holds every page under its address, then the prompt and the skill", () => {
   const full = llmsFullText(index, pages, "PROMPT TEXT", "---\nname: vectoys\n---\n\nSKILL TEXT");
   expect(full).toStartWith("# vectoys\n\n> ");
-  for (const { info, markdown } of pages) expect(full).toContain(`Source: https://vectoys.com${info.path}\n\n${markdown.trim()}`);
-  expect(full).toContain("Source: https://vectoys.com/prompt.txt\n\nPROMPT TEXT");
-  expect(full).toContain("Source: https://vectoys.com/skill.md\n\nSKILL TEXT");
+  const parts = [
+    ...pages.map(({ info, markdown }) => `Source: https://vectoys.com${info.path}\n\n${markdown.trim()}`),
+    "Source: https://vectoys.com/prompt.txt\n\nPROMPT TEXT",
+    "Source: https://vectoys.com/skill.md\n\nSKILL TEXT",
+  ];
+  let from = 0;
+  for (const part of parts) {
+    const at = full.indexOf(part, from);
+    expect(at).toBeGreaterThanOrEqual(from);
+    from = at + part.length;
+  }
   expect(full).not.toContain("name: vectoys");
 });

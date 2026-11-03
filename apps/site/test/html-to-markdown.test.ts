@@ -64,7 +64,7 @@ describe("htmlToMarkdown", () => {
   });
 
   test("reads only the first element named by within", () => {
-    const html = "<header><p>Menu</p></header><main><h1>Title</h1></main><footer><p>Footer</p></footer>";
+    const html = "<header><p>Menu</p></header><main><h1>Title</h1></main><main><h1>Second</h1></main><footer><p>Footer</p></footer>";
     expect(htmlToMarkdown(html, { base: "https://vectoys.com", within: "main" })).toBe("# Title\n");
     expect(() => htmlToMarkdown("<p>No main</p>", { base: "https://vectoys.com", within: "main" })).toThrow("no <main>");
   });

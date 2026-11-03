@@ -2,7 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { Header } from "../src/components/header";
-import { SUBMIT_COMMANDS, SUBMIT_PROMPT, Submit } from "../src/sections/submit";
+import { Submit } from "../src/sections/submit";
 
 // The gallery's previews come from Vite's import.meta.glob, which bun has not got.
 mock.module("../src/sources", () => ({ SOURCES: {} }));
@@ -39,16 +39,28 @@ describe("pageFor", () => {
 });
 
 describe("Submit", () => {
-  test("leads with the agent prompt and its four commands, then the steps by hand, and links to CONTRIBUTING", () => {
+  test("leads with the agent prompt and its commands, then the steps by hand, and links to CONTRIBUTING", () => {
     const host = draw(<Submit />);
     expect(host.querySelector("h1")?.textContent).toBe("Submit a toy");
     expect([...host.querySelectorAll("h2")].map((heading) => heading.textContent)).toEqual(["Let your agent do it", "By hand", "What makes a good toy", "What happens next"]);
     const [agent] = host.querySelectorAll(".submit-part");
-    expect(agent?.querySelector(".prompt p")?.textContent).toBe(SUBMIT_PROMPT);
-    expect(SUBMIT_PROMPT).toContain("npx @vinena/vectoys-cli skill");
-    for (const command of SUBMIT_COMMANDS) expect(SUBMIT_PROMPT).toContain(command);
+    const expected = [
+      "npx @vinena/vectoys-cli create spinning-top",
+      "cd spinning-top && npm install",
+      "npx @vinena/vectoys-cli check .",
+      "npx @vinena/vectoys-cli preview . --open",
+      "npx @vinena/vectoys-cli submit .",
+    ];
+    const prompt = agent?.querySelector(".prompt p")?.textContent ?? "";
+    expect(prompt).toStartWith("Run npx @vinena/vectoys-cli skill and follow it.");
+    let from = 0;
+    for (const command of expected) {
+      const at = prompt.indexOf(command, from);
+      expect(at).toBeGreaterThanOrEqual(from);
+      from = at + command.length;
+    }
     const commands = (part: Element | undefined) => [...(part?.querySelectorAll(".command code") ?? [])].map((code) => code.textContent?.replace(/^\$\s*/, ""));
-    expect(commands(agent)).toEqual(SUBMIT_COMMANDS);
+    expect(commands(agent)).toEqual(expected);
     expect(commands(host.querySelectorAll(".submit-part")[1])).toEqual(["npx @vinena/vectoys-cli create spinning-top", "npx @vinena/vectoys-cli check .", "npx @vinena/vectoys-cli submit ."]);
     expect(host.querySelectorAll(".prompt")).toHaveLength(1);
     expect(linksTo(host, "https://github.com/vinenastudio/vectoys/blob/main/CONTRIBUTING.md")).toHaveLength(1);

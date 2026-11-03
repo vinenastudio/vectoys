@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { sitemapXml } from "../scripts/agent-files";
 import { PAGES } from "../src/pages";
@@ -43,4 +43,9 @@ test("robots.txt points to a sitemap of every public page", () => {
   expect(readFileSync(resolve(site, "public/robots.txt"), "utf8")).toContain("Sitemap: https://vectoys.com/sitemap.xml");
   const sitemap = sitemapXml("https://vectoys.com");
   for (const url of ["https://vectoys.com/", "https://vectoys.com/toys", "https://vectoys.com/submit"]) expect(sitemap).toContain(`<loc>${url}</loc>`);
+});
+
+// The build writes public/sitemap.xml (it is not checked in). CI builds before it tests.
+test.skipIf(!existsSync(resolve(site, "public/sitemap.xml")))("public/sitemap.xml is the generated sitemap", () => {
+  expect(readFileSync(resolve(site, "public/sitemap.xml"), "utf8")).toBe(sitemapXml("https://vectoys.com"));
 });

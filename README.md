@@ -26,7 +26,7 @@ To make your own toy, run `npx @vinena/vectoys-cli skill` and follow it, or give
 Run npx @vinena/vectoys-cli skill and follow it. Make me a spinning top for my landing page, check it, preview it, then submit it.
 ```
 
-The prompt to send a toy in, step by step, is on [vectoys.com/submit](https://vectoys.com/submit). Every page as plain text for agents is in [llms.txt](https://vectoys.com/llms.txt) and [llms-full.txt](https://vectoys.com/llms-full.txt).
+The prompt to send a toy in, step by step, is on [vectoys.com/submit](https://vectoys.com/submit). For agents, [llms.txt](https://vectoys.com/llms.txt) is the index that links to each page as Markdown, and [llms-full.txt](https://vectoys.com/llms-full.txt) holds the full text of every page in one file.
 
 ## Packages
 
