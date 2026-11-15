@@ -31,3 +31,10 @@ export const ArrowUpRightIcon = () => (
     <path d="M7.5 16.5l9-9M9 7.5h7.5V15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+
+export const MailIcon = () => (
+  <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden="true" className="icon">
+    <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    <path d="M4.5 7.5l7.5 5.5 7.5-5.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
