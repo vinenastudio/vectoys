@@ -1524,7 +1524,7 @@ code.inline {
   translate: 2px -2px;
 }
 
-/* What people say: one quote card per press mention, the whole card a link to the source. */
+/* Honorable mentions: one quote card per press mention, the whole card a link to the source. */
 
 .praise {
   display: grid;

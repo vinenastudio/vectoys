@@ -59,6 +59,13 @@ describe("htmlToMarkdown", () => {
     expect(md('<ul><li><a href="https://snug.so"><div><h3>Snug</h3><p>A Mac app</p></div></a></li></ul>')).toBe("- [Snug: A Mac app](https://snug.so/)\n");
   });
 
+  test("joins blocks inside a link with a space after a full stop, else with a colon", () => {
+    expect(md('<a href="/q"><div><p>So useful.</p><p>Ada</p></div></a>')).toBe("[So useful. Ada](https://vectoys.com/q)\n");
+    expect(md('<a href="/q"><figure><blockquote><p>Great tool</p></blockquote><figcaption><div>Ada</div><div>@ada</div></figcaption></figure></a>')).toBe(
+      "[Great tool: Ada: @ada](https://vectoys.com/q)\n",
+    );
+  });
+
   test("turns loose text between blocks into paragraphs", () => {
     expect(md("<div>Loose <code>text</code><p>A paragraph</p>after</div>")).toBe("Loose `text`\n\nA paragraph\n\nafter\n");
   });
