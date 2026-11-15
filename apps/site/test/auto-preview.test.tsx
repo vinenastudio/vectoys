@@ -1,7 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { autoPreview, pickPreview, type Loader } from "../src/auto-preview";
+import { autoPreview, lazyPreview, pickPreview, type Loader } from "../src/auto-preview";
 
 const Demo = () => <p>demo</p>;
 const Ball = () => <p>ball</p>;
@@ -83,4 +83,16 @@ test("after a failed load, the next draw tries the import again", async () => {
   } finally {
     quiet.mockRestore();
   }
+});
+
+test("a hand-made preview shows the placeholder while its module loads, then itself, with no frame", async () => {
+  let resolve: (component: typeof Demo) => void = () => {};
+  const Preview = lazyPreview(() => new Promise((done) => (resolve = done)));
+  const host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () => root?.render(<Preview />));
+  expect(host.textContent).toBe("Preview on its way");
+  await act(async () => resolve(Demo));
+  expect(host.innerHTML).toBe("<p>demo</p>");
 });
