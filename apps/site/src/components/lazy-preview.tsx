@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { startTransition, useEffect, useRef, useState, type ReactNode } from "react";
 
 /**
  * A preview well that draws its preview only once it comes near the screen,
@@ -13,7 +13,8 @@ export function LazyPreview({ className, children }: { className: string; childr
     if (!element || shown) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry?.isIntersecting) setShown(true);
+        // A transition, so React draws the previews that come in together in small slices, not in one long task.
+        if (entry?.isIntersecting) startTransition(() => setShown(true));
       },
       { rootMargin: "400px 0px" },
     );

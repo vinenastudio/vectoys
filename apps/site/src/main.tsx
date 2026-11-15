@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, startTransition } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
 import { startAnalytics } from "./analytics";
 import { App } from "./app";
@@ -22,8 +22,12 @@ if (import.meta.env.DEV && (location.pathname === "/realistic" || location.pathn
   void import("./dev/realistic").then(({ Polish, Realistic }) =>
     createRoot(root).render(<StrictMode>{location.pathname === "/realistic" ? <Realistic /> : <Polish />}</StrictMode>),
   );
-} else if (root.hasChildNodes()) hydrateRoot(root, app);
-else createRoot(root).render(app);
+} else if (root.hasChildNodes()) {
+  // A transition, so React hydrates the page in small slices, not in one long task.
+  startTransition(() => {
+    hydrateRoot(root, app);
+  });
+} else createRoot(root).render(app);
 
 startAnalytics();
 

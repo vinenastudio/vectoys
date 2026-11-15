@@ -1,7 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { autoPreview, pickPreview, type Loader } from "../src/auto-preview";
+import { autoPreview, lazyPreview, pickPreview, type Loader } from "../src/auto-preview";
 
 const Demo = () => <p>demo</p>;
 const Ball = () => <p>ball</p>;
@@ -80,6 +80,32 @@ test("after a failed load, the next draw tries the import again", async () => {
     const host = await draw("flaky", load);
     expect(tries).toBe(2);
     expect(host.innerHTML).toBe('<div class="preview-toy"><p>demo</p></div>');
+  } finally {
+    quiet.mockRestore();
+  }
+});
+
+test("a hand-made preview shows the placeholder while its module loads, then itself, with no frame", async () => {
+  let resolve: (component: typeof Demo) => void = () => {};
+  const Preview = lazyPreview(() => new Promise((done) => (resolve = done)));
+  const host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () => root?.render(<Preview />));
+  expect(host.textContent).toBe("Preview on its way");
+  await act(async () => resolve(Demo));
+  expect(host.innerHTML).toBe("<p>demo</p>");
+});
+
+test("a hand-made preview that fails to load shows the placeholder, not an error", async () => {
+  const quiet = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const Preview = lazyPreview(() => Promise.reject(new Error("offline")));
+    const host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root?.render(<Preview />));
+    expect(host.textContent).toBe("Preview on its way");
   } finally {
     quiet.mockRestore();
   }

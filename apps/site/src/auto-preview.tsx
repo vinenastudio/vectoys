@@ -30,6 +30,18 @@ class PreviewBoundary extends Component<{ children: ReactNode }, { failed: boole
 
 const made = new Map<string, ComponentType>();
 
+/** A hand-made preview that loads its module only when drawn, so its toy's code stays out of the page's first script; the placeholder until then. */
+export function lazyPreview(load: () => Promise<ComponentType>): ComponentType {
+  const Loaded = lazy(async () => ({ default: await load() }));
+  return () => (
+    <PreviewBoundary>
+      <Suspense fallback={<Placeholder />}>
+        <Loaded />
+      </Suspense>
+    </PreviewBoundary>
+  );
+}
+
 /** A preview that loads the item's module only when drawn, then shows what `pickPreview` finds there; the placeholder until then. */
 export function autoPreview(name: string, load: Loader): ComponentType {
   const known = made.get(name);
