@@ -7,6 +7,7 @@ import { Faq } from "./sections/faq";
 import { Hero } from "./sections/hero";
 import { JustSvg } from "./sections/just-svg";
 import { MakeYourOwn } from "./sections/make-your-own";
+import { Praise } from "./sections/praise";
 import { Showcase } from "./sections/showcase";
 import { Submit } from "./sections/submit";
 import { Toys } from "./sections/toys";
@@ -26,6 +27,7 @@ const CONTENT: Record<Page, (index: RegistryIndex | null) => ReactNode> = {
         <Typing />
         <Uses index={index} />
         <Showcase />
+        <Praise />
         <MakeYourOwn />
         <Faq />
       </div>
