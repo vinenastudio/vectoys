@@ -96,3 +96,17 @@ test("a hand-made preview shows the placeholder while its module loads, then its
   await act(async () => resolve(Demo));
   expect(host.innerHTML).toBe("<p>demo</p>");
 });
+
+test("a hand-made preview that fails to load shows the placeholder, not an error", async () => {
+  const quiet = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const Preview = lazyPreview(() => Promise.reject(new Error("offline")));
+    const host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root?.render(<Preview />));
+    expect(host.textContent).toBe("Preview on its way");
+  } finally {
+    quiet.mockRestore();
+  }
+});
