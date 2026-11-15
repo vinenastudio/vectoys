@@ -784,18 +784,23 @@ code.inline {
   cursor: pointer;
 }
 
-/* Concentric with the field round it: its radius is the field's less the 4 pixel gap between them. */
+/* Concentric with the field round it: its radius is the field's less the 4 pixel gap between them.
+   The glass is drawn at about half size on phones, so the button reaches 6 pixels past what it paints to stay 24 pixels to tap; the negative margin keeps the layout. */
 .todo-add-button {
+  box-sizing: content-box;
   width: 42px;
   height: 42px;
-  border-radius: 12px;
+  margin: -6px;
+  padding: 6px;
+  border-radius: 18px;
   color: #ffffff;
-  background: #1f6fff;
+  background-color: #1f6fff;
+  background-clip: content-box;
   transition: background-color 150ms var(--ease);
 }
 
 .todo-add-button:hover {
-  background: #1a5fdc;
+  background-color: #1a5fdc;
 }
 
 .todo-glass svg {
@@ -829,22 +834,26 @@ code.inline {
   height: 34px;
   padding: 0;
   border: 0;
-  border-radius: 9px;
+  border-radius: 9px / 14px;
   color: #4a4f59;
   background: none;
   font: inherit;
   font-size: 15px;
   line-height: 34px;
+  box-sizing: content-box;
+  margin: -5px 0;
+  padding: 5px 0;
+  background-clip: content-box;
   cursor: pointer;
-  transition-property: background-color, box-shadow, color;
+  transition-property: background-color, filter, color;
   transition-duration: 150ms;
   transition-timing-function: var(--ease);
 }
 
 .todo-filter[aria-pressed="true"] {
   color: #16181d;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(16, 18, 24, 0.12);
+  background: #ffffff content-box;
+  filter: drop-shadow(0 1px 1.5px rgba(16, 18, 24, 0.12));
 }
 
 .todo-count {
