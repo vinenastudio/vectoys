@@ -1537,13 +1537,18 @@ code.inline {
 
 /* Concentric: card 26 = icon well 10 + padding 16. */
 .praise-card {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  display: block;
   padding: 24px 16px 16px;
   border-radius: 26px;
   background: var(--card);
   text-decoration: none;
+}
+
+.praise-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 0;
 }
 
 .praise-card blockquote {

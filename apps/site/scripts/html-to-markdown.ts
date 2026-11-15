@@ -87,7 +87,10 @@ function inline(nodes: Node[], base: string): string {
       }
       if (node.tag === "a") {
         const href = node.attrs.href;
-        const label = linkParts(node.children, base).join(": ");
+        const label = linkParts(node.children, base).reduce(
+          (text, part) => (text ? `${text}${/[.!?:]$/.test(text) ? " " : ": "}${part}` : part),
+          "",
+        );
         if (!label) return "";
         return href ? `[${label}](${new URL(href, base).href})` : label;
       }
@@ -100,7 +103,7 @@ function inline(nodes: Node[], base: string): string {
     .join("");
 }
 
-/** A link's text, one part per block inside it, so a card's title and its line read "Title: line". */
+/** A link's text, one part per block inside it, so a card's title and its line read "Title: line" (just a space after . ! ? or :). */
 function linkParts(nodes: Node[], base: string): string[] {
   const parts: string[] = [];
   let run: Node[] = [];

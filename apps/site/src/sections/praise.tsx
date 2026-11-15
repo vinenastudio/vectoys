@@ -1,6 +1,6 @@
 import { MailIcon } from "../components/icons";
 
-const TITLE = "What people say";
+const TITLE = "Honorable mentions";
 
 /** Press quotes about vectoys, one card each. */
 const QUOTES = [
@@ -32,18 +32,20 @@ export function Praise() {
               data-to={item.host}
               data-placement="praise"
             >
-              <blockquote cite={item.url}>
-                <p>{item.quote}</p>
-              </blockquote>
-              <div className="praise-source">
-                <span className="praise-icon">
-                  <MailIcon />
-                </span>
-                <span className="praise-name">
-                  {item.name}{" "}
-                  <span className="praise-detail">{item.detail}</span>
-                </span>
-              </div>
+              <figure className="praise-figure">
+                <blockquote cite={item.url}>
+                  <p>{item.quote}</p>
+                </blockquote>
+                <figcaption className="praise-source">
+                  <span className="praise-icon">
+                    <MailIcon />
+                  </span>
+                  <div className="praise-name">
+                    <div>{item.name}</div>
+                    <div className="praise-detail">{item.detail}</div>
+                  </div>
+                </figcaption>
+              </figure>
             </a>
           </li>
         ))}
