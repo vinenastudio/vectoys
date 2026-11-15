@@ -1,3 +1,129 @@
+/* Funnel Display, Funnel Sans and Martian Mono (SIL Open Font License), served from here so no font stylesheet blocks the first paint. */
+
+/* Funnel Display latin-ext */
+@font-face {
+  font-family: "Funnel Display";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/fonts/funnel-display-latin-ext.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Funnel Display latin */
+@font-face {
+  font-family: "Funnel Display";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/fonts/funnel-display-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Funnel Display latin-ext */
+@font-face {
+  font-family: "Funnel Display";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(/fonts/funnel-display-latin-ext.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Funnel Display latin */
+@font-face {
+  font-family: "Funnel Display";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(/fonts/funnel-display-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Funnel Sans latin-ext */
+@font-face {
+  font-family: "Funnel Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/fonts/funnel-sans-latin-ext.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Funnel Sans latin */
+@font-face {
+  font-family: "Funnel Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/fonts/funnel-sans-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Funnel Sans latin-ext */
+@font-face {
+  font-family: "Funnel Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(/fonts/funnel-sans-latin-ext.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Funnel Sans latin */
+@font-face {
+  font-family: "Funnel Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(/fonts/funnel-sans-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Martian Mono cyrillic-ext */
+@font-face {
+  font-family: "Martian Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 75% 112.5%;
+  font-display: swap;
+  src: url(/fonts/martian-mono-cyrillic-ext.woff2) format("woff2");
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+
+/* Martian Mono cyrillic */
+@font-face {
+  font-family: "Martian Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 75% 112.5%;
+  font-display: swap;
+  src: url(/fonts/martian-mono-cyrillic.woff2) format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+/* Martian Mono latin-ext */
+@font-face {
+  font-family: "Martian Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 75% 112.5%;
+  font-display: swap;
+  src: url(/fonts/martian-mono-latin-ext.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Martian Mono latin */
+@font-face {
+  font-family: "Martian Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 75% 112.5%;
+  font-display: swap;
+  src: url(/fonts/martian-mono-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
   --page: #f3f4f6;
   --card: #e9ebef;
@@ -658,18 +784,23 @@ code.inline {
   cursor: pointer;
 }
 
-/* Concentric with the field round it: its radius is the field's less the 4 pixel gap between them. */
+/* Concentric with the field round it: its radius is the field's less the 4 pixel gap between them.
+   The glass is drawn at about half size on phones, so the button reaches 6 pixels past what it paints to stay 24 pixels to tap; the negative margin keeps the layout. */
 .todo-add-button {
+  box-sizing: content-box;
   width: 42px;
   height: 42px;
-  border-radius: 12px;
+  margin: -6px;
+  padding: 6px;
+  border-radius: 18px;
   color: #ffffff;
-  background: #1f6fff;
+  background-color: #1f6fff;
+  background-clip: content-box;
   transition: background-color 150ms var(--ease);
 }
 
 .todo-add-button:hover {
-  background: #1a5fdc;
+  background-color: #1a5fdc;
 }
 
 .todo-glass svg {
@@ -703,22 +834,26 @@ code.inline {
   height: 34px;
   padding: 0;
   border: 0;
-  border-radius: 9px;
+  border-radius: 9px / 14px;
   color: #4a4f59;
   background: none;
   font: inherit;
   font-size: 15px;
   line-height: 34px;
+  box-sizing: content-box;
+  margin: -5px 0;
+  padding: 5px 0;
+  background-clip: content-box;
   cursor: pointer;
-  transition-property: background-color, box-shadow, color;
+  transition-property: background-color, filter, color;
   transition-duration: 150ms;
   transition-timing-function: var(--ease);
 }
 
 .todo-filter[aria-pressed="true"] {
   color: #16181d;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(16, 18, 24, 0.12);
+  background: #ffffff content-box;
+  filter: drop-shadow(0 1px 1.5px rgba(16, 18, 24, 0.12));
 }
 
 .todo-count {
